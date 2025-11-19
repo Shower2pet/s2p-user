@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Timer } from 'lucide-react';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface CountdownTimerProps {
   initialSeconds: number;
@@ -9,6 +10,7 @@ interface CountdownTimerProps {
 
 export const CountdownTimer = ({ initialSeconds, onComplete }: CountdownTimerProps) => {
   const [seconds, setSeconds] = useState(initialSeconds);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (seconds <= 0) {
@@ -32,7 +34,7 @@ export const CountdownTimer = ({ initialSeconds, onComplete }: CountdownTimerPro
       <div className="flex flex-col items-center gap-6">
         <div className="flex items-center gap-2 text-primary">
           <Timer className="w-6 h-6" />
-          <span className="text-sm font-bold uppercase tracking-wide">Time Remaining</span>
+          <span className="text-sm font-bold uppercase tracking-wide">{t('session.timeRemaining')}</span>
         </div>
         
         <div className="relative">
@@ -66,7 +68,7 @@ export const CountdownTimer = ({ initialSeconds, onComplete }: CountdownTimerPro
                 {String(minutes).padStart(2, '0')}:{String(remainingSeconds).padStart(2, '0')}
               </div>
               <div className="text-sm text-muted-foreground font-light mt-2">
-                minutes
+                {t('payment.minutes')}
               </div>
             </div>
           </div>
@@ -74,7 +76,7 @@ export const CountdownTimer = ({ initialSeconds, onComplete }: CountdownTimerPro
         
         <div className="text-center">
           <p className="text-muted-foreground font-light">
-            The station will turn off automatically when the time is over
+            {t('session.autoTurnOff')}
           </p>
         </div>
       </div>

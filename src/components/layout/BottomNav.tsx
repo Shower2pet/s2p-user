@@ -1,15 +1,18 @@
 import { Home, CreditCard, History, User } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/i18n/LanguageContext';
 
-const navItems = [
-  { path: '/', label: 'Home', icon: Home },
-  { path: '/credits', label: 'Credits', icon: CreditCard },
-  { path: '/history', label: 'History', icon: History },
-  { path: '/profile', label: 'Profile', icon: User },
-];
+const BottomNav = () => {
+  const { t } = useLanguage();
+  
+  const navItems = [
+    { path: '/', label: t('nav.home'), icon: Home },
+    { path: '/credits', label: t('nav.credits'), icon: CreditCard },
+    { path: '/history', label: t('nav.history'), icon: History },
+    { path: '/profile', label: t('nav.profile'), icon: User },
+  ];
 
-export const BottomNav = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50">
       <div className="flex items-center justify-around max-w-lg mx-auto">
@@ -32,3 +35,5 @@ export const BottomNav = () => {
     </nav>
   );
 };
+
+export { BottomNav };
