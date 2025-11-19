@@ -4,23 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '@/i18n/LanguageContext';
 import { toast } from 'sonner';
-import logoVertical from '@/assets/logo-vertical.png';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error(t('auth.fillFields'));
+      toast.error('Please fill in all fields');
       return;
     }
-    toast.success(t('auth.loginSuccess'));
+    toast.success('Logged in successfully');
     navigate('/');
   };
 
@@ -28,20 +25,18 @@ const Login = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="text-center space-y-2">
-          <img 
-            src={logoVertical} 
-            alt="Shower2Pet"
-            className="h-32 mx-auto mb-4"
-          />
-          <h1 className="text-3xl font-bold text-foreground">{t('auth.welcomeBack')}</h1>
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <span className="text-primary-foreground font-bold text-2xl">S2P</span>
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
           <p className="text-muted-foreground font-light">
-            {t('auth.loginSubtitle')}
+            Login to your Shower2Pet account
           </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">{t('auth.email')}</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
@@ -53,7 +48,7 @@ const Login = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">{t('auth.password')}</Label>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
@@ -65,7 +60,7 @@ const Login = () => {
           </div>
 
           <Button type="submit" variant="default" size="lg" className="w-full">
-            {t('auth.login')}
+            Login
           </Button>
         </form>
 
@@ -74,15 +69,15 @@ const Login = () => {
             onClick={() => navigate('/forgot-password')}
             className="text-sm text-primary hover:underline font-light"
           >
-            {t('auth.forgotPassword')}
+            Forgot password?
           </button>
           <div className="text-sm text-muted-foreground font-light">
-            {t('auth.noAccount')}{' '}
+            Don't have an account?{' '}
             <button
               onClick={() => navigate('/register')}
               className="text-primary hover:underline font-bold"
             >
-              {t('auth.createAccount')}
+              Create account
             </button>
           </div>
         </div>

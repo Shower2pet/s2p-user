@@ -1,6 +1,5 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useLanguage } from '@/i18n/LanguageContext';
 
 type StationStatus = 'available' | 'busy' | 'offline';
 
@@ -10,19 +9,17 @@ interface StationStatusBadgeProps {
 }
 
 export const StationStatusBadge = ({ status, className }: StationStatusBadgeProps) => {
-  const { t } = useLanguage();
-  
   const statusConfig = {
     available: {
-      label: t('common.available'),
+      label: 'Available',
       className: 'bg-success text-foreground hover:bg-success/90',
     },
     busy: {
-      label: t('common.busy'),
+      label: 'Busy',
       className: 'bg-warning text-foreground hover:bg-warning/90',
     },
     offline: {
-      label: t('common.offline'),
+      label: 'Offline',
       className: 'bg-muted text-muted-foreground',
     },
   };

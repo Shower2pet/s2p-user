@@ -6,11 +6,9 @@ import { Card } from '@/components/ui/card';
 import { branding } from '@/config/branding';
 import { CreditCard, LogIn, Droplets, Wind, Shield, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '@/i18n/LanguageContext';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
   const stationStatus: 'available' | 'busy' | 'offline' = 'available';
 
   const handlePayNow = () => {
@@ -43,10 +41,10 @@ const Index = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-foreground mb-2">
-                {t('home.description')}
+                {branding.station.description}
               </h2>
               <p className="text-sm text-muted-foreground font-light">
-                {t('home.professionalDesc')}
+                Professional dog washing station with water and dryer. Perfect for keeping your furry friend clean and happy!
               </p>
             </div>
           </div>
@@ -65,7 +63,7 @@ const Index = () => {
             disabled={stationStatus !== 'available'}
           >
             <CreditCard className="w-5 h-5" />
-            {t('home.payNow')}
+            Pay Now with Card
           </Button>
 
           <Button
@@ -75,7 +73,7 @@ const Index = () => {
             className="w-full"
           >
             <LogIn className="w-5 h-5" />
-            {t('home.loginCredits')}
+            Login and Use Your Credits
           </Button>
         </div>
 
@@ -83,7 +81,7 @@ const Index = () => {
         <Card className="p-6">
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-success" />
-            {t('home.howItWorks')}
+            How it works?
           </h3>
           <div className="space-y-4">
             <div className="flex gap-3">
@@ -91,9 +89,9 @@ const Index = () => {
                 1
               </div>
               <div>
-                <p className="font-bold text-foreground">{t('home.step1Title')}</p>
+                <p className="font-bold text-foreground">Pay or use credits</p>
                 <p className="text-sm text-muted-foreground font-light">
-                  {t('home.step1Desc')}
+                  Choose your payment method or login to use your credits
                 </p>
               </div>
             </div>
@@ -102,9 +100,9 @@ const Index = () => {
                 2
               </div>
               <div>
-                <p className="font-bold text-foreground">{t('home.step2Title')}</p>
+                <p className="font-bold text-foreground">Wash your dog</p>
                 <p className="text-sm text-muted-foreground font-light">
-                  {t('home.step2Desc')}
+                  Use water and soap to clean your pet thoroughly
                 </p>
               </div>
             </div>
@@ -113,9 +111,9 @@ const Index = () => {
                 3
               </div>
               <div>
-                <p className="font-bold text-foreground">{t('home.step3Title')}</p>
+                <p className="font-bold text-foreground">Dry and finish</p>
                 <p className="text-sm text-muted-foreground font-light">
-                  {t('home.step3Desc')}
+                  Use the dryer to leave your dog clean and dry
                 </p>
               </div>
             </div>
@@ -126,13 +124,13 @@ const Index = () => {
         <Card className="p-6 bg-sand/10 border-sand">
           <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
             <Shield className="w-5 h-5 text-sand-foreground" />
-            {t('home.safetyTitle')}
+            Safety recommendations
           </h3>
           <ul className="space-y-2 text-sm text-muted-foreground font-light">
-            <li>• {t('home.safety1')}</li>
-            <li>• {t('home.safety2')}</li>
-            <li>• {t('home.safety3')}</li>
-            <li>• {t('home.safety4')}</li>
+            <li>• Always supervise your pet during the wash</li>
+            <li>• Check water temperature before starting</li>
+            <li>• Keep your dog calm and secured</li>
+            <li>• Use the dryer carefully, avoiding eyes and ears</li>
           </ul>
         </Card>
 
@@ -140,16 +138,16 @@ const Index = () => {
         <div className="grid grid-cols-2 gap-4">
           <Card className="p-4 text-center">
             <Droplets className="w-8 h-8 text-sky mx-auto mb-2" />
-            <p className="font-bold text-foreground">{t('home.waterSystem')}</p>
+            <p className="font-bold text-foreground">Water System</p>
             <p className="text-xs text-muted-foreground font-light mt-1">
-              {t('home.adjustablePressure')}
+              Adjustable pressure
             </p>
           </Card>
           <Card className="p-4 text-center">
             <Wind className="w-8 h-8 text-sky mx-auto mb-2" />
-            <p className="font-bold text-foreground">{t('home.petDryer')}</p>
+            <p className="font-bold text-foreground">Pet Dryer</p>
             <p className="text-xs text-muted-foreground font-light mt-1">
-              {t('home.safeTemperature')}
+              Safe temperature
             </p>
           </Card>
         </div>

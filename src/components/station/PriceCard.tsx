@@ -1,11 +1,9 @@
 import { Card } from '@/components/ui/card';
 import { Timer, Coins } from 'lucide-react';
 import { branding } from '@/config/branding';
-import { useLanguage } from '@/i18n/LanguageContext';
 
 export const PriceCard = () => {
   const { station } = branding;
-  const { t } = useLanguage();
   
   return (
     <Card className="p-6 bg-gradient-to-br from-sky/10 to-primary/10 border-2 border-sky shadow-md">
@@ -19,7 +17,7 @@ export const PriceCard = () => {
               {station.currency}{station.pricePerSession.toFixed(2)}
             </div>
             <div className="text-sm text-muted-foreground font-light">
-              {t('home.pricePerSession')}
+              per session
             </div>
           </div>
         </div>
@@ -30,7 +28,7 @@ export const PriceCard = () => {
             <span className="text-xl font-bold">{station.durationMinutes} min</span>
           </div>
           <div className="text-xs text-muted-foreground font-light">
-            {t('home.fullService')}
+            full service
           </div>
         </div>
       </div>
