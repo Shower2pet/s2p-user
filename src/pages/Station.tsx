@@ -1,17 +1,36 @@
 import { AppShell } from '@/components/layout/AppShell';
+import { StationStatusBadge } from '@/components/station/StationStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { Play, LogIn, Droplets, Wind, MapPin } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Play, Droplets, Wind, LogIn, CreditCard } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getStationById } from '@/config/stations';
 
-const Index = () => {
+const Station = () => {
   const navigate = useNavigate();
+  const { stationId } = useParams<{ stationId: string }>();
   const { t } = useLanguage();
   const { user, profile, loading } = useAuth();
 
-  const hasCredits = (profile?.credits || 0) > 0;
+  const station = getStationById(stationId || '');
+
+  if (!station) {
+    return (
+      <AppShell showNav={false}>
+        <div className="container max-w-2xl mx-auto px-4 py-6 text-center">
+          <h1 className="text-2xl font-bold text-foreground">{t('stationNotFound')}</h1>
+          <Button onClick={() => navigate('/map')} className="mt-4">
+            {t('backToMap')}
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const creditsNeeded = station.durationMinutes / 5; // 1 credit = 5 minutes
+  const hasEnoughCredits = (profile?.credits || 0) >= creditsNeeded;
 
   const handleActivateService = () => {
     if (!user) {
@@ -19,38 +38,47 @@ const Index = () => {
       return;
     }
     
-    if (!hasCredits) {
+    if (!hasEnoughCredits) {
       navigate('/credits');
       return;
     }
     
-    // Navigate to map to select a station
-    navigate('/map');
+    navigate(`/${stationId}/activate`);
+  };
+
+  const handlePayWithCard = () => {
+    navigate(`/${stationId}/payment`);
   };
 
   return (
-    <AppShell>
+    <AppShell showNav={false}>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-center">
-        </div>
-
-        {/* Hero Title */}
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground leading-tight">
             {t('heroTitle')}
           </h1>
         </div>
 
-        {/* User Credits Display */}
-        {user && (
-          <Card className="p-4 bg-gradient-to-r from-primary/10 to-sky/10 border-primary/20">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t('yourCredits')}</span>
-              <span className="text-2xl font-bold text-primary">{profile?.credits || 0} {t('credits')}</span>
+        {/* Status Card */}
+        <Card className="p-5 border-2 border-primary/20">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="font-bold text-foreground">{station.name}</p>
+              <p className="text-xs text-muted-foreground">{station.location}</p>
             </div>
-          </Card>
-        )}
+            <StationStatusBadge status={station.status} />
+          </div>
+          
+          <div className="text-center py-4">
+            <div className="text-4xl font-bold text-primary mb-1">
+              {creditsNeeded} {t('credits')}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {station.durationMinutes} {t('minutes')}
+            </p>
+          </div>
+        </Card>
 
         {/* Action Buttons */}
         <div className="space-y-3">
@@ -60,10 +88,11 @@ const Index = () => {
                 onClick={handleActivateService} 
                 variant="default" 
                 size="lg" 
-                className="w-full h-14 text-base"
+                className="w-full h-14 text-base" 
+                disabled={station.status !== 'available'}
               >
                 <Play className="w-5 h-5" />
-                {hasCredits ? t('activateService') : t('buyCreditsFirst')}
+                {hasEnoughCredits ? t('activateService') : t('buyCreditsFirst')}
               </Button>
             ) : (
               <Button 
@@ -79,15 +108,26 @@ const Index = () => {
           )}
 
           <Button 
-            onClick={() => navigate('/map')} 
+            onClick={handlePayWithCard} 
             variant="outline" 
             size="lg" 
-            className="w-full h-14 text-base"
+            className="w-full h-14 text-base" 
+            disabled={station.status !== 'available'}
           >
-            <MapPin className="w-5 h-5" />
-            {t('findStations')}
+            <CreditCard className="w-5 h-5" />
+            {t('payNowWithCard')}
           </Button>
         </div>
+
+        {/* User Credits Display */}
+        {user && (
+          <Card className="p-4 bg-muted/30">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">{t('yourCredits')}</span>
+              <span className="font-bold text-foreground">{profile?.credits || 0} {t('credits')}</span>
+            </div>
+          </Card>
+        )}
 
         {/* Features */}
         <div className="grid grid-cols-2 gap-3">
@@ -107,7 +147,7 @@ const Index = () => {
           </Card>
         </div>
 
-        {/* How It Works - Compact */}
+        {/* How It Works */}
         <Card className="p-4">
           <h3 className="text-sm font-bold text-foreground mb-3">{t('howItWorks')}</h3>
           <div className="flex justify-between text-center">
@@ -130,4 +170,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Station;

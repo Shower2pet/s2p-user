@@ -56,14 +56,14 @@ serve(async (req) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        logStep("Checkout session completed", { sessionId: session.id });
+        logStep("Checkout session completed", { sessionId: session.id, mode: session.mode });
 
         // Update transaction status
         const { error } = await supabaseClient
           .from('transactions')
           .update({ 
             status: 'completed',
-            stripe_payment_intent_id: session.payment_intent as string,
+            stripe_payment_intent_id: session.payment_intent as string || session.subscription as string,
           })
           .eq('stripe_session_id', session.id);
 
@@ -73,18 +73,34 @@ serve(async (req) => {
           logStep("Transaction updated to completed");
         }
 
-        // Add credits if it's a credit pack purchase
         const userId = session.metadata?.user_id;
         const productType = session.metadata?.product_type;
+        const amountPaid = session.amount_total || 0;
 
-        if (userId && productType === 'credit_pack') {
-          // Get the amount paid and calculate credits
-          const amountPaid = session.amount_total || 0;
+        if (userId) {
           let creditsToAdd = 0;
 
-          // Map price amounts to credits (in cents)
-          if (amountPaid === 1000) creditsToAdd = 12; // €10 pack
-          else if (amountPaid === 2000) creditsToAdd = 25; // €20 pack
+          // Handle credit pack purchases
+          if (productType === 'credit_pack') {
+            // Map price amounts to credits (in cents)
+            if (amountPaid === 1000) creditsToAdd = 12; // €10 pack
+            else if (amountPaid === 2000) creditsToAdd = 25; // €20 pack
+            logStep("Credit pack purchase", { amountPaid, creditsToAdd });
+          }
+          
+          // Handle subscription purchases
+          else if (productType === 'subscription' || session.mode === 'subscription') {
+            // Map subscription amounts to credits (in cents)
+            if (amountPaid === 1000) creditsToAdd = 15; // €10/week plan - 15 credits
+            else if (amountPaid === 3500) creditsToAdd = 40; // €35/month plan - 40 credits
+            else if (amountPaid === 5000) creditsToAdd = 100; // €50/month unlimited - 100 credits
+            logStep("Subscription purchase", { amountPaid, creditsToAdd });
+          }
+          
+          // Handle single session payment (no credits added, direct session)
+          else if (productType === 'session') {
+            logStep("Session payment - no credits to add");
+          }
 
           if (creditsToAdd > 0) {
             const { data: profile } = await supabaseClient
@@ -95,12 +111,16 @@ serve(async (req) => {
 
             const currentCredits = profile?.credits || 0;
             
-            await supabaseClient
+            const { error: updateError } = await supabaseClient
               .from('profiles')
               .update({ credits: currentCredits + creditsToAdd })
               .eq('user_id', userId);
 
-            logStep("Credits added", { userId, creditsToAdd, newTotal: currentCredits + creditsToAdd });
+            if (updateError) {
+              logStep("Error adding credits", { error: updateError.message });
+            } else {
+              logStep("Credits added", { userId, creditsToAdd, newTotal: currentCredits + creditsToAdd });
+            }
           }
         }
         break;
