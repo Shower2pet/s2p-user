@@ -24,6 +24,7 @@ export const translations = {
     // Actions
     payNowWithCard: 'Pay Now with Card',
     loginAndUseCredits: 'Login and Use Your Credits',
+    useMyCredits: 'Use My Credits',
     activate: 'Activate',
     directions: 'Directions',
     save: 'Save',
@@ -172,6 +173,7 @@ export const translations = {
     // Actions
     payNowWithCard: 'Paga Ora con Carta',
     loginAndUseCredits: 'Accedi e Usa i Tuoi Crediti',
+    useMyCredits: 'Usa i Miei Crediti',
     activate: 'Attiva',
     directions: 'Indicazioni',
     save: 'Salva',
