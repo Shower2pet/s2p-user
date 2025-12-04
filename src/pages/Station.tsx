@@ -2,19 +2,32 @@ import { AppShell } from '@/components/layout/AppShell';
 import { StationStatusBadge } from '@/components/station/StationStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
+import { useStation } from '@/hooks/useStations';
 import { Play, Droplets, Wind, LogIn, CreditCard, MapPin } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getStationById } from '@/config/stations';
 
 const Station = () => {
   const navigate = useNavigate();
   const { stationId } = useParams<{ stationId: string }>();
   const { t } = useLanguage();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
+  const { data: station, isLoading } = useStation(stationId);
 
-  const station = getStationById(stationId || '');
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-5">
+          <Skeleton className="h-10 w-48 mx-auto" />
+          <Skeleton className="h-6 w-32 mx-auto" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!station) {
     return (
@@ -29,7 +42,7 @@ const Station = () => {
     );
   }
 
-  const creditsNeeded = station.durationMinutes / 5; // 1 credit = 5 minutes
+  const creditsNeeded = station.duration_minutes / 5;
   const hasEnoughCredits = (profile?.credits || 0) >= creditsNeeded;
 
   const handleActivateService = () => {
@@ -88,14 +101,14 @@ const Station = () => {
               {creditsNeeded} {t('credits')}
             </div>
             <p className="text-sm text-muted-foreground">
-              {station.durationMinutes} {t('minutes')} {t('ofService')}
+              {station.duration_minutes} {t('minutes')} {t('ofService')}
             </p>
           </div>
         </Card>
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          {!loading && (
+          {!authLoading && (
             user ? (
               <Button 
                 onClick={handleActivateService} 

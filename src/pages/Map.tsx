@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useStations, Station } from '@/hooks/useStations';
 import { MapPin, Navigation, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { stations, Station } from '@/config/stations';
 
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hvd2VyMnBldCIsImEiOiJjbWlydGpkZ3UwaGU2NGtzZ3JzdHM0OHd1In0.W88uve0Md19Ks3x-A8bC6A';
 
@@ -16,21 +17,30 @@ const Map = () => {
   const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const { data: stations, isLoading } = useStations();
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || !stations || stations.length === 0) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/light-v11',
-      center: [9.1900, 45.4642],
-      zoom: 11,
-    });
+    // Initialize map if not already done
+    if (!map.current) {
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: [9.1900, 45.4642],
+        zoom: 11,
+      });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    }
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
 
     // Add markers for each station
     stations.forEach((station) => {
@@ -48,8 +58,17 @@ const Map = () => {
       marker.getElement().addEventListener('click', () => {
         setSelectedStation(station);
       });
+
+      markersRef.current.push(marker);
     });
 
+    return () => {
+      // Cleanup only markers, keep map instance
+    };
+  }, [stations]);
+
+  // Cleanup map on unmount
+  useEffect(() => {
     return () => {
       map.current?.remove();
       map.current = null;
@@ -57,7 +76,6 @@ const Map = () => {
   }, []);
 
   const handleActivateStation = (station: Station) => {
-    // Navigate to the station page
     navigate(`/${station.id}`);
   };
 
@@ -88,6 +106,19 @@ const Map = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <Skeleton className="h-10 w-48 mx-auto" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -107,7 +138,7 @@ const Map = () => {
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
           
-          {stations.map((station) => (
+          {stations?.map((station) => (
             <Card
               key={station.id}
               className={`p-4 cursor-pointer transition-all ${

@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
+import { useStation } from '@/hooks/useStations';
 import { supabase } from '@/integrations/supabase/client';
 import { Play, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { getStationById } from '@/config/stations';
 
 const ServiceActivation = () => {
   const navigate = useNavigate();
@@ -16,8 +17,19 @@ const ServiceActivation = () => {
   const { t } = useLanguage();
   const { user, profile, refreshProfile } = useAuth();
   const [isActivating, setIsActivating] = useState(false);
+  const { data: station, isLoading } = useStation(stationId);
 
-  const station = getStationById(stationId || '');
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+          <Skeleton className="h-10 w-20" />
+          <Skeleton className="h-10 w-48 mx-auto" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!station) {
     return (
@@ -32,7 +44,7 @@ const ServiceActivation = () => {
     );
   }
 
-  const creditsNeeded = station.durationMinutes / 5; // 1 credit = 5 minutes
+  const creditsNeeded = station.duration_minutes / 5;
   const currentCredits = profile?.credits || 0;
   const hasEnoughCredits = currentCredits >= creditsNeeded;
 
@@ -44,7 +56,6 @@ const ServiceActivation = () => {
 
     setIsActivating(true);
     try {
-      // Deduct credits from account
       const newCredits = currentCredits - creditsNeeded;
       
       const { error: updateError } = await supabase
@@ -54,21 +65,17 @@ const ServiceActivation = () => {
 
       if (updateError) throw updateError;
 
-      // Create transaction record for the usage
       await supabase.from('transactions').insert({
         user_id: user.id,
-        amount: creditsNeeded * 100, // Store in cents
+        amount: creditsNeeded * 100,
         product_type: 'session_usage',
-        description: `${station.name} - ${station.durationMinutes} ${t('minutes')}`,
+        description: `${station.name} - ${station.duration_minutes} ${t('minutes')}`,
         status: 'completed',
       });
 
-      // Refresh profile to update credits display
       await refreshProfile();
 
       toast.success(t('serviceActivated'));
-      
-      // Navigate to active session
       navigate(`/${stationId}/session`);
     } catch (error) {
       console.error('Error activating service:', error);
@@ -115,7 +122,7 @@ const ServiceActivation = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground font-light">{t('duration')}</span>
-                <span className="font-bold text-foreground">{station.durationMinutes} {t('minutes')}</span>
+                <span className="font-bold text-foreground">{station.duration_minutes} {t('minutes')}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground font-light">{t('location')}</span>
@@ -131,7 +138,6 @@ const ServiceActivation = () => {
             </div>
           </div>
 
-          {/* Credits Status */}
           <Card className={`p-4 ${hasEnoughCredits ? 'bg-success/10 border-success' : 'bg-destructive/10 border-destructive'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
