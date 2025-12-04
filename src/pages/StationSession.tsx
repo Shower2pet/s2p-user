@@ -4,18 +4,29 @@ import { CountdownTimer } from '@/components/station/CountdownTimer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useStation } from '@/hooks/useStations';
 import { CheckCircle, Home } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getStationById } from '@/config/stations';
 
 const StationSession = () => {
   const navigate = useNavigate();
   const { stationId } = useParams<{ stationId: string }>();
   const { t } = useLanguage();
   const [sessionComplete, setSessionComplete] = useState(false);
+  const { data: station, isLoading } = useStation(stationId);
 
-  const station = getStationById(stationId || '');
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-8 space-y-6">
+          <Skeleton className="h-10 w-48 mx-auto" />
+          <Skeleton className="h-48 w-48 mx-auto rounded-full" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!station) {
     return (
@@ -30,7 +41,7 @@ const StationSession = () => {
     );
   }
 
-  const initialSeconds = station.durationMinutes * 60;
+  const initialSeconds = station.duration_minutes * 60;
 
   const handleSessionComplete = () => {
     setSessionComplete(true);

@@ -50,6 +50,54 @@ export type Database = {
         }
         Relationships: []
       }
+      stations: {
+        Row: {
+          address: string
+          created_at: string
+          currency: string
+          duration_minutes: number
+          id: string
+          lat: number
+          lng: number
+          location: string
+          name: string
+          price_per_session: number
+          status: string
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          currency?: string
+          duration_minutes?: number
+          id: string
+          lat: number
+          lng: number
+          location: string
+          name: string
+          price_per_session: number
+          status?: string
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          currency?: string
+          duration_minutes?: number
+          id?: string
+          lat?: number
+          lng?: number
+          location?: string
+          name?: string
+          price_per_session?: number
+          status?: string
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number

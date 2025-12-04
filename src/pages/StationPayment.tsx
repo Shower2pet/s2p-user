@@ -2,20 +2,32 @@ import { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useStation } from '@/hooks/useStations';
 import { supabase } from '@/integrations/supabase/client';
 import { CreditCard, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { getStationById } from '@/config/stations';
 
 const StationPayment = () => {
   const navigate = useNavigate();
   const { stationId } = useParams<{ stationId: string }>();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
+  const { data: station, isLoading: stationLoading } = useStation(stationId);
 
-  const station = getStationById(stationId || '');
+  if (stationLoading) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+          <Skeleton className="h-10 w-20" />
+          <Skeleton className="h-10 w-48 mx-auto" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!station) {
     return (
@@ -35,11 +47,11 @@ const StationPayment = () => {
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          priceId: station.stripePriceId,
+          priceId: station.stripe_price_id,
           mode: 'payment',
           quantity: 1,
           productType: 'session',
-          description: `${station.name} - ${station.durationMinutes} ${t('minutes')}`,
+          description: `${station.name} - ${station.duration_minutes} ${t('minutes')}`,
           stationId: stationId,
         },
       });
@@ -89,7 +101,7 @@ const StationPayment = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground font-light">{t('duration')}</span>
-                <span className="font-bold text-foreground">{station.durationMinutes} {t('minutes')}</span>
+                <span className="font-bold text-foreground">{station.duration_minutes} {t('minutes')}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground font-light">{t('location')}</span>
@@ -100,7 +112,7 @@ const StationPayment = () => {
             <div className="flex justify-between items-center pt-2">
               <span className="text-xl font-bold text-foreground">{t('total')}</span>
               <span className="text-3xl font-bold text-primary">
-                €{station.pricePerSession.toFixed(2)}
+                €{Number(station.price_per_session).toFixed(2)}
               </span>
             </div>
           </div>
