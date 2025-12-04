@@ -7,6 +7,9 @@ export const translations = {
     profile: 'Profile',
     map: 'Map',
     
+    // Hero
+    heroTitle: 'Ready to take your pup home clean? Wash now!',
+    
     // Station
     stationDescription: 'Self-service dog wash – water + dryer',
     stationSubtitle: 'Professional dog washing station with water and dryer. Perfect for keeping your furry friend clean and happy!',
@@ -155,6 +158,9 @@ export const translations = {
     history: 'Storico',
     profile: 'Profilo',
     map: 'Mappa',
+    
+    // Hero
+    heroTitle: 'Sei pronto a riportare il tuo cucciolo a casa pulito? Lavalo subito!',
     
     // Station
     stationDescription: 'Lavaggio cani self-service – acqua + asciugatura',

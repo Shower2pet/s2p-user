@@ -13,7 +13,7 @@ import Credits from "./pages/Credits";
 import Subscriptions from "./pages/Subscriptions";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
-import PaymentMethods from "./pages/PaymentMethods";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -40,7 +40,7 @@ const App = () => (
             <Route path="/subscriptions" element={<Subscriptions />} />
             <Route path="/history" element={<History />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/payment-methods" element={<PaymentMethods />} />
+            
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

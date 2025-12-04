@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/hooks/useLanguage';
 import { MapPin, Navigation, Play } from 'lucide-react';
 import { toast } from 'sonner';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Mock stations data - in production this would come from Supabase
 const mockStations = [
@@ -37,9 +39,51 @@ const mockStations = [
   },
 ];
 
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hvd2VyMnBldCIsImEiOiJjbWlydGpkZ3UwaGU2NGtzZ3JzdHM0OHd1In0.W88uve0Md19Ks3x-A8bC6A';
+
 const Map = () => {
   const { t } = useLanguage();
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
   const [selectedStation, setSelectedStation] = useState<typeof mockStations[0] | null>(null);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [9.1900, 45.4642],
+      zoom: 11,
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Add markers for each station
+    mockStations.forEach((station) => {
+      const markerColor = station.status === 'available' ? '#22c55e' : '#f59e0b';
+      
+      const marker = new mapboxgl.Marker({ color: markerColor })
+        .setLngLat([station.lng, station.lat])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<strong>${station.name}</strong><br/>${station.location}`
+          )
+        )
+        .addTo(map.current!);
+
+      marker.getElement().addEventListener('click', () => {
+        setSelectedStation(station);
+      });
+    });
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
 
   const handleActivateStation = (station: typeof mockStations[0]) => {
     if (station.status !== 'available') {
@@ -76,10 +120,6 @@ const Map = () => {
     }
   };
 
-  // Google Maps embed URL - centered on Milano
-  const mapCenter = { lat: 45.4642, lng: 9.1900 };
-  const googleMapsEmbedUrl = `https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6ceFEVLjWhZxCQI&center=${mapCenter.lat},${mapCenter.lng}&zoom=12`;
-
   return (
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -90,18 +130,9 @@ const Map = () => {
           </p>
         </div>
 
-        {/* Google Maps Embed */}
+        {/* Mapbox Map */}
         <Card className="overflow-hidden">
-          <iframe
-            src={googleMapsEmbedUrl}
-            width="100%"
-            height="250"
-            style={{ border: 0 }}
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            title="Station Map"
-          />
+          <div ref={mapContainer} className="w-full h-64" />
         </Card>
 
         {/* Stations List */}
