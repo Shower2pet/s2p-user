@@ -40,8 +40,14 @@ const Map = () => {
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Add markers for each station
+    // Add markers for each station (skip invalid coordinates)
     stations.forEach((station) => {
+      // Validate coordinates before adding marker
+      if (station.lat < -90 || station.lat > 90 || station.lng < -180 || station.lng > 180) {
+        console.warn(`Skipping station ${station.id} with invalid coordinates: lat=${station.lat}, lng=${station.lng}`);
+        return;
+      }
+
       const markerColor = station.status === 'available' ? '#22c55e' : '#f59e0b';
       
       const marker = new mapboxgl.Marker({ color: markerColor })
