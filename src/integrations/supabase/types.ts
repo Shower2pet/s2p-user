@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      company_profiles: {
+        Row: {
+          address: string | null
+          city: string | null
+          company_name: string
+          country: string | null
+          created_at: string
+          email: string | null
+          id: string
+          logo_url: string | null
+          phone: string | null
+          postal_code: string | null
+          updated_at: string
+          user_id: string
+          vat_number: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          company_name: string
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          user_id: string
+          vat_number?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          company_name?: string
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          updated_at?: string
+          user_id?: string
+          vat_number?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -53,6 +101,7 @@ export type Database = {
       stations: {
         Row: {
           address: string
+          company_id: string | null
           created_at: string
           currency: string
           duration_minutes: number
@@ -68,6 +117,7 @@ export type Database = {
         }
         Insert: {
           address: string
+          company_id?: string | null
           created_at?: string
           currency?: string
           duration_minutes?: number
@@ -83,6 +133,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          company_id?: string | null
           created_at?: string
           currency?: string
           duration_minutes?: number
@@ -96,7 +147,15 @@ export type Database = {
           stripe_price_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {

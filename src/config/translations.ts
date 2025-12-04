@@ -179,6 +179,12 @@ export const translations: Record<string, Record<string, string>> = {
     serviceActive: 'Service Active',
     sessionInProgress: 'Your session is in progress. Please wait for the timer to complete.',
     creditsAddedSuccess: 'Credits added successfully!',
+    unlockStation: 'Unlock Station',
+    enterStationCode: 'Enter station code',
+    enterStationCodeDesc: 'Enter the station code to access it',
+    stationCodePlaceholder: 'e.g. test1',
+    go: 'Go',
+    cancel: 'Cancel',
   },
   it: {
     // Navigation
@@ -360,6 +366,12 @@ export const translations: Record<string, Record<string, string>> = {
     serviceActive: 'Servizio Attivo',
     sessionInProgress: 'La tua sessione è in corso. Attendi il completamento del timer.',
     creditsAddedSuccess: 'Crediti aggiunti con successo!',
+    unlockStation: 'Sblocca Stazione',
+    enterStationCode: 'Inserisci il codice stazione',
+    enterStationCodeDesc: 'Inserisci il codice della stazione per accedervi',
+    stationCodePlaceholder: 'es. test1',
+    go: 'Vai',
+    cancel: 'Annulla',
   },
 };
 
