@@ -1,34 +1,82 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/hooks/useLanguage';
+import shower2petLogo from '@/assets/shower2pet-logo.png';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        navigate('/');
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        navigate('/');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       toast.error('Please fill in all fields');
       return;
     }
-    toast.success('Logged in successfully');
-    navigate('/');
+
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Invalid email or password');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      if (data.user) {
+        toast.success('Logged in successfully');
+        navigate('/');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-primary-foreground font-bold text-2xl">S2P</span>
-          </div>
-          <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
+          <img 
+            src={shower2petLogo} 
+            alt="Shower2Pet"
+            className="h-16 w-auto mx-auto mb-4"
+          />
+          <h1 className="text-3xl font-bold text-foreground">{t('login')}</h1>
           <p className="text-muted-foreground font-light">
             Login to your Shower2Pet account
           </p>
@@ -36,7 +84,7 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('email')}</Label>
             <Input
               id="email"
               type="email"
@@ -44,11 +92,12 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t('password')}</Label>
             <Input
               id="password"
               type="password"
@@ -56,11 +105,12 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
-          <Button type="submit" variant="default" size="lg" className="w-full">
-            Login
+          <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
+            {loading ? 'Logging in...' : t('login')}
           </Button>
         </form>
 
@@ -68,16 +118,18 @@ const Login = () => {
           <button
             onClick={() => navigate('/forgot-password')}
             className="text-sm text-primary hover:underline font-light"
+            disabled={loading}
           >
-            Forgot password?
+            {t('forgotPassword')}
           </button>
           <div className="text-sm text-muted-foreground font-light">
-            Don't have an account?{' '}
+            {t('dontHaveAccount')}{' '}
             <button
               onClick={() => navigate('/register')}
               className="text-primary hover:underline font-bold"
+              disabled={loading}
             >
-              Create account
+              {t('register')}
             </button>
           </div>
         </div>
