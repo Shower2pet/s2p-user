@@ -1,17 +1,41 @@
+import { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { Play, LogIn, Droplets, Wind, MapPin } from 'lucide-react';
+import { useStations } from '@/hooks/useStations';
+import { Play, LogIn, Droplets, Wind, MapPin, Unlock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const Index = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, profile, loading } = useAuth();
+  const { data: stations } = useStations();
+  const [stationCode, setStationCode] = useState('');
+  const [showUnlockInput, setShowUnlockInput] = useState(false);
 
   const hasCredits = (profile?.credits || 0) > 0;
+
+  const handleUnlockStation = () => {
+    if (!stationCode.trim()) {
+      toast.error(t('enterStationCode'));
+      return;
+    }
+    
+    const station = stations?.find(s => s.id.toLowerCase() === stationCode.trim().toLowerCase());
+    
+    if (station) {
+      window.open(`https://shower-pet-station.lovable.app/${station.id}`, '_blank');
+      setStationCode('');
+      setShowUnlockInput(false);
+    } else {
+      toast.error(t('stationNotFound'));
+    }
+  };
 
   const handleActivateService = () => {
     if (!user) {
@@ -90,6 +114,46 @@ const Index = () => {
             <MapPin className="w-5 h-5" />
             {t('findStations')}
           </Button>
+
+          {/* Unlock Station */}
+          {!showUnlockInput ? (
+            <Button 
+              onClick={() => setShowUnlockInput(true)} 
+              variant="secondary" 
+              size="lg" 
+              className="w-full h-14 text-base"
+            >
+              <Unlock className="w-5 h-5" />
+              {t('unlockStation')}
+            </Button>
+          ) : (
+            <Card className="p-4 space-y-3">
+              <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
+              <div className="flex gap-2">
+                <Input
+                  value={stationCode}
+                  onChange={(e) => setStationCode(e.target.value)}
+                  placeholder={t('stationCodePlaceholder')}
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()}
+                />
+                <Button onClick={handleUnlockStation}>
+                  {t('go')}
+                </Button>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full"
+                onClick={() => {
+                  setShowUnlockInput(false);
+                  setStationCode('');
+                }}
+              >
+                {t('cancel')}
+              </Button>
+            </Card>
+          )}
         </div>
 
         {/* Features */}
