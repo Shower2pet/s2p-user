@@ -14,7 +14,7 @@ export const branding = {
     pricePerSession: 1.00,
     durationMinutes: 5,
     currency: '€',
-    stripePriceId: 'price_session_placeholder', // Replace with actual Stripe price ID
+    stripePriceId: 'price_1SahdbGzJdGfXoSntBByabU6', // 1 EUR for 5 min session
   },
   
   // Payment configuration
