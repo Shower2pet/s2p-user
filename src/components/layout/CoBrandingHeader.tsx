@@ -1,13 +1,15 @@
 import { branding } from '@/config/branding';
+import shower2petLogo from '@/assets/shower2pet-logo.png';
 
 export const CoBrandingHeader = () => {
   return (
     <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-2">
-        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-          <span className="text-primary-foreground font-bold text-lg">S2P</span>
-        </div>
-        <span className="font-bold text-foreground">{branding.appName}</span>
+        <img 
+          src={shower2petLogo} 
+          alt="Shower2Pet"
+          className="h-10 w-auto object-contain"
+        />
       </div>
       
       <div className="flex items-center gap-2">
