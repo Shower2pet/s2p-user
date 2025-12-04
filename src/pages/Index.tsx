@@ -6,8 +6,9 @@ import { Card } from '@/components/ui/card';
 import { branding } from '@/config/branding';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useLanguage } from '@/hooks/useLanguage';
-import { CreditCard, LogIn, Droplets, Wind, Shield, CheckCircle } from 'lucide-react';
+import { CreditCard, LogIn, Droplets, Wind, Shield, CheckCircle, Sparkles, PawPrint } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import shower2petLogo from '@/assets/shower2pet-logo.png';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -30,15 +31,37 @@ const Index = () => {
           <LanguageSwitcher />
         </div>
 
-        {/* Station Header */}
-        <div className="text-center space-y-3">
-          <h1 className="text-3xl font-bold text-foreground">
-            {branding.station.name}
-          </h1>
-          <p className="text-muted-foreground font-light">
-            {branding.clientName}
-          </p>
-          <StationStatusBadge status={stationStatus} className="inline-flex" />
+        {/* Hero Section */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-sky to-primary/80 p-6 text-primary-foreground">
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-20">
+            <PawPrint className="w-full h-full" />
+          </div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 opacity-10">
+            <Sparkles className="w-full h-full" />
+          </div>
+          
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center p-2">
+              <img src={shower2petLogo} alt="Shower2Pet" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold mb-1">
+                {branding.station.name}
+              </h1>
+              <p className="text-sm opacity-90 font-light">
+                {branding.clientName}
+              </p>
+              <div className="mt-2">
+                <StationStatusBadge status={stationStatus} className="bg-white/20 backdrop-blur-sm" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-white/20">
+            <p className="text-sm font-light opacity-90">
+              🐕 {t('stationDescription')}
+            </p>
+          </div>
         </div>
 
         {/* Station Description */}
