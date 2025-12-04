@@ -1,9 +1,12 @@
 import { AppShell } from '@/components/layout/AppShell';
 import { HistoryList } from '@/components/history/HistoryList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLanguage } from '@/hooks/useLanguage';
 import { subDays } from 'date-fns';
 
 const History = () => {
+  const { t } = useLanguage();
+  
   // Mock data
   const sessions = [
     {
@@ -58,16 +61,16 @@ const History = () => {
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">History</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('historyTitle')}</h1>
           <p className="text-muted-foreground font-light">
-            Your sessions and payment history
+            {t('historyDesc')}
           </p>
         </div>
 
         <Tabs defaultValue="sessions" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="sessions">Sessions</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="sessions">{t('sessions')}</TabsTrigger>
+            <TabsTrigger value="payments">{t('payments')}</TabsTrigger>
           </TabsList>
           
           <TabsContent value="sessions" className="space-y-4 mt-6">

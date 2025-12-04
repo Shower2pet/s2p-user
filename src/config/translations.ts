@@ -5,6 +5,7 @@ export const translations = {
     myCredits: 'My Credits',
     history: 'History',
     profile: 'Profile',
+    map: 'Map',
     
     // Station
     stationDescription: 'Self-service dog wash – water + dryer',
@@ -23,6 +24,9 @@ export const translations = {
     // Actions
     payNowWithCard: 'Pay Now with Card',
     loginAndUseCredits: 'Login and Use Your Credits',
+    activate: 'Activate',
+    directions: 'Directions',
+    save: 'Save',
     
     // How it works
     howItWorks: 'How it works?',
@@ -59,11 +63,89 @@ export const translations = {
     dontHaveAccount: "Don't have an account?",
     acceptTerms: 'I accept the Terms and Conditions',
     joinToday: 'Join Shower2Pet today',
+    logout: 'Logout',
+    loggingOut: 'Logging out...',
     
     // Language
     language: 'Language',
     english: 'English',
     italian: 'Italiano',
+    
+    // Profile
+    myProfile: 'My Profile',
+    manageAccount: 'Manage your account settings',
+    settings: 'Settings',
+    paymentMethods: 'Payment Methods',
+    manageSubscription: 'Manage Subscription',
+    notifications: 'Notifications',
+    emailNotifications: 'Email Notifications',
+    receiveUpdates: 'Receive updates via email',
+    pushNotifications: 'Push Notifications',
+    getNotified: 'Get notified on your device',
+    support: 'Support',
+    helpSupport: 'Help & Support',
+    changePhoto: 'Change Photo',
+    
+    // Map
+    findStations: 'Find Stations',
+    findStationsDesc: 'Locate nearby dog wash stations and get directions',
+    nearbyStations: 'Nearby Stations',
+    mapboxTokenRequired: 'To view the interactive map, please enter your Mapbox public token.',
+    getMapboxToken: 'Get your free Mapbox token',
+    mapboxTokenSaved: 'Token saved! Map loading...',
+    mapLoading: 'Map is loading...',
+    stationNotAvailable: 'This station is currently not available',
+    stationActivated: 'Station activated! You can now start washing.',
+    
+    // Credits
+    currentBalance: 'Current Balance',
+    credits: 'credits',
+    creditValue: '1 credit = €1 value',
+    buyCredits: 'Buy Credits',
+    creditPacks: 'Credit Packs',
+    bonus: 'bonus',
+    purchase: 'Purchase',
+    recentTransactions: 'Recent Transactions',
+    saveWithSubscription: 'Save more with a subscription!',
+    viewPlans: 'View Plans',
+    
+    // Subscriptions
+    subscriptionPlans: 'Subscription Plans',
+    chooseYourPlan: 'Choose the plan that fits your needs',
+    perWeek: '/week',
+    perMonth: '/month',
+    activateSubscription: 'Activate Subscription',
+    activePlan: 'Active Plan',
+    subscriptionActivated: 'Subscription activated successfully!',
+    activeSubscriptionMessage: 'You have an active subscription. Your credits will be renewed automatically.',
+    
+    // Payment
+    payment: 'Payment',
+    completePayment: 'Complete your payment to start the service',
+    orderSummary: 'Order Summary',
+    station: 'Station',
+    location: 'Location',
+    total: 'Total',
+    proceedToPayment: 'Proceed to Payment',
+    processing: 'Processing...',
+    redirectToPayment: 'You will be redirected to our secure payment provider',
+    acceptedCards: 'We accept all major credit and debit cards',
+    back: 'Back',
+    
+    // Payment Success
+    paymentSuccessful: 'Payment Successful!',
+    thankYou: 'Thank you for your payment. Your session is now ready.',
+    sessionDetails: 'Session Details',
+    date: 'Date',
+    startTime: 'Start Time',
+    goToSession: 'Go to Active Session',
+    
+    // History
+    sessions: 'Sessions',
+    payments: 'Payments',
+    historyTitle: 'History',
+    historyDesc: 'Your sessions and payment history',
+    completed: 'Completed',
   },
   it: {
     // Navigation
@@ -71,6 +153,7 @@ export const translations = {
     myCredits: 'I Miei Crediti',
     history: 'Storico',
     profile: 'Profilo',
+    map: 'Mappa',
     
     // Station
     stationDescription: 'Lavaggio cani self-service – acqua + asciugatura',
@@ -89,6 +172,9 @@ export const translations = {
     // Actions
     payNowWithCard: 'Paga Ora con Carta',
     loginAndUseCredits: 'Accedi e Usa i Tuoi Crediti',
+    activate: 'Attiva',
+    directions: 'Indicazioni',
+    save: 'Salva',
     
     // How it works
     howItWorks: 'Come funziona?',
@@ -125,13 +211,92 @@ export const translations = {
     dontHaveAccount: 'Non hai un account?',
     acceptTerms: 'Accetto i Termini e Condizioni',
     joinToday: 'Unisciti a Shower2Pet oggi',
+    logout: 'Esci',
+    loggingOut: 'Disconnessione...',
     
     // Language
     language: 'Lingua',
     english: 'English',
     italian: 'Italiano',
+    
+    // Profile
+    myProfile: 'Il Mio Profilo',
+    manageAccount: 'Gestisci le impostazioni del tuo account',
+    settings: 'Impostazioni',
+    paymentMethods: 'Metodi di Pagamento',
+    manageSubscription: 'Gestisci Abbonamento',
+    notifications: 'Notifiche',
+    emailNotifications: 'Notifiche Email',
+    receiveUpdates: 'Ricevi aggiornamenti via email',
+    pushNotifications: 'Notifiche Push',
+    getNotified: 'Ricevi notifiche sul tuo dispositivo',
+    support: 'Supporto',
+    helpSupport: 'Aiuto e Supporto',
+    changePhoto: 'Cambia Foto',
+    
+    // Map
+    findStations: 'Trova Stazioni',
+    findStationsDesc: 'Localizza le stazioni di lavaggio cani nelle vicinanze e ottieni indicazioni',
+    nearbyStations: 'Stazioni Vicine',
+    mapboxTokenRequired: 'Per visualizzare la mappa interattiva, inserisci il tuo token pubblico Mapbox.',
+    getMapboxToken: 'Ottieni il tuo token Mapbox gratuito',
+    mapboxTokenSaved: 'Token salvato! Caricamento mappa...',
+    mapLoading: 'Caricamento mappa...',
+    stationNotAvailable: 'Questa stazione non è attualmente disponibile',
+    stationActivated: 'Stazione attivata! Puoi iniziare il lavaggio.',
+    
+    // Credits
+    currentBalance: 'Saldo Attuale',
+    credits: 'crediti',
+    creditValue: '1 credito = €1 di valore',
+    buyCredits: 'Acquista Crediti',
+    creditPacks: 'Pacchetti Crediti',
+    bonus: 'bonus',
+    purchase: 'Acquista',
+    recentTransactions: 'Transazioni Recenti',
+    saveWithSubscription: 'Risparmia di più con un abbonamento!',
+    viewPlans: 'Vedi Piani',
+    
+    // Subscriptions
+    subscriptionPlans: 'Piani di Abbonamento',
+    chooseYourPlan: 'Scegli il piano più adatto alle tue esigenze',
+    perWeek: '/settimana',
+    perMonth: '/mese',
+    activateSubscription: 'Attiva Abbonamento',
+    activePlan: 'Piano Attivo',
+    subscriptionActivated: 'Abbonamento attivato con successo!',
+    activeSubscriptionMessage: 'Hai un abbonamento attivo. I tuoi crediti saranno rinnovati automaticamente.',
+    
+    // Payment
+    payment: 'Pagamento',
+    completePayment: 'Completa il pagamento per avviare il servizio',
+    orderSummary: 'Riepilogo Ordine',
+    station: 'Stazione',
+    location: 'Posizione',
+    total: 'Totale',
+    proceedToPayment: 'Procedi al Pagamento',
+    processing: 'Elaborazione...',
+    redirectToPayment: 'Sarai reindirizzato al nostro provider di pagamento sicuro',
+    acceptedCards: 'Accettiamo tutte le principali carte di credito e debito',
+    back: 'Indietro',
+    
+    // Payment Success
+    paymentSuccessful: 'Pagamento Completato!',
+    thankYou: 'Grazie per il tuo pagamento. La tua sessione è pronta.',
+    sessionDetails: 'Dettagli Sessione',
+    date: 'Data',
+    startTime: 'Ora di Inizio',
+    goToSession: 'Vai alla Sessione Attiva',
+    
+    // History
+    sessions: 'Sessioni',
+    payments: 'Pagamenti',
+    historyTitle: 'Storico',
+    historyDesc: 'Le tue sessioni e lo storico pagamenti',
+    completed: 'Completato',
   },
 };
+
 
 export type Language = 'en' | 'it';
 export type TranslationKey = keyof typeof translations.en;

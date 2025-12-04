@@ -1,16 +1,20 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { branding } from '@/config/branding';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface SubscriptionCardProps {
   plan: typeof branding.subscriptionPlans[0];
   isActive?: boolean;
+  isLoading?: boolean;
   onActivate: () => void;
 }
 
-export const SubscriptionCard = ({ plan, isActive, onActivate }: SubscriptionCardProps) => {
+export const SubscriptionCard = ({ plan, isActive, isLoading, onActivate }: SubscriptionCardProps) => {
+  const { t } = useLanguage();
+
   return (
     <Card className={cn(
       "p-6 hover:shadow-lg transition-all duration-300 relative",
@@ -35,7 +39,7 @@ export const SubscriptionCard = ({ plan, isActive, onActivate }: SubscriptionCar
             {branding.station.currency}{plan.price}
           </span>
           <span className="text-muted-foreground font-light">
-            / {plan.interval}
+            {plan.interval === 'week' ? t('perWeek') : t('perMonth')}
           </span>
         </div>
         
@@ -43,12 +47,12 @@ export const SubscriptionCard = ({ plan, isActive, onActivate }: SubscriptionCar
           <div className="flex items-center gap-2 text-foreground">
             <Check className="w-5 h-5 text-success" />
             <span className="font-light">
-              {plan.creditsPerWeek ? `${plan.creditsPerWeek} credits per week` : `${plan.creditsPerMonth} credits per month`}
+              {plan.creditsPerWeek ? `${plan.creditsPerWeek} ${t('credits')} ${t('perWeek')}` : `${plan.creditsPerMonth} ${t('credits')} ${t('perMonth')}`}
             </span>
           </div>
           <div className="flex items-center gap-2 text-foreground">
             <Check className="w-5 h-5 text-success" />
-            <span className="font-light">Billed {plan.billingCycle.toLowerCase()}</span>
+            <span className="font-light">{plan.billingCycle}</span>
           </div>
           <div className="flex items-center gap-2 text-foreground">
             <Check className="w-5 h-5 text-success" />
@@ -61,9 +65,18 @@ export const SubscriptionCard = ({ plan, isActive, onActivate }: SubscriptionCar
           variant={isActive ? "outline" : "default"}
           size="lg"
           className="w-full"
-          disabled={isActive}
+          disabled={isActive || isLoading}
         >
-          {isActive ? 'Active Plan' : 'Activate Subscription'}
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {t('processing')}
+            </>
+          ) : isActive ? (
+            t('activePlan')
+          ) : (
+            t('activateSubscription')
+          )}
         </Button>
       </div>
     </Card>

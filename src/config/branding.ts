@@ -14,6 +14,7 @@ export const branding = {
     pricePerSession: 1.00,
     durationMinutes: 5,
     currency: '€',
+    stripePriceId: 'price_session_placeholder', // Replace with actual Stripe price ID
   },
   
   // Payment configuration
@@ -30,6 +31,7 @@ export const branding = {
       creditsPerWeek: 15,
       description: 'Perfect for regular users',
       badge: 'Best Value',
+      stripePriceId: 'price_weekly_placeholder', // Replace with actual Stripe price ID
     },
     {
       id: 'monthly',
@@ -39,6 +41,7 @@ export const branding = {
       billingCycle: 'Monthly',
       creditsPerMonth: 40,
       description: 'Great savings for frequent use',
+      stripePriceId: 'price_monthly_placeholder', // Replace with actual Stripe price ID
     },
   ],
   
@@ -51,6 +54,7 @@ export const branding = {
       credits: 12,
       bonus: 2,
       description: 'Get 2 bonus credits',
+      stripePriceId: 'price_pack10_placeholder', // Replace with actual Stripe price ID
     },
     {
       id: 'pack-20',
@@ -60,6 +64,7 @@ export const branding = {
       bonus: 5,
       description: 'Get 5 bonus credits',
       badge: 'Popular',
+      stripePriceId: 'price_pack20_placeholder', // Replace with actual Stripe price ID
     },
   ],
 };

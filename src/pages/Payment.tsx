@@ -3,18 +3,39 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { branding } from '@/config/branding';
+import { useLanguage } from '@/hooks/useLanguage';
+import { supabase } from '@/integrations/supabase/client';
 import { CreditCard, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const Payment = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePayment = async () => {
     setIsLoading(true);
-    // Mock payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    navigate('/payment/success');
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          priceId: branding.station.stripePriceId || 'price_placeholder',
+          mode: 'payment',
+          quantity: 1,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      toast.error('Error processing payment');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -26,39 +47,39 @@ const Payment = () => {
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t('back')}
         </Button>
 
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground">
-            Payment
+            {t('payment')}
           </h1>
           <p className="text-muted-foreground font-light">
-            Complete your payment to start the service
+            {t('completePayment')}
           </p>
         </div>
 
         <Card className="p-6 space-y-6">
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-foreground">Order Summary</h2>
+            <h2 className="text-xl font-bold text-foreground">{t('orderSummary')}</h2>
             
             <div className="space-y-3 py-4 border-y border-border">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground font-light">Station</span>
+                <span className="text-muted-foreground font-light">{t('station')}</span>
                 <span className="font-bold text-foreground">{branding.station.name}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground font-light">Duration</span>
-                <span className="font-bold text-foreground">{branding.station.durationMinutes} minutes</span>
+                <span className="text-muted-foreground font-light">{t('duration')}</span>
+                <span className="font-bold text-foreground">{branding.station.durationMinutes} {t('minutes')}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground font-light">Location</span>
+                <span className="text-muted-foreground font-light">{t('location')}</span>
                 <span className="font-bold text-foreground">{branding.clientName}</span>
               </div>
             </div>
 
             <div className="flex justify-between items-center pt-2">
-              <span className="text-xl font-bold text-foreground">Total</span>
+              <span className="text-xl font-bold text-foreground">{t('total')}</span>
               <span className="text-3xl font-bold text-primary">
                 {branding.station.currency}{branding.station.pricePerSession.toFixed(2)}
               </span>
@@ -75,24 +96,24 @@ const Payment = () => {
             {isLoading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Processing...
+                {t('processing')}
               </>
             ) : (
               <>
                 <CreditCard className="w-5 h-5" />
-                Proceed to Payment
+                {t('proceedToPayment')}
               </>
             )}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground font-light">
-            You will be redirected to our secure payment provider
+            {t('redirectToPayment')}
           </p>
         </Card>
 
         <Card className="p-4 bg-mint/10 border-mint">
           <p className="text-sm text-center text-muted-foreground font-light">
-            💳 We accept all major credit and debit cards
+            💳 {t('acceptedCards')}
           </p>
         </Card>
       </div>
