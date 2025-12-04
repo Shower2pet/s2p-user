@@ -1,15 +1,19 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { branding } from '@/config/branding';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface CreditPackCardProps {
   pack: typeof branding.creditPacks[0];
   onPurchase: () => void;
+  isLoading?: boolean;
 }
 
-export const CreditPackCard = ({ pack, onPurchase }: CreditPackCardProps) => {
+export const CreditPackCard = ({ pack, onPurchase, isLoading }: CreditPackCardProps) => {
+  const { t } = useLanguage();
+  
   return (
     <Card className="p-6 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
       {pack.badge && (
@@ -36,10 +40,10 @@ export const CreditPackCard = ({ pack, onPurchase }: CreditPackCardProps) => {
           <Sparkles className="w-5 h-5 text-mint-foreground" />
           <div>
             <div className="font-bold text-foreground">
-              {pack.credits} Credits
+              {pack.credits} {t('credits')}
             </div>
             <div className="text-xs text-muted-foreground font-light">
-              includes {pack.bonus} bonus credits
+              +{pack.bonus} {t('bonus')}
             </div>
           </div>
         </div>
@@ -49,8 +53,16 @@ export const CreditPackCard = ({ pack, onPurchase }: CreditPackCardProps) => {
           variant="default"
           size="lg"
           className="w-full"
+          disabled={isLoading}
         >
-          Buy Now
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {t('processing')}
+            </>
+          ) : (
+            t('purchase')
+          )}
         </Button>
       </div>
     </Card>

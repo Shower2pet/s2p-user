@@ -3,17 +3,40 @@ import { AppShell } from '@/components/layout/AppShell';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { Button } from '@/components/ui/button';
 import { branding } from '@/config/branding';
-import { ArrowLeft } from 'lucide-react';
+import { useLanguage } from '@/hooks/useLanguage';
+import { supabase } from '@/integrations/supabase/client';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const Subscriptions = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
 
-  const handleActivate = (planId: string) => {
-    setActivePlanId(planId);
-    toast.success('Subscription activated successfully!');
+  const handleActivate = async (planId: string, stripePriceId?: string) => {
+    setLoadingPlanId(planId);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          priceId: stripePriceId || 'price_placeholder',
+          mode: 'subscription',
+          quantity: 1,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      toast.error('Error processing subscription');
+    } finally {
+      setLoadingPlanId(null);
+    }
   };
 
   return (
@@ -24,15 +47,15 @@ const Subscriptions = () => {
           onClick={() => navigate('/credits')}
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t('back')}
         </Button>
 
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground">
-            Subscription Plans
+            {t('subscriptionPlans')}
           </h1>
           <p className="text-muted-foreground font-light">
-            Save more with our subscription plans
+            {t('chooseYourPlan')}
           </p>
         </div>
 
@@ -42,7 +65,8 @@ const Subscriptions = () => {
               key={plan.id}
               plan={plan}
               isActive={activePlanId === plan.id}
-              onActivate={() => handleActivate(plan.id)}
+              isLoading={loadingPlanId === plan.id}
+              onActivate={() => handleActivate(plan.id, plan.stripePriceId)}
             />
           ))}
         </div>
@@ -50,10 +74,7 @@ const Subscriptions = () => {
         {activePlanId && (
           <div className="bg-success/10 border border-success rounded-xl p-6 text-center space-y-3">
             <p className="font-bold text-foreground">
-              Your subscription is active
-            </p>
-            <p className="text-sm text-muted-foreground font-light">
-              You will be charged on the next billing cycle
+              {t('activeSubscriptionMessage')}
             </p>
           </div>
         )}
