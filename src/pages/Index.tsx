@@ -8,31 +8,30 @@ import { useAuth } from '@/hooks/useAuth';
 import { CreditCard, LogIn, Droplets, Wind, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
-
 const Index = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const { user, loading } = useAuth();
+  const {
+    t
+  } = useLanguage();
+  const {
+    user,
+    loading
+  } = useAuth();
   const stationStatus: 'available' | 'busy' | 'offline' = 'available';
-
   const handlePayNow = () => {
     navigate('/payment');
   };
-
   const handleLoginToUseCredits = () => {
     navigate('/login');
   };
-
   const handleGoToCredits = () => {
     navigate('/credits');
   };
-
-  return (
-    <AppShell>
+  return <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-5">
         {/* Header con logo */}
         <div className="flex items-center justify-center">
-          <img src={shower2petLogo} alt="Shower2Pet" className="w-12 h-12 object-contain" />
+          
         </div>
 
         {/* Hero Title */}
@@ -64,40 +63,18 @@ const Index = () => {
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          <Button
-            onClick={handlePayNow}
-            variant="default"
-            size="lg"
-            className="w-full h-14 text-base"
-            disabled={stationStatus !== 'available'}
-          >
+          <Button onClick={handlePayNow} variant="default" size="lg" className="w-full h-14 text-base" disabled={stationStatus !== 'available'}>
             <CreditCard className="w-5 h-5" />
             {t('payNowWithCard')}
           </Button>
 
-          {!loading && (
-            user ? (
-              <Button
-                onClick={handleGoToCredits}
-                variant="outline"
-                size="lg"
-                className="w-full h-14 text-base"
-              >
+          {!loading && (user ? <Button onClick={handleGoToCredits} variant="outline" size="lg" className="w-full h-14 text-base">
                 <User className="w-5 h-5" />
                 {t('useMyCredits')}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleLoginToUseCredits}
-                variant="outline"
-                size="lg"
-                className="w-full h-14 text-base"
-              >
+              </Button> : <Button onClick={handleLoginToUseCredits} variant="outline" size="lg" className="w-full h-14 text-base">
                 <LogIn className="w-5 h-5" />
                 {t('loginAndUseCredits')}
-              </Button>
-            )
-          )}
+              </Button>)}
         </div>
 
         {/* Features */}
@@ -137,8 +114,6 @@ const Index = () => {
           </div>
         </Card>
       </div>
-    </AppShell>
-  );
+    </AppShell>;
 };
-
 export default Index;
