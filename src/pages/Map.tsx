@@ -6,7 +6,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStations, Station } from '@/hooks/useStations';
 import { MapPin, Navigation, Play } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -14,7 +13,6 @@ const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hvd2VyMnBldCIsImEiOiJjbWlydGpkZ3UwaGU2NGtzZ3J
 
 const Map = () => {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -76,7 +74,8 @@ const Map = () => {
   }, []);
 
   const handleActivateStation = (station: Station) => {
-    navigate(`/${station.id}`);
+    // Redirect to external station app
+    window.open(`https://shower-pet-station.lovable.app/${station.id}`, '_blank');
   };
 
   const handleNavigate = (station: Station) => {

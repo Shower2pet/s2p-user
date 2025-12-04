@@ -13,11 +13,6 @@ import Credits from "./pages/Credits";
 import Subscriptions from "./pages/Subscriptions";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
-import Station from "./pages/Station";
-import StationPayment from "./pages/StationPayment";
-import ServiceActivation from "./pages/ServiceActivation";
-import StationSession from "./pages/StationSession";
-
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -49,12 +44,6 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/support" element={<Support />} />
             <Route path="/map" element={<Map />} />
-            
-            {/* Station routes - must come after specific routes */}
-            <Route path="/:stationId" element={<Station />} />
-            <Route path="/:stationId/payment" element={<StationPayment />} />
-            <Route path="/:stationId/activate" element={<ServiceActivation />} />
-            <Route path="/:stationId/session" element={<StationSession />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
