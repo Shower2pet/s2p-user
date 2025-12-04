@@ -15,7 +15,7 @@ const Subscriptions = () => {
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
 
-  const handleActivate = async (planId: string, stripePriceId?: string) => {
+  const handleActivate = async (planId: string, stripePriceId?: string, planName?: string) => {
     setLoadingPlanId(planId);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
@@ -23,6 +23,8 @@ const Subscriptions = () => {
           priceId: stripePriceId || 'price_placeholder',
           mode: 'subscription',
           quantity: 1,
+          productType: 'subscription',
+          description: planName || 'Abbonamento',
         },
       });
 
@@ -66,7 +68,7 @@ const Subscriptions = () => {
               plan={plan}
               isActive={activePlanId === plan.id}
               isLoading={loadingPlanId === plan.id}
-              onActivate={() => handleActivate(plan.id, plan.stripePriceId)}
+              onActivate={() => handleActivate(plan.id, plan.stripePriceId, plan.name)}
             />
           ))}
         </div>

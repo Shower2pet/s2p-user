@@ -4,48 +4,19 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/hooks/useLanguage';
 import { MapPin, Navigation, Play } from 'lucide-react';
-import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-
-// Mock stations data - in production this would come from Supabase
-const mockStations = [
-  {
-    id: '1',
-    name: 'Doccia Bracco',
-    location: 'Camping del Sole',
-    address: 'Via Roma 123, Milano',
-    lat: 45.4642,
-    lng: 9.1900,
-    status: 'available' as const,
-  },
-  {
-    id: '2',
-    name: 'Doccia Luna',
-    location: 'Parco Centrale',
-    address: 'Via Verdi 45, Milano',
-    lat: 45.4700,
-    lng: 9.1850,
-    status: 'busy' as const,
-  },
-  {
-    id: '3',
-    name: 'Doccia Stella',
-    location: 'Centro Commerciale Nord',
-    address: 'Via Milano 78, Monza',
-    lat: 45.5845,
-    lng: 9.2744,
-    status: 'available' as const,
-  },
-];
+import { stations, Station } from '@/config/stations';
 
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hvd2VyMnBldCIsImEiOiJjbWlydGpkZ3UwaGU2NGtzZ3JzdHM0OHd1In0.W88uve0Md19Ks3x-A8bC6A';
 
 const Map = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [selectedStation, setSelectedStation] = useState<typeof mockStations[0] | null>(null);
+  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -62,7 +33,7 @@ const Map = () => {
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
     // Add markers for each station
-    mockStations.forEach((station) => {
+    stations.forEach((station) => {
       const markerColor = station.status === 'available' ? '#22c55e' : '#f59e0b';
       
       const marker = new mapboxgl.Marker({ color: markerColor })
@@ -85,15 +56,12 @@ const Map = () => {
     };
   }, []);
 
-  const handleActivateStation = (station: typeof mockStations[0]) => {
-    if (station.status !== 'available') {
-      toast.error(t('stationNotAvailable'));
-      return;
-    }
-    toast.success(t('stationActivated'));
+  const handleActivateStation = (station: Station) => {
+    // Navigate to the station page
+    navigate(`/${station.id}`);
   };
 
-  const handleNavigate = (station: typeof mockStations[0]) => {
+  const handleNavigate = (station: Station) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`;
     window.open(url, '_blank');
   };
@@ -139,7 +107,7 @@ const Map = () => {
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
           
-          {mockStations.map((station) => (
+          {stations.map((station) => (
             <Card
               key={station.id}
               className={`p-4 cursor-pointer transition-all ${
