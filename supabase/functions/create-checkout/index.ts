@@ -19,14 +19,14 @@ serve(async (req) => {
 
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
   );
 
   try {
     logStep("Function started");
 
-    const { priceId, mode, quantity = 1 } = await req.json();
-    logStep("Request params", { priceId, mode, quantity });
+    const { priceId, mode, quantity = 1, productType = 'session', description = '' } = await req.json();
+    logStep("Request params", { priceId, mode, quantity, productType });
 
     if (!priceId) {
       throw new Error("Price ID is required");
@@ -34,6 +34,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     let userEmail: string | undefined;
+    let userId: string | undefined;
     let customerId: string | undefined;
 
     if (authHeader) {
@@ -43,7 +44,8 @@ serve(async (req) => {
       
       if (user?.email) {
         userEmail = user.email;
-        logStep("User authenticated", { email: userEmail });
+        userId = user.id;
+        logStep("User authenticated", { email: userEmail, userId });
 
         const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
           apiVersion: "2025-08-27.basil",
@@ -61,6 +63,13 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
+    // Get price info to store amount
+    const price = await stripe.prices.retrieve(priceId);
+    const amount = price.unit_amount || 0;
+    logStep("Price retrieved", { priceId, amount });
+
+    const origin = req.headers.get("origin") || "https://hvltamnpmwstdtkftplz.lovable.app";
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       line_items: [
         {
@@ -69,8 +78,13 @@ serve(async (req) => {
         },
       ],
       mode: mode || "payment",
-      success_url: `${req.headers.get("origin")}/payment/success`,
-      cancel_url: `${req.headers.get("origin")}/`,
+      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/`,
+      metadata: {
+        user_id: userId || '',
+        product_type: productType,
+        description: description,
+      },
     };
 
     if (customerId) {
@@ -81,6 +95,27 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create(sessionParams);
     logStep("Checkout session created", { sessionId: session.id });
+
+    // Create transaction record if user is authenticated
+    if (userId) {
+      const { error: txError } = await supabaseClient
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          stripe_session_id: session.id,
+          amount: amount,
+          currency: price.currency || 'eur',
+          description: description || `${productType} purchase`,
+          product_type: productType,
+          status: 'pending',
+        });
+
+      if (txError) {
+        logStep("Error creating transaction record", { error: txError.message });
+      } else {
+        logStep("Transaction record created", { sessionId: session.id });
+      }
+    }
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

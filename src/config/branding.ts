@@ -24,24 +24,34 @@ export const branding = {
   subscriptionPlans: [
     {
       id: 'weekly',
-      name: 'Weekly Plan',
+      name: 'Piano Settimanale',
       price: 10,
       interval: 'week',
-      billingCycle: 'Monthly',
+      billingCycle: 'Mensile',
       creditsPerWeek: 15,
-      description: 'Perfect for regular users',
+      description: 'Perfetto per utenti regolari',
       badge: 'Best Value',
-      stripePriceId: 'price_weekly_placeholder', // Replace with actual Stripe price ID
+      stripePriceId: 'price_1SahTwGzJdGfXoSnagKQ17Ah',
     },
     {
       id: 'monthly',
-      name: 'Monthly Plan',
+      name: 'Piano Mensile',
       price: 35,
       interval: 'month',
-      billingCycle: 'Monthly',
+      billingCycle: 'Mensile',
       creditsPerMonth: 40,
-      description: 'Great savings for frequent use',
-      stripePriceId: 'price_monthly_placeholder', // Replace with actual Stripe price ID
+      description: 'Ottimo risparmio per uso frequente',
+      stripePriceId: 'price_1SahvJGzJdGfXoSn3JcWTgiJ',
+    },
+    {
+      id: 'unlimited',
+      name: 'Lavaggi Illimitati',
+      price: 50,
+      interval: 'month',
+      billingCycle: 'Mensile',
+      description: 'Lavaggi illimitati per tutto il mese',
+      badge: 'Premium',
+      stripePriceId: 'price_1SahwmGzJdGfXoSnMhMK7s5J',
     },
   ],
   
@@ -49,22 +59,22 @@ export const branding = {
   creditPacks: [
     {
       id: 'pack-10',
-      name: 'Starter Pack',
+      name: 'Pacchetto Starter',
       price: 10,
       credits: 12,
       bonus: 2,
-      description: 'Get 2 bonus credits',
-      stripePriceId: 'price_pack10_placeholder', // Replace with actual Stripe price ID
+      description: 'Ottieni 2 crediti bonus',
+      stripePriceId: 'price_1SagSVGzJdGfXoSnWCJxvEab',
     },
     {
       id: 'pack-20',
-      name: 'Value Pack',
+      name: 'Pacchetto Value',
       price: 20,
       credits: 25,
       bonus: 5,
-      description: 'Get 5 bonus credits',
-      badge: 'Popular',
-      stripePriceId: 'price_pack20_placeholder', // Replace with actual Stripe price ID
+      description: 'Ottieni 5 crediti bonus',
+      badge: 'Popolare',
+      stripePriceId: 'price_1SahtPGzJdGfXoSnVAXAIzTj',
     },
   ],
 };

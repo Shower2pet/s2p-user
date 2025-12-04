@@ -1,13 +1,11 @@
 import { AppShell } from '@/components/layout/AppShell';
 import { StationStatusBadge } from '@/components/station/StationStatusBadge';
-import { PriceCard } from '@/components/station/PriceCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { branding } from '@/config/branding';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { CreditCard, LogIn, Droplets, Wind, MapPin, User } from 'lucide-react';
+import { CreditCard, LogIn, Droplets, Wind, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
 
@@ -32,28 +30,24 @@ const Index = () => {
   return (
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={shower2petLogo} alt="Shower2Pet" className="w-10 h-10 object-contain" />
-            <div>
-              <h1 className="text-lg font-bold text-foreground leading-tight">
-                {branding.station.name}
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                {branding.clientName}
-              </p>
-            </div>
-          </div>
-          <LanguageSwitcher />
+        {/* Header con logo */}
+        <div className="flex items-center justify-center">
+          <img src={shower2petLogo} alt="Shower2Pet" className="w-12 h-12 object-contain" />
+        </div>
+
+        {/* Hero Title */}
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold text-foreground leading-tight">
+            {t('heroTitle')}
+          </h1>
         </div>
 
         {/* Status Card */}
         <Card className="p-5 border-2 border-primary/20">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">{branding.clientName}</span>
+            <div>
+              <p className="font-bold text-foreground">{branding.station.name}</p>
+              <p className="text-xs text-muted-foreground">{branding.clientName}</p>
             </div>
             <StationStatusBadge status={stationStatus} />
           </div>
@@ -66,10 +60,6 @@ const Index = () => {
               {branding.station.durationMinutes} {t('minutes')}
             </p>
           </div>
-
-          <p className="text-center text-sm text-muted-foreground mb-4">
-            {t('stationDescription')}
-          </p>
         </Card>
 
         {/* Action Buttons */}

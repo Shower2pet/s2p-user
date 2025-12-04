@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { CreditPackCard } from '@/components/credits/CreditPackCard';
 import { Card } from '@/components/ui/card';
@@ -7,25 +7,54 @@ import { branding } from '@/config/branding';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Coins, Plus, TrendingUp, Loader2 } from 'lucide-react';
+import { Coins, Plus, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+
+interface Transaction {
+  id: string;
+  amount: number;
+  description: string;
+  product_type: string;
+  status: string;
+  created_at: string;
+}
 
 const Credits = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [loadingPackId, setLoadingPackId] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      fetchTransactions();
+    }
+  }, [user]);
+
+  const fetchTransactions = async () => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setTransactions(data);
+    }
+  };
 
   const handlePurchase = async (pack: typeof branding.creditPacks[0]) => {
     setLoadingPackId(pack.id);
     try {
-      // In production, you would have actual Stripe price IDs in branding config
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          priceId: pack.stripePriceId || 'price_placeholder',
+          priceId: pack.stripePriceId,
           mode: 'payment',
           quantity: 1,
+          productType: 'credit_pack',
+          description: pack.name,
         },
       });
 
@@ -36,9 +65,30 @@ const Credits = () => {
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
-      toast.error('Error processing payment');
+      toast.error('Errore durante il pagamento');
     } finally {
       setLoadingPackId(null);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Oggi';
+    if (diffDays === 1) return 'Ieri';
+    return `${diffDays} giorni fa`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'text-success';
+      case 'pending':
+        return 'text-warning';
+      default:
+        return 'text-muted-foreground';
     }
   };
 
@@ -126,35 +176,32 @@ const Credits = () => {
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-foreground">{t('recentTransactions')}</h2>
           <div className="space-y-2">
-            {[
-              { date: 'Today, 14:30', type: 'Used', amount: -1, description: 'Session at Doccia Bracco' },
-              { date: 'Yesterday', type: 'Top-up', amount: +12, description: 'Purchased Starter Pack' },
-              { date: '3 days ago', type: 'Used', amount: -1, description: 'Session at Doccia Bracco' },
-            ].map((transaction, index) => (
-              <Card key={index} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-bold text-foreground">{transaction.description}</p>
-                    <p className="text-sm text-muted-foreground font-light">{transaction.date}</p>
+            {transactions.length > 0 ? (
+              transactions.map((transaction) => (
+                <Card key={transaction.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-bold text-foreground">{transaction.description}</p>
+                      <p className="text-sm text-muted-foreground font-light">
+                        {formatDate(transaction.created_at)} • <span className={getStatusBadge(transaction.status)}>{transaction.status}</span>
+                      </p>
+                    </div>
+                    <div className="text-lg font-bold text-foreground">
+                      €{(transaction.amount / 100).toFixed(2)}
+                    </div>
                   </div>
-                  <div className={cn(
-                    "text-lg font-bold",
-                    transaction.amount > 0 ? "text-success" : "text-foreground"
-                  )}>
-                    {transaction.amount > 0 ? '+' : ''}{transaction.amount} {t('credits')}
-                  </div>
-                </div>
+                </Card>
+              ))
+            ) : (
+              <Card className="p-4 text-center text-muted-foreground">
+                Nessuna transazione
               </Card>
-            ))}
+            )}
           </div>
         </div>
       </div>
     </AppShell>
   );
 };
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
-}
 
 export default Credits;
