@@ -1,4 +1,4 @@
-export const translations = {
+export const translations: Record<string, Record<string, string>> = {
   en: {
     // Navigation
     home: 'Home',
@@ -158,6 +158,9 @@ export const translations = {
     buyCreditsFirst: 'Buy Credits to Activate',
     loginToActivate: 'Login to Activate',
     yourCredits: 'Your Credits',
+    locationInfo: 'Location',
+    getDirections: 'Get Directions',
+    ofService: 'of service',
     paymentError: 'Payment error',
     serviceActivated: 'Service activated!',
     activationError: 'Activation error',
@@ -336,6 +339,9 @@ export const translations = {
     buyCreditsFirst: 'Acquista Crediti per Attivare',
     loginToActivate: 'Accedi per Attivare',
     yourCredits: 'I Tuoi Crediti',
+    locationInfo: 'Posizione',
+    getDirections: 'Indicazioni Stradali',
+    ofService: 'di servizio',
     paymentError: 'Errore nel pagamento',
     serviceActivated: 'Servizio attivato!',
     activationError: 'Errore di attivazione',

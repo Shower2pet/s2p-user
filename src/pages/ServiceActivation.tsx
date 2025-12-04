@@ -21,7 +21,7 @@ const ServiceActivation = () => {
 
   if (!station) {
     return (
-      <AppShell showNav={false}>
+      <AppShell>
         <div className="container max-w-2xl mx-auto px-4 py-6 text-center">
           <h1 className="text-2xl font-bold text-foreground">{t('stationNotFound')}</h1>
           <Button onClick={() => navigate('/map')} className="mt-4">
@@ -84,7 +84,7 @@ const ServiceActivation = () => {
   }
 
   return (
-    <AppShell showNav={false}>
+    <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         <Button
           variant="ghost"

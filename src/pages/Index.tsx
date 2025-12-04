@@ -42,14 +42,17 @@ const Index = () => {
           </h1>
         </div>
 
-        {/* User Credits Display */}
+        {/* User Credits Display - Circle */}
         {user && (
-          <Card className="p-4 bg-gradient-to-r from-primary/10 to-sky/10 border-primary/20">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{t('yourCredits')}</span>
-              <span className="text-2xl font-bold text-primary">{profile?.credits || 0} {t('credits')}</span>
+          <div className="flex justify-center">
+            <div 
+              className="w-36 h-36 rounded-full bg-gradient-to-br from-primary to-sky border-4 border-primary/30 flex flex-col items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => navigate('/credits')}
+            >
+              <span className="text-4xl font-bold text-primary-foreground">{profile?.credits || 0}</span>
+              <span className="text-sm text-primary-foreground/80 font-medium">{t('yourCredits')}</span>
             </div>
-          </Card>
+          </div>
         )}
 
         {/* Action Buttons */}

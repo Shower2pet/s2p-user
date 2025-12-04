@@ -19,7 +19,7 @@ const StationSession = () => {
 
   if (!station) {
     return (
-      <AppShell showNav={false}>
+      <AppShell>
         <div className="container max-w-2xl mx-auto px-4 py-6 text-center">
           <h1 className="text-2xl font-bold text-foreground">{t('stationNotFound')}</h1>
           <Button onClick={() => navigate('/map')} className="mt-4">
@@ -38,7 +38,7 @@ const StationSession = () => {
 
   if (sessionComplete) {
     return (
-      <AppShell showNav={false}>
+      <AppShell>
         <div className="container max-w-2xl mx-auto px-4 py-8 space-y-6">
           <div className="text-center space-y-4">
             <div className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center mx-auto">
@@ -73,7 +73,7 @@ const StationSession = () => {
   }
 
   return (
-    <AppShell showNav={false}>
+    <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground">

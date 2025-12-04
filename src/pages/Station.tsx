@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { Play, Droplets, Wind, LogIn, CreditCard } from 'lucide-react';
+import { Play, Droplets, Wind, LogIn, CreditCard, MapPin } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getStationById } from '@/config/stations';
 
@@ -18,7 +18,7 @@ const Station = () => {
 
   if (!station) {
     return (
-      <AppShell showNav={false}>
+      <AppShell>
         <div className="container max-w-2xl mx-auto px-4 py-6 text-center">
           <h1 className="text-2xl font-bold text-foreground">{t('stationNotFound')}</h1>
           <Button onClick={() => navigate('/map')} className="mt-4">
@@ -51,31 +51,44 @@ const Station = () => {
   };
 
   return (
-    <AppShell showNav={false}>
+    <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-5">
-        {/* Header */}
+        {/* Station Header */}
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground leading-tight">
-            {t('heroTitle')}
+            {station.name}
           </h1>
+          <p className="text-muted-foreground">{station.location}</p>
         </div>
 
-        {/* Status Card */}
-        <Card className="p-5 border-2 border-primary/20">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="font-bold text-foreground">{station.name}</p>
-              <p className="text-xs text-muted-foreground">{station.location}</p>
-            </div>
-            <StationStatusBadge status={station.status} />
-          </div>
-          
-          <div className="text-center py-4">
+        {/* Status Badge */}
+        <div className="flex justify-center">
+          <StationStatusBadge status={station.status} />
+        </div>
+
+        {/* Location & Directions Card */}
+        <Card className="p-4 border border-border">
+          <h3 className="text-sm font-bold text-foreground mb-2">{t('locationInfo')}</h3>
+          <p className="text-sm text-muted-foreground mb-3">{station.address}</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full"
+            onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`, '_blank')}
+          >
+            <MapPin className="w-4 h-4 mr-2" />
+            {t('getDirections')}
+          </Button>
+        </Card>
+
+        {/* Service Info Card */}
+        <Card className="p-5 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <div className="text-center py-2">
             <div className="text-4xl font-bold text-primary mb-1">
               {creditsNeeded} {t('credits')}
             </div>
             <p className="text-sm text-muted-foreground">
-              {station.durationMinutes} {t('minutes')}
+              {station.durationMinutes} {t('minutes')} {t('ofService')}
             </p>
           </div>
         </Card>
