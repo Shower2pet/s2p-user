@@ -31,7 +31,7 @@ const Map = () => {
     
     const station = stations?.find(s => s.id.toLowerCase() === stationCode.toLowerCase().trim());
     if (station) {
-      window.open(`https://shower-pet-station.lovable.app/${station.id}`, '_blank');
+      window.open(`https://station-shower2pet.lovable.app/${station.id}`, '_blank');
       setShowUnlockInput(false);
       setStationCode('');
     } else {
@@ -101,7 +101,7 @@ const Map = () => {
 
   const handleActivateStation = (station: Station) => {
     // Redirect to external station app
-    window.open(`https://shower-pet-station.lovable.app/${station.id}`, '_blank');
+    window.open(`https://station-shower2pet.lovable.app/${station.id}`, '_blank');
   };
 
   const handleNavigate = (station: Station) => {

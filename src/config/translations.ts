@@ -2,7 +2,7 @@ export const translations: Record<string, Record<string, string>> = {
   en: {
     // Navigation
     home: 'Home',
-    myCredits: 'My Credits',
+    myCredits: 'Credits',
     history: 'History',
     profile: 'Profile',
     map: 'Map',
@@ -192,7 +192,7 @@ export const translations: Record<string, Record<string, string>> = {
   it: {
     // Navigation
     home: 'Home',
-    myCredits: 'I Miei Crediti',
+    myCredits: 'Crediti',
     history: 'Storico',
     profile: 'Profilo',
     map: 'Mappa',
