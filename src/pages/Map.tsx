@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStations, Station } from '@/hooks/useStations';
-import { MapPin, Navigation, Play } from 'lucide-react';
+import { MapPin, Navigation, Play, Unlock, X } from 'lucide-react';
+import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -17,7 +19,25 @@ const Map = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [showUnlockInput, setShowUnlockInput] = useState(false);
+  const [stationCode, setStationCode] = useState('');
   const { data: stations, isLoading } = useStations();
+
+  const handleUnlockStation = () => {
+    if (!stationCode.trim()) {
+      toast.error(t('enterStationCode'));
+      return;
+    }
+    
+    const station = stations?.find(s => s.id.toLowerCase() === stationCode.toLowerCase().trim());
+    if (station) {
+      window.open(`https://shower-pet-station.lovable.app/${station.id}`, '_blank');
+      setShowUnlockInput(false);
+      setStationCode('');
+    } else {
+      toast.error(t('stationNotFound'));
+    }
+  };
 
   useEffect(() => {
     if (!mapContainer.current || !stations || stations.length === 0) return;
@@ -133,6 +153,46 @@ const Map = () => {
             {t('findStationsDesc')}
           </p>
         </div>
+
+        {/* Unlock Station Button */}
+        {!showUnlockInput ? (
+          <Button
+            onClick={() => setShowUnlockInput(true)}
+            className="w-full shadow-glow-primary"
+            size="lg"
+          >
+            <Unlock className="w-5 h-5 mr-2" />
+            {t('unlockStation')}
+          </Button>
+        ) : (
+          <Card className="p-4 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-foreground">{t('enterStationCode')}</h3>
+              <button
+                onClick={() => {
+                  setShowUnlockInput(false);
+                  setStationCode('');
+                }}
+                className="p-1.5 hover:bg-muted rounded-full transition-colors"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
+            <div className="flex gap-2">
+              <Input
+                value={stationCode}
+                onChange={(e) => setStationCode(e.target.value)}
+                placeholder={t('stationCodePlaceholder')}
+                className="flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()}
+              />
+              <Button onClick={handleUnlockStation}>
+                {t('go')}
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Mapbox Map */}
         <Card className="overflow-hidden">
