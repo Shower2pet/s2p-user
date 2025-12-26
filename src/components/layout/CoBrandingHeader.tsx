@@ -1,9 +1,10 @@
 import { branding } from '@/config/branding';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
 
 export const CoBrandingHeader = () => {
   return (
-    <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
+    <div className="bg-card/80 backdrop-blur-lg border-b border-border/50 px-4 py-3 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-2">
         <img 
           src={shower2petLogo} 
@@ -12,15 +13,15 @@ export const CoBrandingHeader = () => {
         />
       </div>
       
-      <div className="flex items-center gap-2">
-        <img 
-          src={branding.clientLogoUrl} 
-          alt={branding.clientName}
-          className="w-10 h-10 object-contain rounded-lg bg-muted p-1"
-        />
-        <span className="text-sm text-muted-foreground font-light hidden sm:inline">
-          {branding.clientName}
-        </span>
+      <div className="flex items-center gap-3">
+        <LanguageSwitcher />
+        <div className="flex items-center gap-2">
+          <img 
+            src={branding.clientLogoUrl} 
+            alt={branding.clientName}
+            className="w-9 h-9 object-contain rounded-xl bg-secondary p-1.5"
+          />
+        </div>
       </div>
     </div>
   );

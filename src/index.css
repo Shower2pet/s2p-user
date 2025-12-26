@@ -1,18 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Mitr:wght=300;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Shower2Pet Design System */
+/* Shower2Pet Soft UI Design System */
 
 @layer base {
   :root {
-    /* Backgrounds */
-    --background: 210 40% 98%;
+    /* Backgrounds - Light grey/blue off-white */
+    --background: 210 30% 97%;
     --foreground: 206 100% 18%;
 
-    /* Cards */
+    /* Cards - Pure white for floating effect */
     --card: 0 0% 100%;
     --card-foreground: 206 100% 18%;
 
@@ -20,85 +20,89 @@
     --popover: 0 0% 100%;
     --popover-foreground: 206 100% 18%;
 
-    /* Primary - Ocean Blue */
-    --primary: 206 100% 30%;
+    /* Primary - Deep Blue #005596 */
+    --primary: 206 100% 29%;
     --primary-foreground: 0 0% 100%;
     
-    /* Sky Blue variant */
-    --sky: 200 75% 70%;
+    /* Sky Blue - Light Blue #79BDE8 */
+    --sky: 200 68% 69%;
     --sky-foreground: 206 100% 18%;
 
-    /* Secondary - Light blue/gray */
-    --secondary: 210 40% 96%;
+    /* Secondary - Very light for soft UI */
+    --secondary: 210 30% 96%;
     --secondary-foreground: 206 100% 18%;
 
     /* Muted */
-    --muted: 210 30% 92%;
-    --muted-foreground: 206 30% 40%;
+    --muted: 210 25% 94%;
+    --muted-foreground: 206 25% 45%;
 
-    /* Accent - Sunset Coral */
-    --accent: 12 95% 68%;
+    /* Accent - Sunset Coral #F5866C */
+    --accent: 12 88% 69%;
     --accent-foreground: 0 0% 100%;
     
-    /* Warm Sand */
-    --sand: 37 100% 76%;
+    /* Warm Sand #FFD18B */
+    --sand: 37 100% 77%;
     --sand-foreground: 206 100% 18%;
     
-    /* Fresh Mint */
-    --mint: 100 38% 72%;
+    /* Fresh Mint/Green #A8D59D */
+    --mint: 108 43% 72%;
     --mint-foreground: 206 100% 18%;
 
     /* Status colors */
-    --success: 100 38% 72%;
-    --warning: 37 100% 76%;
-    --destructive: 0 84.2% 60.2%;
+    --success: 108 43% 72%;
+    --warning: 37 100% 77%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders & inputs */
-    --border: 210 30% 88%;
-    --input: 210 30% 88%;
-    --ring: 206 100% 30%;
+    /* Borders & inputs - Very subtle */
+    --border: 210 20% 92%;
+    --input: 210 20% 92%;
+    --ring: 206 100% 29%;
 
-    /* Radius */
-    --radius: 1rem;
+    /* Radius - Higher for soft UI */
+    --radius: 1.25rem;
+    --radius-xl: 1.5rem;
+    --radius-2xl: 2rem;
+    --radius-3xl: 2.5rem;
 
-    /* Shadows */
-    --shadow-sm: 0 2px 8px rgba(0, 85, 150, 0.08);
-    --shadow-md: 0 4px 16px rgba(0, 85, 150, 0.12);
-    --shadow-lg: 0 8px 24px rgba(0, 85, 150, 0.16);
+    /* Soft UI Shadows */
+    --shadow-soft: 0 4px 20px rgba(0, 85, 150, 0.06);
+    --shadow-lifted: 0 8px 32px rgba(0, 85, 150, 0.10);
+    --shadow-floating: 0 12px 48px rgba(0, 85, 150, 0.14);
+    --shadow-glow-primary: 0 4px 24px rgba(0, 85, 150, 0.25);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 206 100% 5%;
+    --background: 206 80% 5%;
     --foreground: 210 40% 98%;
-    --card: 206 80% 8%;
+    --card: 206 60% 10%;
     --card-foreground: 210 40% 98%;
-    --popover: 206 80% 8%;
+    --popover: 206 60% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 200 75% 70%;
+    --primary: 200 68% 69%;
     --primary-foreground: 206 100% 10%;
-    --sky: 206 100% 30%;
+    --sky: 206 100% 29%;
     --sky-foreground: 0 0% 100%;
-    --secondary: 206 60% 15%;
+    --secondary: 206 50% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 206 60% 15%;
-    --muted-foreground: 210 30% 65%;
-    --accent: 12 95% 68%;
+    --muted: 206 50% 15%;
+    --muted-foreground: 210 25% 60%;
+    --accent: 12 88% 69%;
     --accent-foreground: 0 0% 100%;
-    --sand: 37 100% 76%;
+    --sand: 37 100% 77%;
     --sand-foreground: 206 100% 18%;
-    --mint: 100 38% 72%;
+    --mint: 108 43% 72%;
     --mint-foreground: 206 100% 18%;
-    --success: 100 38% 72%;
-    --warning: 37 100% 76%;
-    --destructive: 0 62.8% 50%;
+    --success: 108 43% 72%;
+    --warning: 37 100% 77%;
+    --destructive: 0 62% 50%;
     --destructive-foreground: 210 40% 98%;
-    --border: 206 60% 15%;
-    --input: 206 60% 15%;
-    --ring: 200 75% 70%;
+    --border: 206 50% 18%;
+    --input: 206 50% 18%;
+    --ring: 200 68% 69%;
   }
 }
 
@@ -108,8 +112,11 @@
   }
 
   body {
-    @apply bg-background text-foreground font-light;
+    @apply bg-background text-foreground;
     font-family: 'Mitr', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -120,7 +127,30 @@
     font-weight: 700;
   }
   
+  .font-medium {
+    font-weight: 500;
+  }
+  
   .font-light {
     font-weight: 300;
+  }
+}
+
+/* Soft UI Card Utilities */
+@layer utilities {
+  .card-soft {
+    @apply bg-card rounded-3xl shadow-lifted;
+  }
+  
+  .card-floating {
+    @apply bg-card rounded-3xl shadow-floating;
+  }
+  
+  .btn-soft {
+    @apply shadow-soft hover:shadow-lifted transition-all duration-300;
+  }
+  
+  .glass {
+    @apply bg-card/80 backdrop-blur-lg;
   }
 }

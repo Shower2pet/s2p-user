@@ -185,6 +185,9 @@ export const translations: Record<string, Record<string, string>> = {
     stationCodePlaceholder: 'e.g. test1',
     go: 'Go',
     cancel: 'Cancel',
+    installApp: 'Install Shower2Pet',
+    installAppDesc: 'Add to your home screen for quick access',
+    install: 'Install',
   },
   it: {
     // Navigation
@@ -372,6 +375,9 @@ export const translations: Record<string, Record<string, string>> = {
     stationCodePlaceholder: 'es. test1',
     go: 'Vai',
     cancel: 'Annulla',
+    installApp: 'Installa Shower2Pet',
+    installAppDesc: 'Aggiungi alla schermata home per un accesso rapido',
+    install: 'Installa',
   },
 };
 
