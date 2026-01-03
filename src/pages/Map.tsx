@@ -6,12 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStations, Station } from '@/hooks/useStations';
-import { MapPin, Navigation, Play, Unlock, X, Search } from 'lucide-react';
+import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1Ijoic2hvd2VyMnBldCIsImEiOiJjbWlydGpkZ3UwaGU2NGtzZ3JzdHM0OHd1In0.W88uve0Md19Ks3x-A8bC6A';
+// Use environment variable only - no hardcoded fallback for security
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+
+// Validation pattern for location search (letters, numbers, spaces, Italian characters)
+const LOCATION_PATTERN = /^[a-zA-Z0-9\s,àèéìòùÀÈÉÌÒÙ\-']+$/;
+const MAX_LOCATION_LENGTH = 100;
 
 const Map = () => {
   const { t } = useLanguage();
@@ -47,14 +52,41 @@ const Map = () => {
   };
 
   const handleLocationSearch = async () => {
-    if (!locationSearch.trim() || !map.current) return;
+    const trimmed = locationSearch.trim();
+    
+    // Validate input
+    if (!trimmed || !map.current || !MAPBOX_TOKEN) return;
+    
+    // Add length limit
+    if (trimmed.length > MAX_LOCATION_LENGTH) {
+      toast.error(`Località troppo lunga (max ${MAX_LOCATION_LENGTH} caratteri)`);
+      return;
+    }
+    
+    // Add character validation
+    if (!LOCATION_PATTERN.test(trimmed)) {
+      toast.error('La località contiene caratteri non validi');
+      return;
+    }
     
     setIsSearching(true);
     setNoStationsMessage(null);
+    
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationSearch)}.json?access_token=${MAPBOX_TOKEN}&country=it&limit=1`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${MAPBOX_TOKEN}&country=it&limit=1`,
+        { signal: controller.signal }
       );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error('Errore nella ricerca');
+      }
+      
       const data = await response.json();
       
       if (data.features && data.features.length > 0) {
@@ -70,8 +102,12 @@ const Map = () => {
         toast.error('Località non trovata');
       }
     } catch (error) {
-      console.error('Geocoding error:', error);
-      toast.error('Errore nella ricerca');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Ricerca scaduta, riprova');
+      } else {
+        console.error('Geocoding error:', error);
+        toast.error('Errore nella ricerca');
+      }
     } finally {
       setIsSearching(false);
     }
@@ -94,7 +130,7 @@ const Map = () => {
   };
 
   useEffect(() => {
-    if (!mapContainer.current || !stations || stations.length === 0) return;
+    if (!mapContainer.current || !stations || stations.length === 0 || !MAPBOX_TOKEN) return;
 
     // Initialize map if not already done
     if (!map.current) {
@@ -198,6 +234,92 @@ const Map = () => {
     );
   }
 
+  // Show error state if Mapbox token is not configured
+  if (!MAPBOX_TOKEN) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-bold text-foreground">{t('findStations')}</h1>
+            <p className="text-sm text-muted-foreground">
+              {t('findStationsDesc')}
+            </p>
+          </div>
+          
+          <Card className="p-6 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <AlertTriangle className="w-10 h-10 text-warning" />
+              <p className="text-muted-foreground">
+                La mappa non è disponibile al momento. Contatta il supporto.
+              </p>
+            </div>
+          </Card>
+          
+          {/* Stations List - still show without map */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
+            
+            {stations?.map((station) => (
+              <Card
+                key={station.id}
+                className={`p-4 cursor-pointer transition-all ${
+                  selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setSelectedStation(station)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-foreground text-sm">{station.name}</h3>
+                      <p className="text-xs text-muted-foreground">{station.location}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{station.address}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(station.status)}`}>
+                    {getStatusText(station.status)}
+                  </span>
+                </div>
+
+                {selectedStation?.id === station.id && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleActivateStation(station);
+                      }}
+                      disabled={station.status !== 'available'}
+                    >
+                      <Play className="w-4 h-4" />
+                      {t('activate')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNavigate(station);
+                      }}
+                    >
+                      <Navigation className="w-4 h-4" />
+                      {t('directions')}
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -218,6 +340,7 @@ const Map = () => {
                 onChange={(e) => setLocationSearch(e.target.value)}
                 placeholder="Cerca località (es. Milano, Roma...)"
                 className="pl-10"
+                maxLength={MAX_LOCATION_LENGTH}
                 onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
               />
             </div>
