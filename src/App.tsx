@@ -11,7 +11,7 @@ import Payment from "./pages/Payment";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import ActiveSession from "./pages/ActiveSession";
 import Credits from "./pages/Credits";
-import Subscriptions from "./pages/Subscriptions";
+
 import History from "./pages/History";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
@@ -38,7 +38,7 @@ const App = () => (
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/session/active" element={<ActiveSession />} />
               <Route path="/credits" element={<Credits />} />
-              <Route path="/subscriptions" element={<Subscriptions />} />
+              
               <Route path="/history" element={<History />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/login" element={<Login />} />

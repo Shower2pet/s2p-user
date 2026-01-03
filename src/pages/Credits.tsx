@@ -182,7 +182,7 @@ const Credits = () => {
         </div>
 
         {/* Subscription Plans Section */}
-        <div className="space-y-4">
+        <div id="subscriptions" className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
@@ -194,7 +194,7 @@ const Credits = () => {
             {t('saveWithSubscription')}
           </p>
 
-          <div className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             {branding.subscriptionPlans.map((plan) => {
               const isUnlimited = (plan as any).unlimited;
               const unlimitedPlan = plan.id === 'unlimited';
@@ -202,14 +202,14 @@ const Credits = () => {
               return (
                 <Card 
                   key={plan.id} 
-                  className={`relative overflow-hidden p-5 transition-all ${
+                  className={`relative overflow-hidden p-6 transition-all ${
                     unlimitedPlan 
                       ? 'bg-gradient-to-br from-primary via-primary to-sky border-2 border-primary shadow-glow-primary' 
                       : 'hover:shadow-lg'
                   }`}
                 >
                   {plan.badge && (
-                    <div className="absolute top-3 right-3">
+                    <div className="absolute top-4 right-4">
                       <span className={`px-2 py-0.5 text-xs font-bold rounded-full flex items-center gap-1 ${
                         unlimitedPlan 
                           ? 'bg-warning text-warning-foreground' 
@@ -221,65 +221,70 @@ const Credits = () => {
                     </div>
                   )}
                   
-                  <div className={`flex items-center gap-4 ${unlimitedPlan ? 'text-primary-foreground' : ''}`}>
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                      unlimitedPlan ? 'bg-white/20' : 'bg-primary/10'
-                    }`}>
-                      {unlimitedPlan ? (
-                        <Infinity className="w-7 h-7 text-primary-foreground" />
-                      ) : (
-                        <Coins className="w-7 h-7 text-primary" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className={`text-lg font-bold ${unlimitedPlan ? '' : 'text-foreground'}`}>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className={`text-xl font-bold ${unlimitedPlan ? 'text-primary-foreground' : 'text-foreground'}`}>
                         {plan.name}
                       </h3>
-                      <p className={`text-sm ${unlimitedPlan ? 'opacity-90' : 'text-muted-foreground'}`}>
+                      <p className={`text-sm font-light mt-1 ${unlimitedPlan ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                         {plan.description}
                       </p>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/20">
-                    <div className={unlimitedPlan ? 'text-primary-foreground' : ''}>
-                      <span className="text-2xl font-bold">€{plan.price}</span>
-                      <span className={`text-sm ${unlimitedPlan ? 'opacity-80' : 'text-muted-foreground'}`}>
+                    
+                    <div className="flex items-baseline gap-2">
+                      <span className={`text-4xl font-bold ${unlimitedPlan ? 'text-primary-foreground' : 'text-primary'}`}>
+                        €{plan.price}
+                      </span>
+                      <span className={unlimitedPlan ? 'text-primary-foreground/80' : 'text-muted-foreground'}>
                         /{plan.interval === 'week' ? 'sett' : 'mese'}
                       </span>
                     </div>
-                    <div className={`text-sm ${unlimitedPlan ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                      {isUnlimited ? (
-                        <span className="flex items-center gap-1">
-                          <Check className="w-4 h-4" /> Lavaggi illimitati
-                        </span>
-                      ) : (plan as any).creditsPerWeek ? (
-                        <span>{(plan as any).creditsPerWeek} crediti/sett</span>
+                    
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                      unlimitedPlan ? 'bg-white/20' : 'bg-mint/20'
+                    }`}>
+                      {unlimitedPlan ? (
+                        <Infinity className="w-5 h-5 text-primary-foreground" />
                       ) : (
-                        <span>{(plan as any).creditsPerMonth} crediti/mese</span>
+                        <Coins className="w-5 h-5 text-mint-foreground" />
                       )}
+                      <div className={unlimitedPlan ? 'text-primary-foreground' : ''}>
+                        <div className={`font-bold ${unlimitedPlan ? '' : 'text-foreground'}`}>
+                          {isUnlimited ? (
+                            'Lavaggi illimitati'
+                          ) : (plan as any).creditsPerWeek ? (
+                            `${(plan as any).creditsPerWeek} crediti/sett`
+                          ) : (
+                            `${(plan as any).creditsPerMonth} crediti/mese`
+                          )}
+                        </div>
+                        <div className={`text-xs font-light ${unlimitedPlan ? 'opacity-80' : 'text-muted-foreground'}`}>
+                          {plan.billingCycle}
+                        </div>
+                      </div>
                     </div>
+                    
+                    <Button
+                      onClick={() => handleSubscription(plan)}
+                      disabled={loadingPlanId === plan.id}
+                      className={`w-full ${
+                        unlimitedPlan 
+                          ? 'bg-white text-primary hover:bg-white/90 font-bold' 
+                          : ''
+                      }`}
+                      variant={unlimitedPlan ? 'default' : 'default'}
+                      size="lg"
+                    >
+                      {loadingPlanId === plan.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {t('processing')}
+                        </>
+                      ) : (
+                        t('purchase')
+                      )}
+                    </Button>
                   </div>
-                  
-                  <Button
-                    onClick={() => handleSubscription(plan)}
-                    disabled={loadingPlanId === plan.id}
-                    className={`w-full mt-4 ${
-                      unlimitedPlan 
-                        ? 'bg-white text-primary hover:bg-white/90 font-bold' 
-                        : ''
-                    }`}
-                    variant={unlimitedPlan ? 'default' : 'outline'}
-                  >
-                    {loadingPlanId === plan.id ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Attendi...
-                      </>
-                    ) : (
-                      'Attiva abbonamento'
-                    )}
-                  </Button>
                 </Card>
               );
             })}
