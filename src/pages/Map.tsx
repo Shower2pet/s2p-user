@@ -23,12 +23,34 @@ const Map = () => {
   const [stationCode, setStationCode] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [noStationsMessage, setNoStationsMessage] = useState<string | null>(null);
   const { data: stations, isLoading } = useStations();
+
+  const checkStationsNearLocation = (lng: number, lat: number, locationName: string) => {
+    if (!stations || stations.length === 0) {
+      setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
+      return;
+    }
+
+    // Check if any station is within ~50km of the searched location
+    const nearbyStations = stations.filter(station => {
+      if (station.lat < -90 || station.lat > 90 || station.lng < -180 || station.lng > 180) return false;
+      const distance = Math.sqrt(Math.pow(station.lat - lat, 2) + Math.pow(station.lng - lng, 2));
+      return distance < 0.5; // Roughly 50km
+    });
+
+    if (nearbyStations.length === 0) {
+      setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
+    } else {
+      setNoStationsMessage(null);
+    }
+  };
 
   const handleLocationSearch = async () => {
     if (!locationSearch.trim() || !map.current) return;
     
     setIsSearching(true);
+    setNoStationsMessage(null);
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationSearch)}.json?access_token=${MAPBOX_TOKEN}&country=it&limit=1`
@@ -37,12 +59,13 @@ const Map = () => {
       
       if (data.features && data.features.length > 0) {
         const [lng, lat] = data.features[0].center;
+        const placeName = data.features[0].place_name;
         map.current.flyTo({
           center: [lng, lat],
           zoom: 13,
           essential: true
         });
-        toast.success(`Spostato a: ${data.features[0].place_name}`);
+        checkStationsNearLocation(lng, lat, placeName);
       } else {
         toast.error('Località non trovata');
       }
@@ -203,6 +226,27 @@ const Map = () => {
             </Button>
           </div>
         </Card>
+
+        {/* No Stations Message */}
+        {noStationsMessage && (
+          <Card className="p-4 bg-warning/10 border-warning animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground text-sm">Nessuna stazione trovata</h3>
+                <p className="text-sm text-muted-foreground mt-1">{noStationsMessage}</p>
+              </div>
+              <button
+                onClick={() => setNoStationsMessage(null)}
+                className="p-1 hover:bg-muted rounded-full transition-colors ml-auto"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+          </Card>
+        )}
 
         {/* Unlock Station Button */}
         {!showUnlockInput ? (
