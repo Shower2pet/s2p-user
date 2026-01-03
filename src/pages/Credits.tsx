@@ -50,11 +50,13 @@ const Credits = () => {
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          priceId: pack.stripePriceId,
+          amount: pack.price * 100, // Convert to cents
+          currency: 'eur',
+          productName: pack.name,
+          description: pack.description,
           mode: 'payment',
-          quantity: 1,
           productType: 'credit_pack',
-          description: pack.name,
+          credits: pack.credits,
         },
       });
 

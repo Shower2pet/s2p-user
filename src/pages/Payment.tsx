@@ -19,9 +19,13 @@ const Payment = () => {
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          priceId: branding.station.stripePriceId || 'price_placeholder',
+          amount: branding.station.pricePerSession * 100, // Convert to cents
+          currency: 'eur',
+          productName: branding.station.name,
+          description: branding.station.description,
           mode: 'payment',
-          quantity: 1,
+          productType: 'session',
+          credits: 1, // 1 session = 1 credit
         },
       });
 

@@ -25,11 +25,31 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const { priceId, mode, quantity = 1, productType = 'session', description = '' } = await req.json();
-    logStep("Request params", { priceId, mode, quantity, productType });
+    const { 
+      amount, // Amount in cents (e.g., 1000 = €10.00)
+      currency = 'eur',
+      productName,
+      description = '',
+      mode = 'payment', // 'payment' or 'subscription'
+      productType = 'session', // 'session', 'credit_pack', 'subscription'
+      interval, // For subscriptions: 'day', 'week', 'month', 'year'
+      intervalCount = 1, // How many intervals between billings
+      quantity = 1,
+      credits = 0, // Credits to add on success
+    } = await req.json();
+    
+    logStep("Request params", { amount, currency, productName, mode, productType, interval });
 
-    if (!priceId) {
-      throw new Error("Price ID is required");
+    if (!amount || amount <= 0) {
+      throw new Error("Valid amount is required");
+    }
+
+    if (!productName) {
+      throw new Error("Product name is required");
+    }
+
+    if (mode === 'subscription' && !interval) {
+      throw new Error("Interval is required for subscriptions");
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -63,27 +83,50 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Get price info to store amount
-    const price = await stripe.prices.retrieve(priceId);
-    const amount = price.unit_amount || 0;
-    logStep("Price retrieved", { priceId, amount });
-
     const origin = req.headers.get("origin") || "https://hvltamnpmwstdtkftplz.lovable.app";
+
+    // Build price_data based on mode
+    let priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData;
+    
+    if (mode === 'subscription') {
+      priceData = {
+        currency: currency,
+        product_data: {
+          name: productName,
+          description: description || undefined,
+        },
+        unit_amount: amount,
+        recurring: {
+          interval: interval as 'day' | 'week' | 'month' | 'year',
+          interval_count: intervalCount,
+        },
+      };
+    } else {
+      priceData = {
+        currency: currency,
+        product_data: {
+          name: productName,
+          description: description || undefined,
+        },
+        unit_amount: amount,
+      };
+    }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       line_items: [
         {
-          price: priceId,
+          price_data: priceData,
           quantity: quantity,
         },
       ],
-      mode: mode || "payment",
+      mode: mode as 'payment' | 'subscription',
       success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/`,
       metadata: {
         user_id: userId || '',
         product_type: productType,
         description: description,
+        credits: credits.toString(),
       },
     };
 
@@ -94,7 +137,7 @@ serve(async (req) => {
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
-    logStep("Checkout session created", { sessionId: session.id });
+    logStep("Checkout session created", { sessionId: session.id, amount, productName });
 
     // Create transaction record if user is authenticated
     if (userId) {
@@ -104,8 +147,8 @@ serve(async (req) => {
           user_id: userId,
           stripe_session_id: session.id,
           amount: amount,
-          currency: price.currency || 'eur',
-          description: description || `${productType} purchase`,
+          currency: currency,
+          description: description || productName,
           product_type: productType,
           status: 'pending',
         });
