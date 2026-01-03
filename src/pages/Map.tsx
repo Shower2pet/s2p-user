@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStations, Station } from '@/hooks/useStations';
-import { MapPin, Navigation, Play, Unlock, X } from 'lucide-react';
+import { MapPin, Navigation, Play, Unlock, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -21,7 +21,38 @@ const Map = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [showUnlockInput, setShowUnlockInput] = useState(false);
   const [stationCode, setStationCode] = useState('');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const { data: stations, isLoading } = useStations();
+
+  const handleLocationSearch = async () => {
+    if (!locationSearch.trim() || !map.current) return;
+    
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationSearch)}.json?access_token=${MAPBOX_TOKEN}&country=it&limit=1`
+      );
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        map.current.flyTo({
+          center: [lng, lat],
+          zoom: 13,
+          essential: true
+        });
+        toast.success(`Spostato a: ${data.features[0].place_name}`);
+      } else {
+        toast.error('Località non trovata');
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      toast.error('Errore nella ricerca');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleUnlockStation = () => {
     if (!stationCode.trim()) {
@@ -153,6 +184,25 @@ const Map = () => {
             {t('findStationsDesc')}
           </p>
         </div>
+
+        {/* Location Search */}
+        <Card className="p-4">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+                placeholder="Cerca località (es. Milano, Roma...)"
+                className="pl-10"
+                onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
+              />
+            </div>
+            <Button onClick={handleLocationSearch} disabled={isSearching}>
+              {isSearching ? '...' : 'Cerca'}
+            </Button>
+          </div>
+        </Card>
 
         {/* Unlock Station Button */}
         {!showUnlockInput ? (

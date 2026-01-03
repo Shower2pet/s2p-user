@@ -59,19 +59,54 @@ const Index = () => {
           </h1>
         </div>
 
-        {/* User Credits Display - Floating Card */}
-        {user && <Card className="p-6 rounded-3xl shadow-floating cursor-pointer hover:shadow-glow-primary transition-all duration-300 animate-slide-up" onClick={() => navigate('/credits')}>
-            <div className="flex items-center justify-between">
+        {/* User Credits Display - Beautiful Card with Dog Theme */}
+        {user && <Card className="relative overflow-hidden p-6 rounded-3xl shadow-floating cursor-pointer hover:shadow-glow-primary transition-all duration-300 animate-slide-up bg-gradient-to-br from-card via-card to-sky/10" onClick={() => navigate('/credits')}>
+            {/* Decorative paw prints */}
+            <div className="absolute top-2 right-8 opacity-10">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-primary">
+                <ellipse cx="12" cy="17" rx="4" ry="5"/>
+                <ellipse cx="5" cy="10" rx="2.5" ry="3"/>
+                <ellipse cx="19" cy="10" rx="2.5" ry="3"/>
+                <ellipse cx="8" cy="6" rx="2" ry="2.5"/>
+                <ellipse cx="16" cy="6" rx="2" ry="2.5"/>
+              </svg>
+            </div>
+            <div className="absolute bottom-4 right-4 opacity-5">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-primary">
+                <ellipse cx="12" cy="17" rx="4" ry="5"/>
+                <ellipse cx="5" cy="10" rx="2.5" ry="3"/>
+                <ellipse cx="19" cy="10" rx="2.5" ry="3"/>
+                <ellipse cx="8" cy="6" rx="2" ry="2.5"/>
+                <ellipse cx="16" cy="6" rx="2" ry="2.5"/>
+              </svg>
+            </div>
+            
+            <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-sky flex items-center justify-center">
-                  <Sparkles className="w-7 h-7 text-primary-foreground" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-sky flex items-center justify-center shadow-lg">
+                  {/* Dog bone icon */}
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-foreground">
+                    <path d="M15.59 3.41a2 2 0 0 0-2.83 0l-8.5 8.5a2 2 0 0 0 0 2.83l2.83 2.83a2 2 0 0 0 2.83 0l8.5-8.5a2 2 0 0 0 0-2.83l-2.83-2.83z"/>
+                    <circle cx="6.5" cy="6.5" r="2.5"/>
+                    <circle cx="17.5" cy="17.5" r="2.5"/>
+                  </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground font-medium">{t('yourCredits')}</p>
-                  <p className="text-4xl font-bold text-primary">{profile?.credits || 0}</p>
+                  <p className="text-sm text-muted-foreground font-medium flex items-center gap-1">
+                    {t('yourCredits')}
+                  </p>
+                  <div className="flex items-baseline gap-1">
+                    <p className="text-4xl font-bold text-primary">{profile?.credits || 0}</p>
+                    <span className="text-sm text-muted-foreground font-medium">crediti</span>
+                  </div>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <ChevronRight className="w-5 h-5 text-primary" />
+                </div>
+                <span className="text-xs text-muted-foreground mt-1">Ricarica</span>
+              </div>
             </div>
           </Card>}
 
