@@ -47,7 +47,12 @@ export const SubscriptionCard = ({ plan, isActive, isLoading, onActivate }: Subs
           <div className="flex items-center gap-2 text-foreground">
             <Check className="w-5 h-5 text-success" />
             <span className="font-light">
-              {plan.creditsPerWeek ? `${plan.creditsPerWeek} ${t('credits')} ${t('perWeek')}` : `${plan.creditsPerMonth} ${t('credits')} ${t('perMonth')}`}
+              {(plan as any).unlimited 
+                ? 'Lavaggi illimitati' 
+                : plan.creditsPerWeek 
+                  ? `${plan.creditsPerWeek} ${t('credits')} ${t('perWeek')}` 
+                  : `${plan.creditsPerMonth} ${t('credits')} ${t('perMonth')}`
+              }
             </span>
           </div>
           <div className="flex items-center gap-2 text-foreground">
