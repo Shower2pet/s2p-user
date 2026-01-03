@@ -7,8 +7,7 @@ import { branding } from '@/config/branding';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Coins, Plus, TrendingUp, Infinity, Star, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Coins, Plus, TrendingUp, Infinity, Star, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Transaction {
@@ -21,11 +20,10 @@ interface Transaction {
 }
 
 const Credits = () => {
-  const navigate = useNavigate();
   const { t } = useLanguage();
   const { profile, user } = useAuth();
   const [loadingPackId, setLoadingPackId] = useState<string | null>(null);
-  const [loadingUnlimited, setLoadingUnlimited] = useState(false);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
@@ -74,22 +72,20 @@ const Credits = () => {
     }
   };
 
-  const unlimitedPlan = branding.subscriptionPlans.find(p => p.id === 'unlimited');
-
-  const handleUnlimitedSubscription = async () => {
-    if (!unlimitedPlan) return;
-    setLoadingUnlimited(true);
+  const handleSubscription = async (plan: typeof branding.subscriptionPlans[0]) => {
+    setLoadingPlanId(plan.id);
     try {
+      const credits = (plan as any).creditsPerWeek || (plan as any).creditsPerMonth || 0;
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          amount: unlimitedPlan.price * 100,
+          amount: plan.price * 100,
           currency: 'eur',
-          productName: unlimitedPlan.name,
-          description: unlimitedPlan.description,
+          productName: plan.name,
+          description: plan.description,
           mode: 'subscription',
           productType: 'subscription',
-          interval: unlimitedPlan.interval,
-          credits: 0,
+          interval: plan.interval,
+          credits: credits,
         },
       });
 
@@ -102,7 +98,7 @@ const Credits = () => {
       console.error('Error creating checkout:', error);
       toast.error('Errore durante il pagamento');
     } finally {
-      setLoadingUnlimited(false);
+      setLoadingPlanId(null);
     }
   };
 
@@ -157,47 +153,6 @@ const Credits = () => {
           </div>
         </Card>
 
-        {/* Unlimited Plan Highlight */}
-        {unlimitedPlan && (
-          <Card className="relative overflow-hidden p-6 bg-gradient-to-br from-primary via-primary to-sky border-2 border-primary shadow-glow-primary">
-            <div className="absolute top-3 right-3">
-              <span className="px-3 py-1 bg-warning text-warning-foreground text-xs font-bold rounded-full flex items-center gap-1">
-                <Star className="w-3 h-3" />
-                PREMIUM
-              </span>
-            </div>
-            <div className="flex items-center gap-4 text-primary-foreground">
-              <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-                <Infinity className="w-8 h-8" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold">{unlimitedPlan.name}</h3>
-                <p className="text-sm opacity-90">{unlimitedPlan.description}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-primary-foreground">
-                <span className="text-3xl font-bold">€{unlimitedPlan.price}</span>
-                <span className="text-sm opacity-80">/mese</span>
-              </div>
-              <Button
-                onClick={handleUnlimitedSubscription}
-                disabled={loadingUnlimited}
-                className="bg-white text-primary hover:bg-white/90 font-bold"
-              >
-                {loadingUnlimited ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Attendi...
-                  </>
-                ) : (
-                  'Attiva ora'
-                )}
-              </Button>
-            </div>
-          </Card>
-        )}
-
         {/* Info Card */}
         <Card className="p-4 bg-mint/10 border-mint">
           <p className="text-sm text-center text-foreground font-light">
@@ -226,27 +181,110 @@ const Credits = () => {
           </div>
         </div>
 
-        {/* Subscription Link */}
-        <Card className="p-6 bg-gradient-to-r from-sand/10 to-accent/10 border-sand">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-bold text-foreground mb-1">
-                {t('saveWithSubscription')}
-              </h3>
-              <p className="text-sm text-muted-foreground font-light">
-                {t('chooseYourPlan')}
-              </p>
-            </div>
-            <Button
-              onClick={() => navigate('/subscriptions')}
-              variant="accent"
-              size="lg"
-            >
+        {/* Subscription Plans Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
-              {t('viewPlans')}
-            </Button>
+              {t('subscriptionPlans')}
+            </h2>
           </div>
-        </Card>
+          
+          <p className="text-sm text-muted-foreground">
+            {t('saveWithSubscription')}
+          </p>
+
+          <div className="grid gap-4">
+            {branding.subscriptionPlans.map((plan) => {
+              const isUnlimited = (plan as any).unlimited;
+              const unlimitedPlan = plan.id === 'unlimited';
+              
+              return (
+                <Card 
+                  key={plan.id} 
+                  className={`relative overflow-hidden p-5 transition-all ${
+                    unlimitedPlan 
+                      ? 'bg-gradient-to-br from-primary via-primary to-sky border-2 border-primary shadow-glow-primary' 
+                      : 'hover:shadow-lg'
+                  }`}
+                >
+                  {plan.badge && (
+                    <div className="absolute top-3 right-3">
+                      <span className={`px-2 py-0.5 text-xs font-bold rounded-full flex items-center gap-1 ${
+                        unlimitedPlan 
+                          ? 'bg-warning text-warning-foreground' 
+                          : 'bg-sand text-sand-foreground'
+                      }`}>
+                        {unlimitedPlan && <Star className="w-3 h-3" />}
+                        {plan.badge}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className={`flex items-center gap-4 ${unlimitedPlan ? 'text-primary-foreground' : ''}`}>
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                      unlimitedPlan ? 'bg-white/20' : 'bg-primary/10'
+                    }`}>
+                      {unlimitedPlan ? (
+                        <Infinity className="w-7 h-7 text-primary-foreground" />
+                      ) : (
+                        <Coins className="w-7 h-7 text-primary" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`text-lg font-bold ${unlimitedPlan ? '' : 'text-foreground'}`}>
+                        {plan.name}
+                      </h3>
+                      <p className={`text-sm ${unlimitedPlan ? 'opacity-90' : 'text-muted-foreground'}`}>
+                        {plan.description}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/20">
+                    <div className={unlimitedPlan ? 'text-primary-foreground' : ''}>
+                      <span className="text-2xl font-bold">€{plan.price}</span>
+                      <span className={`text-sm ${unlimitedPlan ? 'opacity-80' : 'text-muted-foreground'}`}>
+                        /{plan.interval === 'week' ? 'sett' : 'mese'}
+                      </span>
+                    </div>
+                    <div className={`text-sm ${unlimitedPlan ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                      {isUnlimited ? (
+                        <span className="flex items-center gap-1">
+                          <Check className="w-4 h-4" /> Lavaggi illimitati
+                        </span>
+                      ) : (plan as any).creditsPerWeek ? (
+                        <span>{(plan as any).creditsPerWeek} crediti/sett</span>
+                      ) : (
+                        <span>{(plan as any).creditsPerMonth} crediti/mese</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <Button
+                    onClick={() => handleSubscription(plan)}
+                    disabled={loadingPlanId === plan.id}
+                    className={`w-full mt-4 ${
+                      unlimitedPlan 
+                        ? 'bg-white text-primary hover:bg-white/90 font-bold' 
+                        : ''
+                    }`}
+                    variant={unlimitedPlan ? 'default' : 'outline'}
+                  >
+                    {loadingPlanId === plan.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Attendi...
+                      </>
+                    ) : (
+                      'Attiva abbonamento'
+                    )}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Recent Transactions */}
         <div className="space-y-4">
