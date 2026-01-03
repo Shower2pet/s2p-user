@@ -2,9 +2,19 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+const allowedOrigins = [
+  'https://hvltamnpmwstdtkftplz.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+const getCorsHeaders = (origin: string | null) => {
+  const isAllowed = origin && allowedOrigins.some(allowed => origin.startsWith(allowed.replace(/\/$/, '')));
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 };
 
 const logStep = (step: string, details?: any) => {
@@ -13,6 +23,9 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -83,7 +96,7 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const origin = req.headers.get("origin") || "https://hvltamnpmwstdtkftplz.lovable.app";
+    const requestOrigin = req.headers.get("origin") || "https://hvltamnpmwstdtkftplz.lovable.app";
 
     // Build price_data based on mode
     let priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData;
@@ -120,8 +133,8 @@ serve(async (req) => {
         },
       ],
       mode: mode as 'payment' | 'subscription',
-      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/`,
+      success_url: `${requestOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${requestOrigin}/`,
       metadata: {
         user_id: userId || '',
         product_type: productType,

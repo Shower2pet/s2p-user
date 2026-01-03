@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/hooks/useLanguage';
+import { registerSchema } from '@/lib/validation';
+import { z } from 'zod';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
 
 const Register = () => {
@@ -25,45 +27,38 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-    
     if (!formData.acceptTerms) {
-      toast.error('Please accept the Terms and Conditions');
+      toast.error('Accetta i Termini e Condizioni per continuare');
       return;
     }
 
-    setLoading(true);
-
+    // Validate input with zod
     try {
+      const validated = registerSchema.parse({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+      });
+
+      setLoading(true);
+
       const redirectUrl = `${window.location.origin}/`;
       
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+        email: validated.email,
+        password: validated.password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: formData.name,
+            full_name: validated.name,
           },
         },
       });
 
       if (error) {
         if (error.message.includes('already registered')) {
-          toast.error('This email is already registered. Please login instead.');
+          toast.error('Questa email è già registrata. Effettua il login.');
         } else {
           toast.error(error.message);
         }
@@ -71,11 +66,15 @@ const Register = () => {
       }
 
       if (data.user) {
-        toast.success('Account created successfully! Please check your email to confirm.');
+        toast.success('Account creato con successo! Controlla la tua email per confermare.');
         navigate('/login');
       }
     } catch (error) {
-      toast.error('An unexpected error occurred');
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+        return;
+      }
+      toast.error('Si è verificato un errore imprevisto');
     } finally {
       setLoading(false);
     }
