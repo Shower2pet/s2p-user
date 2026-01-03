@@ -165,7 +165,7 @@ const Index = () => {
             <Card 
               className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-br from-primary via-primary to-sky border-2 border-primary shadow-glow-primary cursor-pointer hover:scale-[1.02] transition-all duration-300 animate-slide-up"
               style={{ animationDelay: '0.3s' }}
-              onClick={() => navigate('/subscriptions')}
+              onClick={() => navigate('/credits#subscriptions')}
             >
               <div className="absolute top-3 right-3">
                 <span className="px-2 py-0.5 bg-warning text-warning-foreground text-xs font-bold rounded-full flex items-center gap-1">
