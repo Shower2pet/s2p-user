@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/hooks/useLanguage';
+import { loginSchema } from '@/lib/validation';
+import { z } from 'zod';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
 
 const Login = () => {
@@ -34,22 +36,21 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
-    setLoading(true);
-
+    
+    // Validate input with zod
     try {
+      const validated = loginSchema.parse({ email, password });
+      
+      setLoading(true);
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: validated.email,
+        password: validated.password,
       });
 
       if (error) {
         if (error.message.includes('Invalid login credentials')) {
-          toast.error('Invalid email or password');
+          toast.error('Email o password non validi');
         } else {
           toast.error(error.message);
         }
@@ -57,11 +58,15 @@ const Login = () => {
       }
 
       if (data.user) {
-        toast.success('Logged in successfully');
+        toast.success('Accesso effettuato con successo');
         navigate('/');
       }
     } catch (error) {
-      toast.error('An unexpected error occurred');
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+        return;
+      }
+      toast.error('Si è verificato un errore imprevisto');
     } finally {
       setLoading(false);
     }
