@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useStations } from '@/hooks/useStations';
-import { Play, LogIn, Droplets, Wind, MapPin, Unlock, Sparkles, ChevronRight } from 'lucide-react';
+import { branding } from '@/config/branding';
+import { Play, LogIn, MapPin, Unlock, ChevronRight, Infinity, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 const Index = () => {
@@ -157,8 +158,34 @@ const Index = () => {
             </Card>}
         </div>
 
-        {/* Features - Soft UI Cards */}
-        
+        {/* Unlimited Plan Highlight */}
+        {(() => {
+          const unlimitedPlan = branding.subscriptionPlans.find(p => p.id === 'unlimited');
+          return unlimitedPlan && (
+            <Card 
+              className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-br from-primary via-primary to-sky border-2 border-primary shadow-glow-primary cursor-pointer hover:scale-[1.02] transition-all duration-300 animate-slide-up"
+              style={{ animationDelay: '0.3s' }}
+              onClick={() => navigate('/subscriptions')}
+            >
+              <div className="absolute top-3 right-3">
+                <span className="px-2 py-0.5 bg-warning text-warning-foreground text-xs font-bold rounded-full flex items-center gap-1">
+                  <Star className="w-3 h-3" />
+                  PREMIUM
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-primary-foreground">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Infinity className="w-7 h-7" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold">{unlimitedPlan.name}</h3>
+                  <p className="text-xs opacity-90">Solo €{unlimitedPlan.price}/mese</p>
+                </div>
+                <ChevronRight className="w-5 h-5 opacity-80" />
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* How It Works - Soft Card */}
         <Card className="p-6 rounded-3xl shadow-lifted animate-slide-up" style={{
