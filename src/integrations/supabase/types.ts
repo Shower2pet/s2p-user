@@ -198,7 +198,62 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      stations_public: {
+        Row: {
+          address: string | null
+          company_id: string | null
+          created_at: string | null
+          currency: string | null
+          duration_minutes: number | null
+          id: string | null
+          lat: number | null
+          lng: number | null
+          location: string | null
+          name: string | null
+          price_per_session: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          duration_minutes?: number | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+          location?: string | null
+          name?: string | null
+          price_per_session?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          duration_minutes?: number | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+          location?: string | null
+          name?: string | null
+          price_per_session?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never
