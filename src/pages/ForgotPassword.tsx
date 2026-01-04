@@ -6,19 +6,44 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { z } from 'zod';
+
+const emailSchema = z.string().trim().email('Indirizzo email non valido');
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      toast.error('Please enter your email');
-      return;
+    
+    try {
+      const validatedEmail = emailSchema.parse(email);
+      
+      setLoading(true);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      
+      setSubmitted(true);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error('Si è verificato un errore');
+      }
+    } finally {
+      setLoading(false);
     }
-    setSubmitted(true);
   };
 
   if (submitted) {
@@ -77,8 +102,8 @@ const ForgotPassword = () => {
             />
           </div>
 
-          <Button type="submit" variant="default" size="lg" className="w-full">
-            Send Reset Link
+          <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
+            {loading ? 'Invio in corso...' : 'Invia Link di Reset'}
           </Button>
         </form>
       </Card>
