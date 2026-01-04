@@ -37,39 +37,16 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate input with zod
-    try {
-      const validated = loginSchema.parse({ email, password });
-      
-      setLoading(true);
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: validated.email,
-        password: validated.password,
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Email o password non validi');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      if (data.user) {
-        toast.success('Accesso effettuato con successo');
-        navigate('/');
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-        return;
-      }
-      toast.error('Si è verificato un errore imprevisto');
-    } finally {
-      setLoading(false);
-    }
+    // TEST MODE: Bypass authentication - accept any credentials
+    // TODO: Remove this before production!
+    setLoading(true);
+    
+    // Simulate a brief loading time
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    toast.success('Accesso effettuato con successo (TEST MODE)');
+    setLoading(false);
+    navigate('/');
   };
 
   return (
