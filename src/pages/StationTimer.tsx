@@ -1,17 +1,27 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Dog, Droplets, Wind } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useLanguage } from "@/contexts/LanguageContext";
-import logo from "@/assets/shower2pet-logo.png";
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Dog, Droplets, Wind, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useStation } from '@/hooks/useStations';
+import logo from '@/assets/shower2pet-logo.png';
 
-const TOTAL_SECONDS = 5 * 60; // 5 minutes
+const StationTimer = () => {
+  const { id } = useParams<{ id: string }>();
+  const { data: station } = useStation(id);
+  const totalSeconds = (station?.duration_minutes || 5) * 60;
 
-const TimerPage = () => {
-  const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
   const [isActive, setIsActive] = useState(true);
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  // Update total when station loads
+  useEffect(() => {
+    if (station) {
+      setSecondsLeft(station.duration_minutes * 60);
+    }
+  }, [station]);
 
   useEffect(() => {
     if (!isActive || secondsLeft <= 0) return;
@@ -31,24 +41,31 @@ const TimerPage = () => {
 
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
-  const progress = ((TOTAL_SECONDS - secondsLeft) / TOTAL_SECONDS) * 100;
+  const progress = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
+  const isFinished = secondsLeft <= 0;
 
   const handleFinish = () => {
-    navigate("/");
+    navigate('/');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary to-shower-primary-dark flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-primary to-[hsl(206,100%,20%)] flex flex-col">
       <div className="mx-auto max-w-[480px] w-full flex-1 flex flex-col px-4 py-6">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <img src={logo} alt="Shower2Pet" className="h-10 object-contain" />
         </div>
 
+        {/* Station name */}
+        {station && (
+          <p className="text-center text-primary-foreground/80 text-sm font-light mb-4">
+            {station.name}
+          </p>
+        )}
+
         {/* Timer Circle */}
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="relative">
-            {/* Background circle */}
             <svg className="w-64 h-64 transform -rotate-90">
               <circle
                 cx="128"
@@ -71,28 +88,31 @@ const TimerPage = () => {
                 className="transition-all duration-1000 ease-linear"
               />
             </svg>
-            
-            {/* Timer display */}
+
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Dog className="h-12 w-12 text-primary-foreground/80 mb-2" />
-              <span className="text-5xl font-bold text-primary-foreground">
-                {minutes}:{seconds.toString().padStart(2, "0")}
+              {isFinished ? (
+                <CheckCircle className="h-12 w-12 text-primary-foreground/80 mb-2" />
+              ) : (
+                <Dog className="h-12 w-12 text-primary-foreground/80 mb-2" />
+              )}
+              <span className="text-5xl font-bold text-primary-foreground tabular-nums">
+                {minutes}:{seconds.toString().padStart(2, '0')}
               </span>
-              <span className="text-primary-foreground/80 mt-1">
-                {secondsLeft > 0 ? t.timerActive : t.timerComplete}
+              <span className="text-primary-foreground/80 mt-1 text-sm">
+                {isFinished ? t('sessionFinished') : t('serviceActive')}
               </span>
             </div>
           </div>
 
-          {/* Status */}
+          {/* Status pills */}
           <div className="mt-8 flex gap-4">
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/20 px-4 py-2">
               <Droplets className="h-5 w-5 text-primary-foreground" />
-              <span className="text-sm text-primary-foreground">{t.water}</span>
+              <span className="text-sm text-primary-foreground">{t('waterSystem')}</span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-primary-foreground/20 px-4 py-2">
               <Wind className="h-5 w-5 text-primary-foreground" />
-              <span className="text-sm text-primary-foreground">{t.dryer}</span>
+              <span className="text-sm text-primary-foreground">{t('petDryer')}</span>
             </div>
           </div>
         </div>
@@ -100,15 +120,15 @@ const TimerPage = () => {
         {/* Finish Button */}
         <Button
           variant="outline"
-          size="xl"
-          className="w-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-0"
+          size="lg"
+          className="w-full h-14 text-base rounded-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-0"
           onClick={handleFinish}
         >
-          {secondsLeft > 0 ? t.stopSession : t.backToStation}
+          {isFinished ? t('backToHome') : t('back')}
         </Button>
       </div>
     </div>
   );
 };
 
-export default TimerPage;
+export default StationTimer;

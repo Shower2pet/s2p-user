@@ -33,7 +33,7 @@ const Index = () => {
     }
     const station = stations?.find(s => s.id.toLowerCase() === stationCode.trim().toLowerCase());
     if (station) {
-      window.open(`https://station-shower2pet.lovable.app/${station.id}`, '_blank');
+      navigate(`/s/${station.id}`);
       setStationCode('');
       setShowUnlockInput(false);
     } else {
