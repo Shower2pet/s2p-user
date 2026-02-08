@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ const MAX_LOCATION_LENGTH = 100;
 
 const Map = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -121,7 +123,7 @@ const Map = () => {
     
     const station = stations?.find(s => s.id.toLowerCase() === stationCode.toLowerCase().trim());
     if (station) {
-      window.open(`https://station-shower2pet.lovable.app/${station.id}`, '_blank');
+      navigate(`/s/${station.id}`);
       setShowUnlockInput(false);
       setStationCode('');
     } else {
@@ -190,8 +192,7 @@ const Map = () => {
   }, []);
 
   const handleActivateStation = (station: Station) => {
-    // Redirect to external station app
-    window.open(`https://station-shower2pet.lovable.app/${station.id}`, '_blank');
+    navigate(`/s/${station.id}`);
   };
 
   const handleNavigate = (station: Station) => {
