@@ -43,9 +43,12 @@ export const ActionButtons = ({
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           price_id: stripePriceId,
-          station_id: stationId,
+          amount: !stripePriceId ? Math.round(price * 100) : undefined,
+          productName: !stripePriceId ? stationName : undefined,
+          productType: 'session',
+          description: `Session at ${stationName}`,
           success_url: `${window.location.origin}/s/${stationId}/timer`,
-          cancel_url: window.location.href,
+          cancel_url: `${window.location.origin}/s/${stationId}`,
         },
       });
 

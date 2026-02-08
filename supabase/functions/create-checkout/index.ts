@@ -2,19 +2,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const allowedOrigins = [
-  'https://hvltamnpmwstdtkftplz.lovable.app',
-  'http://localhost:5173',
-  'http://localhost:8080',
-];
-
-const getCorsHeaders = (origin: string | null) => {
-  const isAllowed = origin && allowedOrigins.some(allowed => origin.startsWith(allowed.replace(/\/$/, '')));
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const logStep = (step: string, details?: any) => {
@@ -23,9 +13,6 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -38,6 +25,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    const body = await req.json();
     const { 
       amount, // Amount in cents (e.g., 1000 = €10.00)
       currency = 'eur',
@@ -46,29 +34,35 @@ serve(async (req) => {
       mode = 'payment', // 'payment' or 'subscription'
       productType = 'session', // 'session', 'credit_pack', 'subscription'
       interval, // For subscriptions: 'day', 'week', 'month', 'year'
-      intervalCount = 1, // How many intervals between billings
+      intervalCount = 1,
       quantity = 1,
-      credits = 0, // Credits to add on success
-    } = await req.json();
+      credits = 0,
+      price_id, // Optional: use existing Stripe price instead of price_data
+      success_url: customSuccessUrl,
+      cancel_url: customCancelUrl,
+    } = body;
     
-    logStep("Request params", { amount, currency, productName, mode, productType, interval });
+    logStep("Request params", { amount, currency, productName, mode, productType, interval, price_id });
 
-    if (!amount || amount <= 0) {
-      throw new Error("Valid amount is required");
+    // Validate: need either amount+productName or price_id
+    if (!price_id && (!amount || amount <= 0)) {
+      throw new Error("Valid amount or price_id is required");
     }
-
-    if (!productName) {
-      throw new Error("Product name is required");
+    if (!price_id && !productName) {
+      throw new Error("Product name or price_id is required");
     }
-
-    if (mode === 'subscription' && !interval) {
-      throw new Error("Interval is required for subscriptions");
+    if (mode === 'subscription' && !interval && !price_id) {
+      throw new Error("Interval is required for subscriptions (unless using price_id)");
     }
 
     const authHeader = req.headers.get("Authorization");
     let userEmail: string | undefined;
     let userId: string | undefined;
     let customerId: string | undefined;
+
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2025-08-27.basil",
+    });
 
     if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
@@ -80,10 +74,6 @@ serve(async (req) => {
         userId = user.id;
         logStep("User authenticated", { email: userEmail, userId });
 
-        const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-          apiVersion: "2025-08-27.basil",
-        });
-
         const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
         if (customers.data.length > 0) {
           customerId = customers.data[0].id;
@@ -92,49 +82,45 @@ serve(async (req) => {
       }
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
+    const requestOrigin = req.headers.get("origin") || "https://s2p-user.lovable.app";
+    const successUrl = customSuccessUrl || `${requestOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = customCancelUrl || `${requestOrigin}/`;
 
-    const requestOrigin = req.headers.get("origin") || "https://hvltamnpmwstdtkftplz.lovable.app";
+    // Build line_items based on whether price_id or price_data is used
+    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[];
 
-    // Build price_data based on mode
-    let priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData;
-    
-    if (mode === 'subscription') {
-      priceData = {
-        currency: currency,
-        product_data: {
-          name: productName,
-          description: description || undefined,
-        },
-        unit_amount: amount,
-        recurring: {
-          interval: interval as 'day' | 'week' | 'month' | 'year',
-          interval_count: intervalCount,
-        },
-      };
+    if (price_id) {
+      // Use existing Stripe price
+      lineItems = [{ price: price_id, quantity }];
     } else {
-      priceData = {
-        currency: currency,
-        product_data: {
-          name: productName,
-          description: description || undefined,
-        },
-        unit_amount: amount,
-      };
+      // Build dynamic price_data
+      let priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData;
+      
+      if (mode === 'subscription') {
+        priceData = {
+          currency,
+          product_data: { name: productName, description: description || undefined },
+          unit_amount: amount,
+          recurring: {
+            interval: interval as 'day' | 'week' | 'month' | 'year',
+            interval_count: intervalCount,
+          },
+        };
+      } else {
+        priceData = {
+          currency,
+          product_data: { name: productName, description: description || undefined },
+          unit_amount: amount,
+        };
+      }
+      lineItems = [{ price_data: priceData, quantity }];
     }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      line_items: [
-        {
-          price_data: priceData,
-          quantity: quantity,
-        },
-      ],
+      line_items: lineItems,
       mode: mode as 'payment' | 'subscription',
-      success_url: `${requestOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${requestOrigin}/`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: {
         user_id: userId || '',
         product_type: productType,
@@ -150,7 +136,7 @@ serve(async (req) => {
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
-    logStep("Checkout session created", { sessionId: session.id, amount, productName });
+    logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
     // Create transaction record if user is authenticated
     if (userId) {
@@ -159,9 +145,9 @@ serve(async (req) => {
         .insert({
           user_id: userId,
           stripe_session_id: session.id,
-          amount: amount,
-          currency: currency,
-          description: description || productName,
+          amount: price_id ? 0 : amount,
+          currency,
+          description: description || productName || 'Station session',
           product_type: productType,
           status: 'pending',
         });
@@ -169,7 +155,7 @@ serve(async (req) => {
       if (txError) {
         logStep("Error creating transaction record", { error: txError.message });
       } else {
-        logStep("Transaction record created", { sessionId: session.id });
+        logStep("Transaction record created");
       }
     }
 
