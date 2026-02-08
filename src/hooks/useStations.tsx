@@ -12,7 +12,6 @@ export interface Station {
   price_per_session: number;
   duration_minutes: number;
   currency: string;
-  stripe_price_id: string | null;
 }
 
 export const useStations = () => {
@@ -20,7 +19,7 @@ export const useStations = () => {
     queryKey: ['stations'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('stations')
+        .from('stations_public')
         .select('*')
         .order('name');
       
@@ -37,7 +36,7 @@ export const useStation = (stationId: string | undefined) => {
       if (!stationId) return null;
       
       const { data, error } = await supabase
-        .from('stations')
+        .from('stations_public')
         .select('*')
         .eq('id', stationId)
         .maybeSingle();

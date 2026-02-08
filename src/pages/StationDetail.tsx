@@ -73,7 +73,6 @@ const StationDetail = () => {
               price={station.price_per_session}
               currency={station.currency}
               durationMinutes={station.duration_minutes}
-              stripePriceId={station.stripe_price_id}
             />
           </div>
 

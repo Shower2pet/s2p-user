@@ -37,10 +37,28 @@ serve(async (req) => {
       intervalCount = 1,
       quantity = 1,
       credits = 0,
-      price_id, // Optional: use existing Stripe price instead of price_data
+      station_id, // Optional: look up stripe_price_id from station
       success_url: customSuccessUrl,
       cancel_url: customCancelUrl,
     } = body;
+
+    // Look up stripe_price_id server-side if station_id provided
+    let price_id: string | undefined;
+    if (station_id) {
+      const { data: stationData, error: stationError } = await supabaseClient
+        .from('stations')
+        .select('stripe_price_id')
+        .eq('id', station_id)
+        .maybeSingle();
+      
+      if (stationError) {
+        logStep("Error looking up station", { error: stationError.message });
+      }
+      if (stationData?.stripe_price_id) {
+        price_id = stationData.stripe_price_id;
+        logStep("Resolved stripe_price_id from station", { station_id, price_id });
+      }
+    }
     
     logStep("Request params", { amount, currency, productName, mode, productType, interval, price_id });
 
