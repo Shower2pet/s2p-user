@@ -17,26 +17,26 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
-        name: 'Shower2Pet User',
-        short_name: 'S2P User',
+        name: 'Shower2Pet',
+        short_name: 'Shower2Pet',
         description: 'Self-service dog wash station app',
         theme_color: '#005596',
-        background_color: '#79BDE8',
+        background_color: '#005596',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
         icons: [
           {
-            src: '/placeholder.svg',
+            src: '/shower2pet-logo.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
-            src: '/placeholder.svg',
+            src: '/shower2pet-logo.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable'
+            type: 'image/png',
+            purpose: 'any'
           }
         ]
       },
