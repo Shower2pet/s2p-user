@@ -27,13 +27,13 @@ export default defineConfig(({ mode }) => ({
         start_url: '/',
         icons: [
           {
-            src: '/shower2pet-logo.png',
+            src: '/pwa-icon.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/shower2pet-logo.png',
+            src: '/pwa-icon.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
