@@ -15,7 +15,6 @@ interface ActionButtonsProps {
   price: number;
   currency: string;
   durationMinutes: number;
-  stripePriceId: string | null;
 }
 
 export const ActionButtons = ({
@@ -25,7 +24,6 @@ export const ActionButtons = ({
   price,
   currency,
   durationMinutes,
-  stripePriceId,
 }: ActionButtonsProps) => {
   const navigate = useNavigate();
   const { user, profile, refreshProfile } = useAuth();
@@ -42,9 +40,9 @@ export const ActionButtons = ({
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          price_id: stripePriceId,
-          amount: !stripePriceId ? Math.round(price * 100) : undefined,
-          productName: !stripePriceId ? stationName : undefined,
+          station_id: stationId,
+          amount: Math.round(price * 100),
+          productName: stationName,
           productType: 'session',
           description: `Session at ${stationName}`,
           success_url: `${window.location.origin}/s/${stationId}/timer`,
