@@ -150,6 +150,7 @@ serve(async (req) => {
         product_type: productType,
         description: description,
         credits: credits.toString(),
+        structure_id: body.structure_id || '',
         station_type: station_type || '',
         station_category: station_category || '',
       },

@@ -75,53 +75,42 @@ serve(async (req) => {
 
         const userId = session.metadata?.user_id;
         const productType = session.metadata?.product_type;
-        const amountPaid = session.amount_total || 0;
+        const structureId = session.metadata?.structure_id;
+        const creditsFromMeta = parseInt(session.metadata?.credits || '0', 10);
 
-        if (userId) {
-          let creditsToAdd = 0;
+        if (userId && productType === 'credit_pack' && structureId && creditsFromMeta > 0) {
+          logStep("Credit pack purchase", { userId, structureId, creditsFromMeta });
 
-          // Handle credit pack purchases
-          if (productType === 'credit_pack') {
-            // Map price amounts to credits (in cents)
-            if (amountPaid === 1000) creditsToAdd = 12; // €10 pack
-            else if (amountPaid === 2000) creditsToAdd = 25; // €20 pack
-            logStep("Credit pack purchase", { amountPaid, creditsToAdd });
-          }
-          
-          // Handle subscription purchases
-          else if (productType === 'subscription' || session.mode === 'subscription') {
-            // Map subscription amounts to credits (in cents)
-            if (amountPaid === 1000) creditsToAdd = 15; // €10/week plan - 15 credits
-            else if (amountPaid === 3500) creditsToAdd = 40; // €35/month plan - 40 credits
-            else if (amountPaid === 5000) creditsToAdd = 100; // €50/month unlimited - 100 credits
-            logStep("Subscription purchase", { amountPaid, creditsToAdd });
-          }
-          
-          // Handle single session payment (no credits added, direct session)
-          else if (productType === 'session') {
-            logStep("Session payment - no credits to add");
-          }
+          // Upsert structure_wallets balance
+          const { data: existing } = await supabaseClient
+            .from('structure_wallets')
+            .select('id, balance')
+            .eq('user_id', userId)
+            .eq('structure_id', structureId)
+            .maybeSingle();
 
-          if (creditsToAdd > 0) {
-            const { data: profile } = await supabaseClient
-              .from('profiles')
-              .select('credits')
-              .eq('user_id', userId)
-              .single();
-
-            const currentCredits = profile?.credits || 0;
-            
+          if (existing) {
             const { error: updateError } = await supabaseClient
-              .from('profiles')
-              .update({ credits: currentCredits + creditsToAdd })
-              .eq('user_id', userId);
-
-            if (updateError) {
-              logStep("Error adding credits", { error: updateError.message });
-            } else {
-              logStep("Credits added", { userId, creditsToAdd, newTotal: currentCredits + creditsToAdd });
-            }
+              .from('structure_wallets')
+              .update({ balance: (existing.balance || 0) + creditsFromMeta, updated_at: new Date().toISOString() })
+              .eq('id', existing.id);
+            if (updateError) logStep("Error updating wallet", { error: updateError.message });
+            else logStep("Wallet updated", { newBalance: (existing.balance || 0) + creditsFromMeta });
+          } else {
+            const { error: insertError } = await supabaseClient
+              .from('structure_wallets')
+              .insert({ user_id: userId, structure_id: structureId, balance: creditsFromMeta });
+            if (insertError) logStep("Error creating wallet", { error: insertError.message });
+            else logStep("Wallet created", { balance: creditsFromMeta });
           }
+
+          // Update transaction with credits info
+          await supabaseClient
+            .from('transactions')
+            .update({ credits_purchased: creditsFromMeta, structure_id: structureId })
+            .eq('stripe_payment_id', session.id);
+        } else if (productType === 'session') {
+          logStep("Session payment - no credits to add");
         }
         break;
       }
