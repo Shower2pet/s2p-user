@@ -213,8 +213,8 @@ const StationTimer = () => {
       setCourtesySeconds(remaining);
 
       if (remaining <= 0) {
-        setStep('cleanup');
-        updateSessionStep(session.id, 'cleanup');
+        setStep('rating');
+        updateSessionStep(session.id, 'rating', 'COMPLETED');
       }
     };
 
