@@ -433,6 +433,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_stations: {
+        Args: never
+        Returns: {
+          created_at: string
+          geo_lat: number
+          geo_lng: number
+          id: string
+          image_url: string
+          last_heartbeat_at: string
+          status: string
+          structure_id: string
+          type: string
+          visibility: string
+          washing_options: Json
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
       is_manager_of: { Args: { struct_id: string }; Returns: boolean }
     }
