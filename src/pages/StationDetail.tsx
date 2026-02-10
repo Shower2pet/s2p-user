@@ -105,6 +105,8 @@ const StationDetail = () => {
             name={station.structure_name || station.id}
             status={displayStatus as 'available' | 'busy' | 'offline'}
             description={station.structure_description || undefined}
+            stationType={station.type}
+            category={station.category}
           />
           {station.visibility === 'RESTRICTED' && (
             <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-warning/10 text-warning text-sm">

@@ -6,15 +6,29 @@ interface StationIdentityBlockProps {
   name: string;
   status: 'available' | 'busy' | 'offline';
   description?: string;
+  stationType?: string;
+  category?: string;
 }
 
-export const StationIdentityBlock = ({ name, status, description }: StationIdentityBlockProps) => {
+export const StationIdentityBlock = ({ name, status, description, stationType, category }: StationIdentityBlockProps) => {
   const { t } = useLanguage();
+
+  const categoryLabel = category === 'SHOWER' ? '🚿 Doccia' : '🛁 Vasca';
 
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between">
-        <h1 className="text-2xl font-bold text-foreground leading-tight">{name}</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground leading-tight">{name}</h1>
+          {stationType && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                {stationType}
+              </span>
+              <span className="text-xs text-muted-foreground">{categoryLabel}</span>
+            </div>
+          )}
+        </div>
         <StationStatusBadge status={status} />
       </div>
       <p className="text-sm text-muted-foreground font-light">

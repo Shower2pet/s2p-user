@@ -67,18 +67,25 @@ const StationTimer = () => {
         const currentStep = data.step as WashStep;
         setStep(currentStep);
 
-        if (currentStep === 'timer') {
+        if (currentStep === 'timer' || currentStep === 'courtesy') {
           const now = Date.now();
           const endsAt = new Date(data.ends_at).getTime();
           const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
 
           if (remaining > 0) {
-            setSecondsLeft(remaining);
-            setIsActive(true);
+            if (currentStep === 'courtesy') {
+              setCourtesySeconds(remaining);
+            } else {
+              setSecondsLeft(remaining);
+              setIsActive(true);
+            }
           } else {
             setSecondsLeft(0);
             setIsActive(false);
-            if (isShowerStation) {
+            if (currentStep === 'courtesy') {
+              updateSessionStep(data.id, 'cleanup');
+              setStep('cleanup');
+            } else if (isShowerStation) {
               updateSessionStep(data.id, 'rating', 'COMPLETED');
               setStep('rating');
             } else {
@@ -254,14 +261,20 @@ const StationTimer = () => {
     }
   };
 
-  const handleCleanupResponse = (clean: boolean) => {
+  const handleCleanupResponse = async (clean: boolean) => {
     if (clean) {
       setStep('rating');
       if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
     } else {
-      setCourtesySeconds(60);
+      const courtesyDuration = 60;
+      setCourtesySeconds(courtesyDuration);
       setStep('courtesy');
-      if (session) updateSessionStep(session.id, 'courtesy');
+      if (session) {
+        // Persist courtesy end time so it survives page refresh
+        const courtesyEndsAt = new Date(Date.now() + courtesyDuration * 1000).toISOString();
+        await supabase.from('wash_sessions').update({ step: 'courtesy', ends_at: courtesyEndsAt }).eq('id', session.id);
+        setSession({ ...session, ends_at: courtesyEndsAt });
+      }
     }
   };
 
