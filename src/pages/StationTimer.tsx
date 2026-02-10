@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,42 @@ type WashStep = TubStep | ShowerStep;
 
 const SANITIZE_SECONDS = 30;
 
+// Session persistence helpers
+const SESSION_KEY = 's2p_active_session';
+
+interface PersistedSession {
+  stationId: string;
+  optionId: number;
+  step: WashStep;
+  /** Unix timestamp (ms) when the main timer ends */
+  timerEndsAt: number | null;
+  /** Unix timestamp (ms) when courtesy timer ends */
+  courtesyEndsAt: number | null;
+  /** Unix timestamp (ms) when sanitize timer ends */
+  sanitizeEndsAt: number | null;
+  totalSeconds: number;
+}
+
+const saveSession = (session: PersistedSession) => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+};
+
+const loadSession = (stationId: string, optionId: number): PersistedSession | null => {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const session: PersistedSession = JSON.parse(raw);
+    if (session.stationId === stationId && session.optionId === optionId) return session;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const clearSession = () => {
+  localStorage.removeItem(SESSION_KEY);
+};
+
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -28,6 +64,13 @@ const StationTimer = () => {
   const option = station?.washing_options?.find(o => o.id === optionId);
   const totalSeconds = option?.duration || 300;
 
+  // Try to restore persisted session
+  const restored = useRef(false);
+  const getInitialState = useCallback(() => {
+    if (!id) return null;
+    return loadSession(id, optionId);
+  }, [id, optionId]);
+
   const [step, setStep] = useState<WashStep>('rules');
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
   const [isActive, setIsActive] = useState(false);
@@ -36,24 +79,87 @@ const StationTimer = () => {
   const [rating, setRating] = useState(0);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
 
-  // Set initial step based on station type
+  // Restore session on mount (runs once when station data is available)
   useEffect(() => {
-    if (!station) return;
+    if (!station || restored.current) return;
+    restored.current = true;
+
+    const saved = getInitialState();
+    if (saved) {
+      const now = Date.now();
+      setStep(saved.step);
+
+      if (saved.step === 'timer' && saved.timerEndsAt) {
+        const remaining = Math.max(0, Math.round((saved.timerEndsAt - now) / 1000));
+        if (remaining > 0) {
+          setSecondsLeft(remaining);
+          setIsActive(true);
+        } else {
+          // Timer expired while away
+          setSecondsLeft(0);
+          setIsActive(false);
+          if (isShowerStation) {
+            setStep('rating');
+          } else {
+            setStep('cleanup');
+          }
+        }
+      } else if (saved.step === 'courtesy' && saved.courtesyEndsAt) {
+        const remaining = Math.max(0, Math.round((saved.courtesyEndsAt - now) / 1000));
+        if (remaining > 0) {
+          setCourtesySeconds(remaining);
+        } else {
+          setStep('cleanup');
+        }
+      } else if (saved.step === 'sanitizing' && saved.sanitizeEndsAt) {
+        const remaining = Math.max(0, Math.round((saved.sanitizeEndsAt - now) / 1000));
+        if (remaining > 0) {
+          setSanitizeSeconds(remaining);
+        } else {
+          setStep('rating');
+        }
+      } else {
+        // For non-timer steps (rules, cleanup, rating), just restore the step
+      }
+      return;
+    }
+
+    // No saved session — initialize normally
     if (isShowerStation) {
-      // Shower: skip rules, start timer immediately
       setStep('timer');
       setIsActive(true);
     } else {
       setStep('rules');
     }
-  }, [station, isShowerStation]);
+  }, [station, isShowerStation, getInitialState]);
 
-  // Update total when station loads
+  // Update total when station loads (only if no restored session)
   useEffect(() => {
-    if (option) {
+    if (option && !loadSession(id || '', optionId)) {
       setSecondsLeft(option.duration);
     }
-  }, [option]);
+  }, [option, id, optionId]);
+
+  // Persist session state whenever step or timers change
+  useEffect(() => {
+    if (!id || step === 'rating') return;
+    const now = Date.now();
+    const session: PersistedSession = {
+      stationId: id,
+      optionId,
+      step,
+      timerEndsAt: step === 'timer' && isActive ? now + secondsLeft * 1000 : null,
+      courtesyEndsAt: step === 'courtesy' ? now + courtesySeconds * 1000 : null,
+      sanitizeEndsAt: step === 'sanitizing' ? now + sanitizeSeconds * 1000 : null,
+      totalSeconds,
+    };
+    saveSession(session);
+  }, [step, secondsLeft, isActive, courtesySeconds, sanitizeSeconds, id, optionId, totalSeconds]);
+
+  // Clear persisted session when reaching rating (session complete)
+  useEffect(() => {
+    if (step === 'rating') clearSession();
+  }, [step]);
 
   // Main timer
   useEffect(() => {
@@ -145,6 +251,7 @@ const StationTimer = () => {
   };
 
   const handleFinish = () => {
+    clearSession();
     navigate('/');
   };
 
