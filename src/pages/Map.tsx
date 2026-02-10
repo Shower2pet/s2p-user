@@ -6,16 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useStations, Station } from '@/hooks/useStations';
-import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle } from 'lucide-react';
+import { useStations, Station, isStationOnline } from '@/hooks/useStations';
+import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Use environment variable only - no hardcoded fallback for security
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
-
-// Validation pattern for location search (letters, numbers, spaces, Italian characters)
 const LOCATION_PATTERN = /^[a-zA-Z0-9\s,àèéìòùÀÈÉÌÒÙ\-']+$/;
 const MAX_LOCATION_LENGTH = 100;
 
@@ -33,17 +30,20 @@ const Map = () => {
   const [noStationsMessage, setNoStationsMessage] = useState<string | null>(null);
   const { data: stations, isLoading } = useStations();
 
+  // Filter out HIDDEN stations
+  const visibleStations = stations?.filter(s => s.visibility !== 'HIDDEN') || [];
+
   const checkStationsNearLocation = (lng: number, lat: number, locationName: string) => {
-    if (!stations || stations.length === 0) {
+    if (visibleStations.length === 0) {
       setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
       return;
     }
 
-    // Check if any station is within ~50km of the searched location
-    const nearbyStations = stations.filter(station => {
-      if (station.lat < -90 || station.lat > 90 || station.lng < -180 || station.lng > 180) return false;
-      const distance = Math.sqrt(Math.pow(station.lat - lat, 2) + Math.pow(station.lng - lng, 2));
-      return distance < 0.5; // Roughly 50km
+    const nearbyStations = visibleStations.filter(s => {
+      if (!s.geo_lat || !s.geo_lng) return false;
+      if (s.geo_lat < -90 || s.geo_lat > 90 || s.geo_lng < -180 || s.geo_lng > 180) return false;
+      const distance = Math.sqrt(Math.pow(s.geo_lat - lat, 2) + Math.pow(s.geo_lng - lng, 2));
+      return distance < 0.5;
     });
 
     if (nearbyStations.length === 0) {
@@ -55,51 +55,35 @@ const Map = () => {
 
   const handleLocationSearch = async () => {
     const trimmed = locationSearch.trim();
-    
-    // Validate input
     if (!trimmed || !map.current || !MAPBOX_TOKEN) return;
-    
-    // Add length limit
     if (trimmed.length > MAX_LOCATION_LENGTH) {
       toast.error(`Località troppo lunga (max ${MAX_LOCATION_LENGTH} caratteri)`);
       return;
     }
-    
-    // Add character validation
     if (!LOCATION_PATTERN.test(trimmed)) {
       toast.error('La località contiene caratteri non validi');
       return;
     }
-    
+
     setIsSearching(true);
     setNoStationsMessage(null);
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${MAPBOX_TOKEN}&country=it&limit=1`,
         { signal: controller.signal }
       );
-      
       clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error('Errore nella ricerca');
-      }
-      
+
+      if (!response.ok) throw new Error('Errore nella ricerca');
       const data = await response.json();
-      
-      if (data.features && data.features.length > 0) {
+
+      if (data.features?.length > 0) {
         const [lng, lat] = data.features[0].center;
-        const placeName = data.features[0].place_name;
-        map.current.flyTo({
-          center: [lng, lat],
-          zoom: 13,
-          essential: true
-        });
-        checkStationsNearLocation(lng, lat, placeName);
+        map.current.flyTo({ center: [lng, lat], zoom: 13, essential: true });
+        checkStationsNearLocation(lng, lat, data.features[0].place_name);
       } else {
         toast.error('Località non trovata');
       }
@@ -107,7 +91,6 @@ const Map = () => {
       if (error instanceof Error && error.name === 'AbortError') {
         toast.error('Ricerca scaduta, riprova');
       } else {
-        console.error('Geocoding error:', error);
         toast.error('Errore nella ricerca');
       }
     } finally {
@@ -120,7 +103,6 @@ const Map = () => {
       toast.error(t('enterStationCode'));
       return;
     }
-    
     const station = stations?.find(s => s.id.toLowerCase() === stationCode.toLowerCase().trim());
     if (station) {
       navigate(`/s/${station.id}`);
@@ -132,58 +114,47 @@ const Map = () => {
   };
 
   useEffect(() => {
-    if (!mapContainer.current || !stations || stations.length === 0 || !MAPBOX_TOKEN) return;
+    if (!mapContainer.current || !visibleStations.length || !MAPBOX_TOKEN) return;
 
-    // Initialize map if not already done
     if (!map.current) {
       mapboxgl.accessToken = MAPBOX_TOKEN;
-      
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/light-v11',
         center: [9.1900, 45.4642],
         zoom: 11,
       });
-
       map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
     }
 
-    // Clear existing markers
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Add markers for each station (skip invalid coordinates)
-    stations.forEach((station) => {
-      // Validate coordinates before adding marker
-      if (station.lat < -90 || station.lat > 90 || station.lng < -180 || station.lng > 180) {
-        console.warn(`Skipping station ${station.id} with invalid coordinates: lat=${station.lat}, lng=${station.lng}`);
-        return;
-      }
+    visibleStations.forEach((station) => {
+      const lat = station.geo_lat;
+      const lng = station.geo_lng;
+      if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
 
-      const markerColor = station.status === 'available' ? '#22c55e' : '#f59e0b';
-      
+      const online = isStationOnline(station);
+      // Pin color: gray if offline/maintenance, blue for public, blue+lock for restricted
+      const markerColor = online ? '#005596' : '#9ca3af';
+
       const marker = new mapboxgl.Marker({ color: markerColor })
-        .setLngLat([station.lng, station.lat])
+        .setLngLat([lng, lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<strong>${station.name}</strong><br/>${station.location}`
+            `<strong>${station.structure_name || station.id}</strong><br/>${station.structure_address || ''}${
+              station.visibility === 'RESTRICTED' ? '<br/><em>🔒 Solo Clienti</em>' : ''
+            }`
           )
         )
         .addTo(map.current!);
 
-      marker.getElement().addEventListener('click', () => {
-        setSelectedStation(station);
-      });
-
+      marker.getElement().addEventListener('click', () => setSelectedStation(station));
       markersRef.current.push(marker);
     });
+  }, [visibleStations]);
 
-    return () => {
-      // Cleanup only markers, keep map instance
-    };
-  }, [stations]);
-
-  // Cleanup map on unmount
   useEffect(() => {
     return () => {
       map.current?.remove();
@@ -191,35 +162,21 @@ const Map = () => {
     };
   }, []);
 
-  const handleActivateStation = (station: Station) => {
-    navigate(`/s/${station.id}`);
-  };
+  const handleActivateStation = (station: Station) => navigate(`/s/${station.id}`);
 
   const handleNavigate = (station: Station) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`;
-    window.open(url, '_blank');
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'bg-success text-success-foreground';
-      case 'busy':
-        return 'bg-warning text-warning-foreground';
-      default:
-        return 'bg-muted text-muted-foreground';
+    const lat = station.geo_lat || station.structure_geo_lat;
+    const lng = station.geo_lng || station.structure_geo_lng;
+    if (lat && lng) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'available':
-        return t('available');
-      case 'busy':
-        return t('busy');
-      default:
-        return t('offline');
-    }
+  const getStatusInfo = (station: Station) => {
+    const online = isStationOnline(station);
+    if (online) return { color: 'bg-success text-success-foreground', text: t('available') };
+    if (station.status === 'BUSY') return { color: 'bg-warning text-warning-foreground', text: t('busy') };
+    return { color: 'bg-muted text-muted-foreground', text: t('offline') };
   };
 
   if (isLoading) {
@@ -229,109 +186,89 @@ const Map = () => {
           <Skeleton className="h-10 w-48 mx-auto" />
           <Skeleton className="h-64 w-full" />
           <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
         </div>
       </AppShell>
     );
   }
 
-  // Show error state if Mapbox token is not configured
   if (!MAPBOX_TOKEN) {
     return (
       <AppShell>
         <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
           <div className="text-center space-y-1">
             <h1 className="text-2xl font-bold text-foreground">{t('findStations')}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t('findStationsDesc')}
-            </p>
           </div>
-          
           <Card className="p-6 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <AlertTriangle className="w-10 h-10 text-warning" />
-              <p className="text-muted-foreground">
-                La mappa non è disponibile al momento. Contatta il supporto.
-              </p>
-            </div>
+            <AlertTriangle className="w-10 h-10 text-warning mx-auto mb-3" />
+            <p className="text-muted-foreground">La mappa non è disponibile al momento.</p>
           </Card>
-          
-          {/* Stations List - still show without map */}
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
-            
-            {stations?.map((station) => (
-              <Card
-                key={station.id}
-                className={`p-4 cursor-pointer transition-all ${
-                  selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''
-                }`}
-                onClick={() => setSelectedStation(station)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-foreground text-sm">{station.name}</h3>
-                      <p className="text-xs text-muted-foreground">{station.location}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{station.address}</p>
-                    </div>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(station.status)}`}>
-                    {getStatusText(station.status)}
-                  </span>
-                </div>
-
-                {selectedStation?.id === station.id && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-border">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleActivateStation(station);
-                      }}
-                      disabled={station.status !== 'available'}
-                    >
-                      <Play className="w-4 h-4" />
-                      {t('activate')}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNavigate(station);
-                      }}
-                    >
-                      <Navigation className="w-4 h-4" />
-                      {t('directions')}
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
         </div>
       </AppShell>
     );
   }
+
+  const renderStationCard = (station: Station) => {
+    const status = getStatusInfo(station);
+    const online = isStationOnline(station);
+
+    return (
+      <Card
+        key={station.id}
+        className={`p-4 cursor-pointer transition-all ${selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''}`}
+        onClick={() => setSelectedStation(station)}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              {station.visibility === 'RESTRICTED' ? (
+                <Lock className="w-5 h-5 text-primary" />
+              ) : (
+                <MapPin className="w-5 h-5 text-primary" />
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-foreground text-sm">{station.structure_name || station.id}</h3>
+              <p className="text-xs text-muted-foreground">{station.structure_address || ''}</p>
+              {station.visibility === 'RESTRICTED' && (
+                <p className="text-xs text-warning mt-0.5">🔒 Solo Clienti</p>
+              )}
+            </div>
+          </div>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
+            {status.text}
+          </span>
+        </div>
+
+        {selectedStation?.id === station.id && (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+            <Button
+              variant="default" size="sm" className="flex-1"
+              onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
+              disabled={!online}
+            >
+              <Play className="w-4 h-4" /> {t('activate')}
+            </Button>
+            <Button
+              variant="outline" size="sm" className="flex-1"
+              onClick={(e) => { e.stopPropagation(); handleNavigate(station); }}
+            >
+              <Navigation className="w-4 h-4" /> {t('directions')}
+            </Button>
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   return (
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold text-foreground">{t('findStations')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t('findStationsDesc')}
-          </p>
+          <p className="text-sm text-muted-foreground">{t('findStationsDesc')}</p>
         </div>
 
-        {/* Location Search */}
+        {/* Search */}
         <Card className="p-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -351,68 +288,45 @@ const Map = () => {
           </div>
         </Card>
 
-        {/* No Stations Message */}
         {noStationsMessage && (
           <Card className="p-4 bg-warning/10 border-warning animate-fade-in">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-5 h-5 text-warning" />
-              </div>
-              <div>
+              <MapPin className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
                 <h3 className="font-bold text-foreground text-sm">Nessuna stazione trovata</h3>
                 <p className="text-sm text-muted-foreground mt-1">{noStationsMessage}</p>
               </div>
-              <button
-                onClick={() => setNoStationsMessage(null)}
-                className="p-1 hover:bg-muted rounded-full transition-colors ml-auto"
-              >
+              <button onClick={() => setNoStationsMessage(null)} className="p-1 hover:bg-muted rounded-full">
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
           </Card>
         )}
 
-        {/* Unlock Station Button */}
+        {/* Unlock */}
         {!showUnlockInput ? (
-          <Button
-            onClick={() => setShowUnlockInput(true)}
-            className="w-full shadow-glow-primary"
-            size="lg"
-          >
-            <Unlock className="w-5 h-5 mr-2" />
-            {t('unlockStation')}
+          <Button onClick={() => setShowUnlockInput(true)} className="w-full shadow-glow-primary" size="lg">
+            <Unlock className="w-5 h-5 mr-2" /> {t('unlockStation')}
           </Button>
         ) : (
           <Card className="p-4 space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-foreground">{t('enterStationCode')}</h3>
-              <button
-                onClick={() => {
-                  setShowUnlockInput(false);
-                  setStationCode('');
-                }}
-                className="p-1.5 hover:bg-muted rounded-full transition-colors"
-              >
+              <button onClick={() => { setShowUnlockInput(false); setStationCode(''); }} className="p-1.5 hover:bg-muted rounded-full">
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
             <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
             <div className="flex gap-2">
-              <Input
-                value={stationCode}
-                onChange={(e) => setStationCode(e.target.value)}
-                placeholder={t('stationCodePlaceholder')}
-                className="flex-1"
-                onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()}
-              />
-              <Button onClick={handleUnlockStation}>
-                {t('go')}
-              </Button>
+              <Input value={stationCode} onChange={(e) => setStationCode(e.target.value)}
+                placeholder={t('stationCodePlaceholder')} className="flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()} />
+              <Button onClick={handleUnlockStation}>{t('go')}</Button>
             </div>
           </Card>
         )}
 
-        {/* Mapbox Map */}
+        {/* Map */}
         <Card className="overflow-hidden">
           <div ref={mapContainer} className="w-full h-64" />
         </Card>
@@ -420,62 +334,7 @@ const Map = () => {
         {/* Stations List */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
-          
-          {stations?.map((station) => (
-            <Card
-              key={station.id}
-              className={`p-4 cursor-pointer transition-all ${
-                selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''
-              }`}
-              onClick={() => setSelectedStation(station)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-foreground text-sm">{station.name}</h3>
-                    <p className="text-xs text-muted-foreground">{station.location}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{station.address}</p>
-                  </div>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(station.status)}`}>
-                  {getStatusText(station.status)}
-                </span>
-              </div>
-
-              {selectedStation?.id === station.id && (
-                <div className="flex gap-2 mt-3 pt-3 border-t border-border">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleActivateStation(station);
-                    }}
-                    disabled={station.status !== 'available'}
-                  >
-                    <Play className="w-4 h-4" />
-                    {t('activate')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleNavigate(station);
-                    }}
-                  >
-                    <Navigation className="w-4 h-4" />
-                    {t('directions')}
-                  </Button>
-                </div>
-              )}
-            </Card>
-          ))}
+          {visibleStations.map(renderStationCard)}
         </div>
       </div>
     </AppShell>

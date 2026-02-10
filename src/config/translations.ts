@@ -188,6 +188,7 @@ export const translations: Record<string, Record<string, string>> = {
     installApp: 'Install Shower2Pet',
     installAppDesc: 'Add to your home screen for quick access',
     install: 'Install',
+    washingOptions: 'Washing Options',
   },
   it: {
     // Navigation
@@ -378,6 +379,7 @@ export const translations: Record<string, Record<string, string>> = {
     installApp: 'Installa Shower2Pet',
     installAppDesc: 'Aggiungi alla schermata home per un accesso rapido',
     install: 'Installa',
+    washingOptions: 'Opzioni Lavaggio',
   },
 };
 
