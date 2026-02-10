@@ -226,8 +226,9 @@ const StationTimer = () => {
 
   const handleCleanupResponse = (clean: boolean) => {
     if (clean) {
-      setStep('sanitizing');
-      if (session) updateSessionStep(session.id, 'sanitizing');
+      // Client goes straight to rating, no sanitization wait
+      setStep('rating');
+      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
     } else {
       setCourtesySeconds(60);
       setStep('courtesy');
