@@ -65,7 +65,12 @@ const Login = () => {
         toast.error(error.errors[0].message);
         return;
       }
-      toast.error('Si è verificato un errore imprevisto');
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
+        toast.error('Errore di connessione. Controlla la tua connessione internet e riprova.');
+      } else {
+        toast.error('Si è verificato un errore imprevisto');
+      }
     } finally {
       setLoading(false);
     }
