@@ -69,8 +69,14 @@ const StationDetail = () => {
       const body: any = {
         station_id: station.id,
         option_id: chosen.id,
+        amount: Math.round(chosen.price * 100),
+        productName: chosen.name,
+        currency: 'eur',
+        mode: 'payment',
+        productType: 'session',
         user_id: user?.id || null,
         guest_email: !user ? guestEmail : null,
+        success_url: `${window.location.origin}/s/${station.id}/timer?option=${chosen.id}`,
       };
 
       const { data, error } = await supabase.functions.invoke('create-checkout', { body });
