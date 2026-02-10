@@ -186,6 +186,52 @@ serve(async (req) => {
       }
     }
 
+    // Create wash session record for station payments
+    if (station_id && option_id && productType === 'session') {
+      // Find the option to get duration
+      let optionDuration = 300; // default 5 min
+      let optionName = productName || 'Wash session';
+      if (station_id) {
+        const { data: stData } = await supabaseClient
+          .from('stations')
+          .select('washing_options')
+          .eq('id', station_id)
+          .maybeSingle();
+        if (stData?.washing_options) {
+          const opt = (stData.washing_options as any[]).find((o: any) => o.id === option_id);
+          if (opt) {
+            optionDuration = opt.duration || 300;
+            optionName = opt.name || optionName;
+          }
+        }
+      }
+
+      const now = new Date();
+      const endsAt = new Date(now.getTime() + optionDuration * 1000);
+
+      const { error: wsError } = await supabaseClient
+        .from('wash_sessions')
+        .insert({
+          station_id,
+          user_id: userId || null,
+          guest_email: body.guest_email || null,
+          option_id,
+          option_name: optionName,
+          total_seconds: optionDuration,
+          started_at: now.toISOString(),
+          ends_at: endsAt.toISOString(),
+          step: 'timer',
+          status: 'ACTIVE',
+          stripe_session_id: session.id,
+        });
+
+      if (wsError) {
+        logStep("Error creating wash session", { error: wsError.message });
+      } else {
+        logStep("Wash session created", { station_id, option_id, ends_at: endsAt.toISOString() });
+      }
+    }
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

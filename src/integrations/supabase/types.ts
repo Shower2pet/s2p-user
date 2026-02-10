@@ -431,6 +431,69 @@ export type Database = {
           },
         ]
       }
+      wash_sessions: {
+        Row: {
+          created_at: string
+          ends_at: string
+          guest_email: string | null
+          id: string
+          option_id: number
+          option_name: string
+          started_at: string
+          station_id: string
+          status: string
+          step: string
+          stripe_session_id: string | null
+          total_seconds: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          guest_email?: string | null
+          id?: string
+          option_id: number
+          option_name: string
+          started_at?: string
+          station_id: string
+          status?: string
+          step?: string
+          stripe_session_id?: string | null
+          total_seconds: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          guest_email?: string | null
+          id?: string
+          option_id?: number
+          option_name?: string
+          started_at?: string
+          station_id?: string
+          status?: string
+          step?: string
+          stripe_session_id?: string | null
+          total_seconds?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wash_sessions_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wash_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
