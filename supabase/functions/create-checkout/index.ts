@@ -172,10 +172,12 @@ serve(async (req) => {
         .insert({
           user_id: userId,
           stripe_payment_id: session.id,
-          total_value: amount / 100, // convert cents to euros
+          total_value: amount / 100,
           amount_paid_stripe: amount / 100,
           transaction_type: productType === 'credit_pack' ? 'CREDIT_TOPUP' : 'WASH_SERVICE',
           station_id: station_id || null,
+          structure_id: body.structure_id || null,
+          credits_purchased: credits || 0,
           status: 'PENDING',
           payment_method: 'STRIPE',
         });
