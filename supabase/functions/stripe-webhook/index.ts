@@ -62,10 +62,9 @@ serve(async (req) => {
         const { error } = await supabaseClient
           .from('transactions')
           .update({ 
-            status: 'completed',
-            stripe_payment_intent_id: session.payment_intent as string || session.subscription as string,
+            status: 'COMPLETED',
           })
-          .eq('stripe_session_id', session.id);
+          .eq('stripe_payment_id', session.id);
 
         if (error) {
           logStep("Error updating transaction", { error: error.message });
@@ -109,6 +108,8 @@ serve(async (req) => {
             .from('transactions')
             .update({ credits_purchased: creditsFromMeta, structure_id: structureId })
             .eq('stripe_payment_id', session.id);
+
+          logStep("Credit pack processing complete");
         } else if (productType === 'session') {
           logStep("Session payment - no credits to add");
         }
@@ -120,8 +121,8 @@ serve(async (req) => {
         
         await supabaseClient
           .from('transactions')
-          .update({ status: 'expired' })
-          .eq('stripe_session_id', session.id);
+          .update({ status: 'EXPIRED' })
+          .eq('stripe_payment_id', session.id);
 
         logStep("Transaction marked as expired", { sessionId: session.id });
         break;
