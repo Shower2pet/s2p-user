@@ -92,19 +92,8 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Settings */}
+        {/* Notifications */}
         <div className="space-y-3">
-          <h2 className="text-lg font-bold text-foreground px-1">{t('settings')}</h2>
-          <Card className="divide-y divide-border">
-            <button onClick={() => navigate('/subscriptions')} className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <Settings className="w-5 h-5 text-muted-foreground" />
-                <span className="font-light text-foreground">{t('manageSubscription')}</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-          </Card>
-
           <h2 className="text-lg font-bold text-foreground px-1 pt-4">{t('notifications')}</h2>
           <Card className="divide-y divide-border">
             <div className="p-4 flex items-center justify-between">

@@ -110,18 +110,6 @@ export const translations: Record<string, Record<string, string>> = {
     bonus: 'bonus',
     purchase: 'Purchase',
     recentTransactions: 'Recent Transactions',
-    saveWithSubscription: 'Save more with a subscription!',
-    viewPlans: 'View Plans',
-    
-    // Subscriptions
-    subscriptionPlans: 'Subscription Plans',
-    chooseYourPlan: 'Choose the plan that fits your needs',
-    perWeek: '/week',
-    perMonth: '/month',
-    activateSubscription: 'Activate Subscription',
-    activePlan: 'Active Plan',
-    subscriptionActivated: 'Subscription activated successfully!',
-    activeSubscriptionMessage: 'You have an active subscription. Your credits will be renewed automatically.',
     
     // Payment
     payment: 'Payment',
@@ -301,18 +289,6 @@ export const translations: Record<string, Record<string, string>> = {
     bonus: 'bonus',
     purchase: 'Acquista',
     recentTransactions: 'Transazioni Recenti',
-    saveWithSubscription: 'Risparmia di più con un abbonamento!',
-    viewPlans: 'Vedi Piani',
-    
-    // Subscriptions
-    subscriptionPlans: 'Piani di Abbonamento',
-    chooseYourPlan: 'Scegli il piano più adatto alle tue esigenze',
-    perWeek: '/settimana',
-    perMonth: '/mese',
-    activateSubscription: 'Attiva Abbonamento',
-    activePlan: 'Piano Attivo',
-    subscriptionActivated: 'Abbonamento attivato con successo!',
-    activeSubscriptionMessage: 'Hai un abbonamento attivo. I tuoi crediti saranno rinnovati automaticamente.',
     
     // Payment
     payment: 'Pagamento',
