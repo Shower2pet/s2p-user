@@ -29,6 +29,7 @@ const StationDetail = () => {
   const [showCheckout, setShowCheckout] = useState(false);
   const [guestEmail, setGuestEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'credits' | 'stripe'>('stripe');
 
   if (isLoading) {
     return (
@@ -59,34 +60,47 @@ const StationDetail = () => {
   const washOptions = station.washing_options || [];
   const chosen = washOptions.find(o => o.id === selectedOption);
   const walletBalance = wallet?.balance || 0;
-  const toPay = chosen ? Math.max(0, chosen.price - walletBalance) : 0;
-  const walletDeduction = chosen ? Math.min(walletBalance, chosen.price) : 0;
+
+  const canPayWithCredits = user && walletBalance >= (chosen?.price || 0) && (chosen?.price || 0) > 0;
+
+  // Auto-select credits if user has enough balance
+  const effectivePaymentMethod = paymentMethod === 'credits' && canPayWithCredits ? 'credits' : 'stripe';
 
   const handlePay = async () => {
     if (!chosen) return;
     setIsProcessing(true);
     try {
-      const body: any = {
-        station_id: station.id,
-        option_id: chosen.id,
-        amount: Math.round(chosen.price * 100),
-        productName: chosen.name,
-        currency: 'eur',
-        mode: 'payment',
-        productType: 'session',
-        user_id: user?.id || null,
-        guest_email: !user ? guestEmail : null,
-        success_url: `${window.location.origin}/s/${station.id}/timer?option=${chosen.id}`,
-      };
+      if (effectivePaymentMethod === 'credits') {
+        // Pay with wallet credits
+        const { data, error } = await supabase.functions.invoke('pay-with-credits', {
+          body: { station_id: station.id, option_id: chosen.id },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
 
-      const { data, error } = await supabase.functions.invoke('create-checkout', { body });
-      if (error) throw error;
-
-      if (data?.url) {
-        window.location.href = data.url;
-      } else if (data?.success) {
         toast.success(t('serviceActivated'));
         navigate(`/s/${station.id}/timer?option=${chosen.id}`);
+      } else {
+        // Pay with Stripe
+        const body: any = {
+          station_id: station.id,
+          option_id: chosen.id,
+          amount: Math.round(chosen.price * 100),
+          productName: chosen.name,
+          currency: 'eur',
+          mode: 'payment',
+          productType: 'session',
+          user_id: user?.id || null,
+          guest_email: !user ? guestEmail : null,
+          success_url: `${window.location.origin}/s/${station.id}/timer?option=${chosen.id}`,
+        };
+
+        const { data, error } = await supabase.functions.invoke('create-checkout', { body });
+        if (error) throw error;
+
+        if (data?.url) {
+          window.location.href = data.url;
+        }
       }
     } catch (err: any) {
       console.error('Payment error:', err);
@@ -207,22 +221,59 @@ const StationDetail = () => {
               </div>
             )}
 
+            {/* Payment method selection */}
+            {user && walletBalance > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Metodo di pagamento</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('credits')}
+                    className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                      paymentMethod === 'credits'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-muted-foreground/30'
+                    } ${!canPayWithCredits ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    disabled={!canPayWithCredits}
+                  >
+                    <Coins className="w-5 h-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Crediti</p>
+                      <p className="text-xs text-muted-foreground">€{walletBalance.toFixed(2)} disp.</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('stripe')}
+                    className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left cursor-pointer ${
+                      paymentMethod === 'stripe'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <CreditCard className="w-5 h-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Carta</p>
+                      <p className="text-xs text-muted-foreground">Visa, MC, ...</p>
+                    </div>
+                  </button>
+                </div>
+                {!canPayWithCredits && walletBalance > 0 && (
+                  <p className="text-xs text-warning">Crediti insufficienti (€{walletBalance.toFixed(2)} / €{chosen?.price.toFixed(2)})</p>
+                )}
+              </div>
+            )}
+
             {/* Price breakdown */}
             <Card className="p-4 space-y-2 bg-muted/30">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t('price')}</span>
                 <span className="font-bold">€{chosen?.price.toFixed(2)}</span>
               </div>
-              {user && walletBalance > 0 && (
+              {effectivePaymentMethod === 'credits' && (
                 <div className="flex justify-between text-sm text-primary">
-                  <span>{t('yourCredits')}</span>
-                  <span>- €{walletDeduction.toFixed(2)}</span>
-                </div>
-              )}
-              {user && walletBalance > 0 && (
-                <div className="flex justify-between text-sm font-bold border-t border-border pt-2">
-                  <span>Da pagare con carta</span>
-                  <span>€{toPay.toFixed(2)}</span>
+                  <span>Pagato con crediti</span>
+                  <span>- €{chosen?.price.toFixed(2)}</span>
                 </div>
               )}
             </Card>
@@ -237,10 +288,17 @@ const StationDetail = () => {
             >
               {isProcessing ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
+              ) : effectivePaymentMethod === 'credits' ? (
+                <Coins className="w-5 h-5" />
               ) : (
                 <CreditCard className="w-5 h-5" />
               )}
-              {isProcessing ? t('processing') : toPay > 0 ? `${t('payNowWithCard')} €${toPay.toFixed(2)}` : t('activateNow')}
+              {isProcessing
+                ? t('processing')
+                : effectivePaymentMethod === 'credits'
+                  ? `${t('activateNow')} (crediti)`
+                  : `${t('payNowWithCard')} €${chosen?.price.toFixed(2)}`
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
