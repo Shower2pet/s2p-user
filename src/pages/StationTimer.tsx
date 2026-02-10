@@ -155,7 +155,9 @@ const StationTimer = () => {
       <div className="mx-auto max-w-[480px] w-full flex-1 flex flex-col px-4 py-6">
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <img src={logo} alt="Shower2Pet" className="h-10 object-contain" />
+          <div className="bg-white/90 rounded-2xl px-4 py-2">
+            <img src={logo} alt="Shower2Pet" className="h-10 object-contain" />
+          </div>
         </div>
 
         {/* Station name + type badge */}
