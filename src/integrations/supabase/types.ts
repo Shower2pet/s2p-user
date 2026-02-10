@@ -10,256 +10,438 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
-      company_profiles: {
+      credit_packages: {
         Row: {
-          address: string | null
-          city: string | null
-          company_name: string
-          country: string | null
-          created_at: string
-          email: string | null
+          credits_value: number
           id: string
-          logo_url: string | null
-          phone: string | null
-          postal_code: string | null
-          updated_at: string
-          user_id: string
-          vat_number: string | null
+          is_active: boolean | null
+          name: string | null
+          price_eur: number
+          structure_id: string | null
         }
         Insert: {
-          address?: string | null
-          city?: string | null
-          company_name: string
-          country?: string | null
-          created_at?: string
-          email?: string | null
+          credits_value: number
           id?: string
-          logo_url?: string | null
-          phone?: string | null
-          postal_code?: string | null
-          updated_at?: string
-          user_id: string
-          vat_number?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_eur: number
+          structure_id?: string | null
         }
         Update: {
-          address?: string | null
-          city?: string | null
-          company_name?: string
-          country?: string | null
-          created_at?: string
-          email?: string | null
+          credits_value?: number
           id?: string
-          logo_url?: string | null
-          phone?: string | null
-          postal_code?: string | null
-          updated_at?: string
-          user_id?: string
-          vat_number?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_eur?: number
+          structure_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "credit_packages_structure_id_fkey"
+            columns: ["structure_id"]
+            isOneToOne: false
+            referencedRelation: "structures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_logs: {
+        Row: {
+          created_at: string | null
+          ended_at: string | null
+          id: string
+          notes: string | null
+          performed_by: string | null
+          reason: string | null
+          started_at: string | null
+          station_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          ended_at?: string | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          started_at?: string | null
+          station_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          ended_at?: string | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          started_at?: string | null
+          station_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partners_fiscal_data: {
+        Row: {
+          business_name: string
+          fiscal_api_credentials: Json | null
+          is_active: boolean | null
+          profile_id: string
+          sdi_code: string | null
+          vat_number: string
+        }
+        Insert: {
+          business_name: string
+          fiscal_api_credentials?: Json | null
+          is_active?: boolean | null
+          profile_id: string
+          sdi_code?: string | null
+          vat_number: string
+        }
+        Update: {
+          business_name?: string
+          fiscal_api_credentials?: Json | null
+          is_active?: boolean | null
+          profile_id?: string
+          sdi_code?: string | null
+          vat_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partners_fiscal_data_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          credits: number
+          created_at: string | null
           email: string | null
-          full_name: string | null
+          first_name: string | null
           id: string
-          language: string | null
-          updated_at: string
-          user_id: string
+          last_name: string | null
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
+          stripe_customer_id: string | null
         }
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          credits?: number
+          created_at?: string | null
           email?: string | null
-          full_name?: string | null
-          id?: string
-          language?: string | null
-          updated_at?: string
-          user_id: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_customer_id?: string | null
         }
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          credits?: number
+          created_at?: string | null
           email?: string | null
-          full_name?: string | null
+          first_name?: string | null
           id?: string
-          language?: string | null
-          updated_at?: string
-          user_id?: string
+          last_name?: string | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_customer_id?: string | null
         }
         Relationships: []
       }
       stations: {
         Row: {
-          address: string
-          company_id: string | null
-          created_at: string
-          currency: string
-          duration_minutes: number
+          access_token: string | null
+          created_at: string | null
+          geo_lat: number | null
+          geo_lng: number | null
           id: string
-          lat: number
-          lng: number
-          location: string
-          name: string
-          price_per_session: number
-          status: string
-          stripe_price_id: string | null
-          updated_at: string
+          image_url: string | null
+          last_heartbeat_at: string | null
+          status: Database["public"]["Enums"]["station_status"] | null
+          structure_id: string | null
+          type: string
+          visibility: Database["public"]["Enums"]["visibility_type"] | null
+          washing_options: Json | null
         }
         Insert: {
-          address: string
-          company_id?: string | null
-          created_at?: string
-          currency?: string
-          duration_minutes?: number
+          access_token?: string | null
+          created_at?: string | null
+          geo_lat?: number | null
+          geo_lng?: number | null
           id: string
-          lat: number
-          lng: number
-          location: string
-          name: string
-          price_per_session: number
-          status?: string
-          stripe_price_id?: string | null
-          updated_at?: string
+          image_url?: string | null
+          last_heartbeat_at?: string | null
+          status?: Database["public"]["Enums"]["station_status"] | null
+          structure_id?: string | null
+          type: string
+          visibility?: Database["public"]["Enums"]["visibility_type"] | null
+          washing_options?: Json | null
         }
         Update: {
-          address?: string
-          company_id?: string | null
-          created_at?: string
-          currency?: string
-          duration_minutes?: number
+          access_token?: string | null
+          created_at?: string | null
+          geo_lat?: number | null
+          geo_lng?: number | null
           id?: string
-          lat?: number
-          lng?: number
-          location?: string
-          name?: string
-          price_per_session?: number
-          status?: string
-          stripe_price_id?: string | null
-          updated_at?: string
+          image_url?: string | null
+          last_heartbeat_at?: string | null
+          status?: Database["public"]["Enums"]["station_status"] | null
+          structure_id?: string | null
+          type?: string
+          visibility?: Database["public"]["Enums"]["visibility_type"] | null
+          washing_options?: Json | null
         }
         Relationships: [
           {
-            foreignKeyName: "stations_company_id_fkey"
-            columns: ["company_id"]
+            foreignKeyName: "stations_structure_id_fkey"
+            columns: ["structure_id"]
             isOneToOne: false
-            referencedRelation: "company_profiles"
+            referencedRelation: "structures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      structure_managers: {
+        Row: {
+          created_at: string | null
+          id: string
+          permissions: Json | null
+          structure_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          permissions?: Json | null
+          structure_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          permissions?: Json | null
+          structure_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "structure_managers_structure_id_fkey"
+            columns: ["structure_id"]
+            isOneToOne: false
+            referencedRelation: "structures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "structure_managers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      structure_wallets: {
+        Row: {
+          balance: number | null
+          id: string
+          structure_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          balance?: number | null
+          id?: string
+          structure_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          balance?: number | null
+          id?: string
+          structure_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "structure_wallets_structure_id_fkey"
+            columns: ["structure_id"]
+            isOneToOne: false
+            referencedRelation: "structures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "structure_wallets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      structures: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          description: string | null
+          geo_lat: number | null
+          geo_lng: number | null
+          id: string
+          image_url: string | null
+          name: string
+          owner_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          description?: string | null
+          geo_lat?: number | null
+          geo_lng?: number | null
+          id?: string
+          image_url?: string | null
+          name: string
+          owner_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          description?: string | null
+          geo_lat?: number | null
+          geo_lng?: number | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          owner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "structures_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
       transactions: {
         Row: {
-          amount: number
-          created_at: string
-          currency: string
-          description: string | null
-          id: string
-          product_type: string
-          status: string
-          stripe_payment_intent_id: string | null
-          stripe_session_id: string | null
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          id?: string
-          product_type: string
-          status?: string
-          stripe_payment_intent_id?: string | null
-          stripe_session_id?: string | null
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          id?: string
-          product_type?: string
-          status?: string
-          stripe_payment_intent_id?: string | null
-          stripe_session_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      stations_public: {
-        Row: {
-          address: string | null
-          company_id: string | null
+          amount_paid_stripe: number | null
+          amount_paid_wallet: number | null
           created_at: string | null
-          currency: string | null
-          duration_minutes: number | null
-          id: string | null
-          lat: number | null
-          lng: number | null
-          location: string | null
-          name: string | null
-          price_per_session: number | null
+          credits_purchased: number | null
+          fiscal_doc_url: string | null
+          fiscal_error_log: string | null
+          fiscal_status: string | null
+          guest_email: string | null
+          id: string
+          payment_method:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          station_id: string | null
           status: string | null
-          updated_at: string | null
+          stripe_payment_id: string | null
+          structure_id: string | null
+          total_value: number
+          transaction_type: Database["public"]["Enums"]["transaction_type_enum"]
+          user_id: string | null
         }
         Insert: {
-          address?: string | null
-          company_id?: string | null
+          amount_paid_stripe?: number | null
+          amount_paid_wallet?: number | null
           created_at?: string | null
-          currency?: string | null
-          duration_minutes?: number | null
-          id?: string | null
-          lat?: number | null
-          lng?: number | null
-          location?: string | null
-          name?: string | null
-          price_per_session?: number | null
+          credits_purchased?: number | null
+          fiscal_doc_url?: string | null
+          fiscal_error_log?: string | null
+          fiscal_status?: string | null
+          guest_email?: string | null
+          id?: string
+          payment_method?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          station_id?: string | null
           status?: string | null
-          updated_at?: string | null
+          stripe_payment_id?: string | null
+          structure_id?: string | null
+          total_value: number
+          transaction_type: Database["public"]["Enums"]["transaction_type_enum"]
+          user_id?: string | null
         }
         Update: {
-          address?: string | null
-          company_id?: string | null
+          amount_paid_stripe?: number | null
+          amount_paid_wallet?: number | null
           created_at?: string | null
-          currency?: string | null
-          duration_minutes?: number | null
-          id?: string | null
-          lat?: number | null
-          lng?: number | null
-          location?: string | null
-          name?: string | null
-          price_per_session?: number | null
+          credits_purchased?: number | null
+          fiscal_doc_url?: string | null
+          fiscal_error_log?: string | null
+          fiscal_status?: string | null
+          guest_email?: string | null
+          id?: string
+          payment_method?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          station_id?: string | null
           status?: string | null
-          updated_at?: string | null
+          stripe_payment_id?: string | null
+          structure_id?: string | null
+          total_value?: number
+          transaction_type?: Database["public"]["Enums"]["transaction_type_enum"]
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "stations_company_id_fkey"
-            columns: ["company_id"]
+            foreignKeyName: "transactions_station_id_fkey"
+            columns: ["station_id"]
             isOneToOne: false
-            referencedRelation: "company_profiles"
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_structure_id_fkey"
+            columns: ["structure_id"]
+            isOneToOne: false
+            referencedRelation: "structures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
     }
-    Functions: {
+    Views: {
       [_ in never]: never
     }
+    Functions: {
+      is_admin: { Args: never; Returns: boolean }
+      is_manager_of: { Args: { struct_id: string }; Returns: boolean }
+    }
     Enums: {
-      [_ in never]: never
+      payment_method_type: "STRIPE" | "CREDITS" | "HYBRID"
+      station_status: "AVAILABLE" | "BUSY" | "OFFLINE" | "MAINTENANCE"
+      transaction_type_enum: "CREDIT_TOPUP" | "WASH_SERVICE" | "GUEST_WASH"
+      user_role: "admin" | "partner" | "manager" | "user"
+      visibility_type: "PUBLIC" | "RESTRICTED" | "HIDDEN"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -386,6 +568,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      payment_method_type: ["STRIPE", "CREDITS", "HYBRID"],
+      station_status: ["AVAILABLE", "BUSY", "OFFLINE", "MAINTENANCE"],
+      transaction_type_enum: ["CREDIT_TOPUP", "WASH_SERVICE", "GUEST_WASH"],
+      user_role: ["admin", "partner", "manager", "user"],
+      visibility_type: ["PUBLIC", "RESTRICTED", "HIDDEN"],
+    },
   },
 } as const
