@@ -19,15 +19,14 @@ export const StationIdentityBlock = ({ name, status, description, stationType, c
     <div className="space-y-3">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground leading-tight">{name}</h1>
-          {stationType && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                {stationType}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-foreground leading-tight">{name}</h1>
+            {stationType && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-primary/10 text-primary uppercase tracking-wide">
+                {category === 'SHOWER' ? '🚿' : '🛁'} {stationType}
               </span>
-              <span className="text-xs text-muted-foreground">{categoryLabel}</span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <StationStatusBadge status={status} />
       </div>
