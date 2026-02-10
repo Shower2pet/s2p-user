@@ -26,7 +26,7 @@ serve(async (req) => {
     logStep("Function started");
 
     const body = await req.json();
-    const { 
+    let { 
       amount, // Amount in cents (e.g., 1000 = €10.00)
       currency = 'eur',
       productName,
@@ -37,19 +37,19 @@ serve(async (req) => {
       intervalCount = 1,
       quantity = 1,
       credits = 0,
-      station_id, // Optional: look up stripe_price_id from station
+      station_id, // Optional: resolve price from washing_options
+      option_id, // Optional: which washing option was selected
       success_url: customSuccessUrl,
       cancel_url: customCancelUrl,
     } = body;
 
-    // Look up stripe_price_id and station metadata server-side if station_id provided
-    let price_id: string | undefined;
+    // Look up station metadata and resolve price from washing_options
     let station_type: string | undefined;
     let station_category: string | undefined;
     if (station_id) {
       const { data: stationData, error: stationError } = await supabaseClient
         .from('stations')
-        .select('stripe_price_id, type, category')
+        .select('type, category, washing_options')
         .eq('id', station_id)
         .maybeSingle();
       
@@ -57,27 +57,34 @@ serve(async (req) => {
         logStep("Error looking up station", { error: stationError.message });
       }
       if (stationData) {
-        if (stationData.stripe_price_id) {
-          price_id = stationData.stripe_price_id;
-          logStep("Resolved stripe_price_id from station", { station_id, price_id });
-        }
         station_type = stationData.type;
         station_category = stationData.category || (stationData.type === 'BRACCO' ? 'SHOWER' : 'TUB');
         logStep("Station metadata", { station_type, station_category });
+
+        // Resolve price from washing_options if option_id provided
+        if (stationData.washing_options && option_id) {
+          const options = stationData.washing_options as any[];
+          const option = options.find((o: any) => o.id === option_id);
+          if (option) {
+            // Server-side values take priority over client-sent values
+            amount = Math.round(option.price * 100); // convert to cents
+            productName = option.name;
+            logStep("Resolved price from washing_options", { option_id, amount, productName });
+          }
+        }
       }
     }
     
-    logStep("Request params", { amount, currency, productName, mode, productType, interval, price_id });
+    logStep("Request params", { amount, currency, productName, mode, productType, interval });
 
-    // Validate: need either amount+productName or price_id
-    if (!price_id && (!amount || amount <= 0)) {
-      throw new Error("Valid amount or price_id is required");
+    if (!amount || amount <= 0) {
+      throw new Error("Valid amount is required");
     }
-    if (!price_id && !productName) {
-      throw new Error("Product name or price_id is required");
+    if (!productName) {
+      throw new Error("Product name is required");
     }
-    if (mode === 'subscription' && !interval && !price_id) {
-      throw new Error("Interval is required for subscriptions (unless using price_id)");
+    if (mode === 'subscription' && !interval) {
+      throw new Error("Interval is required for subscriptions");
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -111,35 +118,27 @@ serve(async (req) => {
     const successUrl = customSuccessUrl || `${requestOrigin}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = customCancelUrl || `${requestOrigin}/`;
 
-    // Build line_items based on whether price_id or price_data is used
-    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[];
-
-    if (price_id) {
-      // Use existing Stripe price
-      lineItems = [{ price: price_id, quantity }];
+    // Build dynamic price_data
+    let priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData;
+    
+    if (mode === 'subscription') {
+      priceData = {
+        currency,
+        product_data: { name: productName, description: description || undefined },
+        unit_amount: amount,
+        recurring: {
+          interval: interval as 'day' | 'week' | 'month' | 'year',
+          interval_count: intervalCount,
+        },
+      };
     } else {
-      // Build dynamic price_data
-      let priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData;
-      
-      if (mode === 'subscription') {
-        priceData = {
-          currency,
-          product_data: { name: productName, description: description || undefined },
-          unit_amount: amount,
-          recurring: {
-            interval: interval as 'day' | 'week' | 'month' | 'year',
-            interval_count: intervalCount,
-          },
-        };
-      } else {
-        priceData = {
-          currency,
-          product_data: { name: productName, description: description || undefined },
-          unit_amount: amount,
-        };
-      }
-      lineItems = [{ price_data: priceData, quantity }];
+      priceData = {
+        currency,
+        product_data: { name: productName, description: description || undefined },
+        unit_amount: amount,
+      };
     }
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price_data: priceData, quantity }];
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       line_items: lineItems,
@@ -171,12 +170,13 @@ serve(async (req) => {
         .from('transactions')
         .insert({
           user_id: userId,
-          stripe_session_id: session.id,
-          amount: price_id ? 0 : amount,
-          currency,
-          description: description || productName || 'Station session',
-          product_type: productType,
-          status: 'pending',
+          stripe_payment_id: session.id,
+          total_value: amount / 100, // convert cents to euros
+          amount_paid_stripe: amount / 100,
+          transaction_type: productType === 'credit_pack' ? 'CREDIT_TOPUP' : 'WASH_SERVICE',
+          station_id: station_id || null,
+          status: 'PENDING',
+          payment_method: 'STRIPE',
         });
 
       if (txError) {
