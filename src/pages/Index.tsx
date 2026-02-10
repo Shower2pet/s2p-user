@@ -77,7 +77,11 @@ const Index = () => {
 
         {/* Main CTA */}
         <Card className="p-6 rounded-3xl shadow-floating animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          {!loading && (user ? (
+          {loading ? (
+            <div className="h-14 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : user ? (
             <Button onClick={() => navigate('/map')} size="lg" className="w-full h-14 text-base rounded-full shadow-glow-primary hover:scale-[1.02] transition-all duration-300">
               <Play className="w-5 h-5" /> {t('activateService')}
             </Button>
@@ -85,7 +89,7 @@ const Index = () => {
             <Button onClick={() => navigate('/login')} size="lg" className="w-full h-14 text-base rounded-full shadow-glow-primary hover:scale-[1.02] transition-all duration-300">
               <LogIn className="w-5 h-5" /> {t('loginToActivate')}
             </Button>
-          ))}
+          )}
           {!user && (
             <p className="text-center text-sm text-muted-foreground mt-4">{t('loginAndUseCredits')}</p>
           )}
