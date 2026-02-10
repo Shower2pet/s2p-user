@@ -202,23 +202,26 @@ const StationTimer = () => {
     return () => clearInterval(interval);
   }, [step, isActive, session, warningShown, isShowerStation]);
 
-  // Courtesy timer (TUB only)
+  // Courtesy timer (TUB only) — uses ends_at from DB
   useEffect(() => {
-    if (step !== 'courtesy' || courtesySeconds <= 0) return;
+    if (step !== 'courtesy' || !session) return;
 
-    const interval = setInterval(() => {
-      setCourtesySeconds((prev) => {
-        if (prev <= 1) {
-          setStep('cleanup');
-          if (session) updateSessionStep(session.id, 'cleanup');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const tick = () => {
+      const now = Date.now();
+      const endsAt = new Date(session.ends_at).getTime();
+      const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
+      setCourtesySeconds(remaining);
 
+      if (remaining <= 0) {
+        setStep('cleanup');
+        updateSessionStep(session.id, 'cleanup');
+      }
+    };
+
+    tick(); // run immediately
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [step, courtesySeconds, session]);
+  }, [step, session?.ends_at]);
 
   // Sanitizing countdown (TUB only)
   useEffect(() => {
