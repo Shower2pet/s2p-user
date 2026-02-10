@@ -42,21 +42,28 @@ serve(async (req) => {
       cancel_url: customCancelUrl,
     } = body;
 
-    // Look up stripe_price_id server-side if station_id provided
+    // Look up stripe_price_id and station metadata server-side if station_id provided
     let price_id: string | undefined;
+    let station_type: string | undefined;
+    let station_category: string | undefined;
     if (station_id) {
       const { data: stationData, error: stationError } = await supabaseClient
         .from('stations')
-        .select('stripe_price_id')
+        .select('stripe_price_id, type, category')
         .eq('id', station_id)
         .maybeSingle();
       
       if (stationError) {
         logStep("Error looking up station", { error: stationError.message });
       }
-      if (stationData?.stripe_price_id) {
-        price_id = stationData.stripe_price_id;
-        logStep("Resolved stripe_price_id from station", { station_id, price_id });
+      if (stationData) {
+        if (stationData.stripe_price_id) {
+          price_id = stationData.stripe_price_id;
+          logStep("Resolved stripe_price_id from station", { station_id, price_id });
+        }
+        station_type = stationData.type;
+        station_category = stationData.category || (stationData.type === 'BRACCO' ? 'SHOWER' : 'TUB');
+        logStep("Station metadata", { station_type, station_category });
       }
     }
     
@@ -144,6 +151,8 @@ serve(async (req) => {
         product_type: productType,
         description: description,
         credits: credits.toString(),
+        station_type: station_type || '',
+        station_category: station_category || '',
       },
     };
 

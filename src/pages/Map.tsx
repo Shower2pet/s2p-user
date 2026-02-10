@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useStations, Station, isStationOnline } from '@/hooks/useStations';
-import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock } from 'lucide-react';
+import { useStations, Station, isStationOnline, StationCategory } from '@/hooks/useStations';
+import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -28,10 +28,12 @@ const Map = () => {
   const [locationSearch, setLocationSearch] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [noStationsMessage, setNoStationsMessage] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<StationCategory | 'ALL'>('ALL');
   const { data: stations, isLoading } = useStations();
 
   // Filter out HIDDEN stations
-  const visibleStations = stations?.filter(s => s.visibility !== 'HIDDEN') || [];
+  const visibleStations = (stations?.filter(s => s.visibility !== 'HIDDEN') || [])
+    .filter(s => categoryFilter === 'ALL' || s.category === categoryFilter);
 
   const checkStationsNearLocation = (lng: number, lat: number, locationName: string) => {
     if (visibleStations.length === 0) {
@@ -287,6 +289,25 @@ const Map = () => {
             </Button>
           </div>
         </Card>
+
+        {/* Category filter */}
+        <div className="flex gap-2">
+          {([
+            { value: 'ALL', label: 'Tutte', icon: '📍' },
+            { value: 'TUB', label: 'Vasche', icon: '🛁' },
+            { value: 'SHOWER', label: 'Docce', icon: '🚿' },
+          ] as const).map(({ value, label, icon }) => (
+            <Button
+              key={value}
+              variant={categoryFilter === value ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1"
+              onClick={() => setCategoryFilter(value)}
+            >
+              {icon} {label}
+            </Button>
+          ))}
+        </div>
 
         {noStationsMessage && (
           <Card className="p-4 bg-warning/10 border-warning animate-fade-in">

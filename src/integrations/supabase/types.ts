@@ -168,6 +168,7 @@ export type Database = {
       stations: {
         Row: {
           access_token: string | null
+          category: string | null
           created_at: string | null
           geo_lat: number | null
           geo_lng: number | null
@@ -182,6 +183,7 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          category?: string | null
           created_at?: string | null
           geo_lat?: number | null
           geo_lng?: number | null
@@ -196,6 +198,7 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          category?: string | null
           created_at?: string | null
           geo_lat?: number | null
           geo_lng?: number | null
@@ -436,6 +439,7 @@ export type Database = {
       get_public_stations: {
         Args: never
         Returns: {
+          category: string
           created_at: string
           geo_lat: number
           geo_lng: number
