@@ -8,9 +8,13 @@ export interface WashingOption {
   duration: number; // seconds
 }
 
+export type StationType = 'BARBONCINO' | 'AKITA' | 'HUSKY' | 'BRACCO';
+export type StationCategory = 'TUB' | 'SHOWER';
+
 export interface Station {
   id: string;
-  type: string;
+  type: StationType;
+  category: StationCategory;
   status: 'AVAILABLE' | 'BUSY' | 'OFFLINE' | 'MAINTENANCE';
   visibility: 'PUBLIC' | 'RESTRICTED' | 'HIDDEN';
   geo_lat: number | null;
@@ -27,6 +31,12 @@ export interface Station {
   structure_geo_lng: number | null;
 }
 
+export const getStationCategory = (type: string): StationCategory =>
+  type === 'BRACCO' ? 'SHOWER' : 'TUB';
+
+export const isShower = (station: Station): boolean => station.category === 'SHOWER';
+export const isTub = (station: Station): boolean => station.category === 'TUB';
+
 const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
 export const isStationOnline = (station: Station): boolean => {
@@ -41,7 +51,8 @@ const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station
   const struct = row.structure_id ? structuresMap.get(row.structure_id) : null;
   return {
     id: row.id,
-    type: row.type,
+    type: row.type as StationType,
+    category: (row.category || getStationCategory(row.type)) as StationCategory,
     status: (row.status || 'OFFLINE') as Station['status'],
     visibility: (row.visibility || 'PUBLIC') as Station['visibility'],
     geo_lat: row.geo_lat,
