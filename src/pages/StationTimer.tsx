@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2 } from 'lucide-react';
+import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -10,9 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/shower2pet-logo.png';
 
-type TubStep = 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
-type ShowerStep = 'timer' | 'rating';
-type WashStep = TubStep | ShowerStep;
+type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
 
 const SANITIZE_SECONDS = 30;
 
@@ -37,17 +35,17 @@ const StationTimer = () => {
   const { t } = useLanguage();
 
   const isShowerStation = station ? isShower(station) : false;
-  const optionId = Number(searchParams.get('option') || 0);
 
   const [session, setSession] = useState<WashSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<WashStep>('timer');
+  const [step, setStep] = useState<WashStep>('ready');
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [warningShown, setWarningShown] = useState(false);
   const [courtesySeconds, setCourtesySeconds] = useState(60);
   const [rating, setRating] = useState(0);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
+  const [starting, setStarting] = useState(false);
 
   // Fetch active session from DB
   useEffect(() => {
@@ -66,13 +64,14 @@ const StationTimer = () => {
 
       if (data) {
         setSession(data as WashSession);
-        const now = Date.now();
-        const endsAt = new Date(data.ends_at).getTime();
-        const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
+        const currentStep = data.step as WashStep;
+        setStep(currentStep);
 
-        setStep(data.step as WashStep);
+        if (currentStep === 'timer') {
+          const now = Date.now();
+          const endsAt = new Date(data.ends_at).getTime();
+          const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
 
-        if (data.step === 'timer') {
           if (remaining > 0) {
             setSecondsLeft(remaining);
             setIsActive(true);
@@ -80,7 +79,7 @@ const StationTimer = () => {
             setSecondsLeft(0);
             setIsActive(false);
             if (isShowerStation) {
-              updateSessionStep(data.id, 'rating');
+              updateSessionStep(data.id, 'rating', 'COMPLETED');
               setStep('rating');
             } else {
               updateSessionStep(data.id, 'cleanup');
@@ -126,17 +125,48 @@ const StationTimer = () => {
     };
   }, [session?.id]);
 
-  // Update session step in DB
   const updateSessionStep = async (sessionId: string, newStep: string, status?: string) => {
     const updates: any = { step: newStep };
     if (status) updates.status = status;
-    await supabase
-      .from('wash_sessions')
-      .update(updates)
-      .eq('id', sessionId);
+    await supabase.from('wash_sessions').update(updates).eq('id', sessionId);
   };
 
-  // Main countdown timer (computed from ends_at)
+  // Handle "Avvia Servizio" — recalculate ends_at from NOW
+  const handleStartService = async () => {
+    if (!session) return;
+    setStarting(true);
+
+    const now = new Date();
+    const endsAt = new Date(now.getTime() + session.total_seconds * 1000);
+
+    const { error } = await supabase
+      .from('wash_sessions')
+      .update({
+        started_at: now.toISOString(),
+        ends_at: endsAt.toISOString(),
+        step: isShowerStation ? 'timer' : 'rules',
+      })
+      .eq('id', session.id);
+
+    if (error) {
+      toast.error('Errore nell\'avvio del servizio');
+      setStarting(false);
+      return;
+    }
+
+    setSession({ ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() });
+    setSecondsLeft(session.total_seconds);
+
+    if (isShowerStation) {
+      setStep('timer');
+      setIsActive(true);
+    } else {
+      setStep('rules');
+    }
+    setStarting(false);
+  };
+
+  // Main countdown timer
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session) return;
 
@@ -183,7 +213,7 @@ const StationTimer = () => {
     return () => clearInterval(interval);
   }, [step, courtesySeconds, session]);
 
-  // Sanitizing countdown (TUB only, 30s)
+  // Sanitizing countdown (TUB only)
   useEffect(() => {
     if (step !== 'sanitizing') return;
     setSanitizeSeconds(SANITIZE_SECONDS);
@@ -226,7 +256,6 @@ const StationTimer = () => {
 
   const handleCleanupResponse = (clean: boolean) => {
     if (clean) {
-      // Client goes straight to rating, no sanitization wait
       setStep('rating');
       if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
     } else {
@@ -284,6 +313,37 @@ const StationTimer = () => {
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-foreground/20 text-primary-foreground">
               {station.type} — {isShowerStation ? '🚿 Doccia' : '🛁 Vasca'}
             </span>
+          </div>
+        )}
+
+        {/* STEP: Ready — waiting for user to start */}
+        {step === 'ready' && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-6">
+            <div className="w-24 h-24 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+              <StationIcon className="h-12 w-12 text-primary-foreground" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-2xl font-bold text-primary-foreground">Pagamento confermato ✓</p>
+              <p className="text-primary-foreground/80 text-base">
+                {session.option_name} — {Math.floor(session.total_seconds / 60)} minuti
+              </p>
+            </div>
+            <Button
+              onClick={handleStartService}
+              disabled={starting}
+              size="lg"
+              className="w-full max-w-xs h-16 text-lg rounded-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-0 shadow-glow-primary"
+            >
+              {starting ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : (
+                <Play className="w-6 h-6" />
+              )}
+              {starting ? 'Avvio in corso...' : 'Avvia Servizio'}
+            </Button>
+            <p className="text-primary-foreground/60 text-xs text-center">
+              Il timer partirà quando premi il pulsante
+            </p>
           </div>
         )}
 
@@ -362,7 +422,7 @@ const StationTimer = () => {
           </div>
         )}
 
-        {/* Sanitizing step (TUB only, 30s countdown) */}
+        {/* Sanitizing step (TUB only) */}
         {step === 'sanitizing' && (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center animate-pulse">
