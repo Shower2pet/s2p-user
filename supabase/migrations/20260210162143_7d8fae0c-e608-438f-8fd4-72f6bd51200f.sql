@@ -1,0 +1,1 @@
+UPDATE public.stations SET last_heartbeat_at = NOW() WHERE id = 'TEST-001';
