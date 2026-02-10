@@ -206,7 +206,9 @@ serve(async (req) => {
         }
       }
 
+      // Session created in "ready" state — timer starts only when user presses "Avvia"
       const now = new Date();
+      // Placeholder ends_at; will be recalculated when user starts the service
       const endsAt = new Date(now.getTime() + optionDuration * 1000);
 
       const { error: wsError } = await supabaseClient
@@ -220,7 +222,7 @@ serve(async (req) => {
           total_seconds: optionDuration,
           started_at: now.toISOString(),
           ends_at: endsAt.toISOString(),
-          step: 'timer',
+          step: 'ready',
           status: 'ACTIVE',
           stripe_session_id: session.id,
         });
