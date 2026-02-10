@@ -20,42 +20,6 @@ export const branding = {
   // Payment configuration
   creditValue: 1, // 1 credit = 1 EUR
   
-  // Subscription plans
-  subscriptionPlans: [
-    {
-      id: 'weekly',
-      name: 'Piano Settimanale',
-      price: 10,
-      interval: 'week',
-      billingCycle: 'Settimanale',
-      creditsPerWeek: 15,
-      description: 'Perfetto per utenti regolari',
-      badge: 'Best Value',
-      stripePriceId: 'price_1SahTwGzJdGfXoSnagKQ17Ah',
-    },
-    {
-      id: 'monthly',
-      name: 'Piano Mensile',
-      price: 35,
-      interval: 'month',
-      billingCycle: 'Mensile',
-      creditsPerMonth: 40,
-      description: 'Ottimo risparmio per uso frequente',
-      stripePriceId: 'price_1SahvJGzJdGfXoSn3JcWTgiJ',
-    },
-    {
-      id: 'unlimited',
-      name: 'Lavaggi Illimitati',
-      price: 50,
-      interval: 'month',
-      billingCycle: 'Mensile',
-      unlimited: true,
-      description: 'Lavaggi illimitati per tutto il mese',
-      badge: 'Premium',
-      stripePriceId: 'price_1SahwmGzJdGfXoSnMhMK7s5J',
-    },
-  ],
-  
   // Credit packs
   creditPacks: [
     {

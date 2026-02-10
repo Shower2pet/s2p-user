@@ -80,14 +80,6 @@ const Support = () => {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-4">
-              <AccordionTrigger className="text-left font-bold">
-                Can I cancel my subscription?
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground font-light">
-                Yes, you can cancel your subscription at any time from your profile settings. Your subscription will remain active until the end of your billing period.
-              </AccordionContent>
-            </AccordionItem>
 
             <AccordionItem value="item-5">
               <AccordionTrigger className="text-left font-bold">
