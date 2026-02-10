@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead } from 'lucide-react';
+import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStation, isShower } from '@/hooks/useStations';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/shower2pet-logo.png';
 
@@ -14,179 +16,154 @@ type WashStep = TubStep | ShowerStep;
 
 const SANITIZE_SECONDS = 30;
 
-// Session persistence helpers
-const SESSION_KEY = 's2p_active_session';
-
-interface PersistedSession {
-  stationId: string;
-  optionId: number;
-  step: WashStep;
-  /** Unix timestamp (ms) when the main timer ends */
-  timerEndsAt: number | null;
-  /** Unix timestamp (ms) when courtesy timer ends */
-  courtesyEndsAt: number | null;
-  /** Unix timestamp (ms) when sanitize timer ends */
-  sanitizeEndsAt: number | null;
-  totalSeconds: number;
+interface WashSession {
+  id: string;
+  station_id: string;
+  option_id: number;
+  option_name: string;
+  total_seconds: number;
+  started_at: string;
+  ends_at: string;
+  step: string;
+  status: string;
 }
-
-const saveSession = (session: PersistedSession) => {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-};
-
-const loadSession = (stationId: string, optionId: number): PersistedSession | null => {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const session: PersistedSession = JSON.parse(raw);
-    if (session.stationId === stationId && session.optionId === optionId) return session;
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-const clearSession = () => {
-  localStorage.removeItem(SESSION_KEY);
-};
 
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const { data: station } = useStation(id);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
   const isShowerStation = station ? isShower(station) : false;
-
-  // Find selected option
   const optionId = Number(searchParams.get('option') || 0);
-  const option = station?.washing_options?.find(o => o.id === optionId);
-  const totalSeconds = option?.duration || 300;
 
-  // Try to restore persisted session
-  const restored = useRef(false);
-  const getInitialState = useCallback(() => {
-    if (!id) return null;
-    return loadSession(id, optionId);
-  }, [id, optionId]);
-
-  const [step, setStep] = useState<WashStep>('rules');
-  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
+  const [session, setSession] = useState<WashSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState<WashStep>('timer');
+  const [secondsLeft, setSecondsLeft] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [warningShown, setWarningShown] = useState(false);
   const [courtesySeconds, setCourtesySeconds] = useState(60);
   const [rating, setRating] = useState(0);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
 
-  // Restore session on mount (runs once when station data is available)
+  // Fetch active session from DB
   useEffect(() => {
-    if (!station || restored.current) return;
-    restored.current = true;
+    if (!id || !user) return;
 
-    const saved = getInitialState();
-    if (saved) {
-      const now = Date.now();
-      setStep(saved.step);
+    const fetchSession = async () => {
+      const { data, error } = await supabase
+        .from('wash_sessions')
+        .select('*')
+        .eq('station_id', id)
+        .eq('user_id', user.id)
+        .eq('status', 'ACTIVE')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (saved.step === 'timer' && saved.timerEndsAt) {
-        const remaining = Math.max(0, Math.round((saved.timerEndsAt - now) / 1000));
-        if (remaining > 0) {
-          setSecondsLeft(remaining);
-          setIsActive(true);
-        } else {
-          // Timer expired while away
-          setSecondsLeft(0);
-          setIsActive(false);
-          if (isShowerStation) {
-            setStep('rating');
+      if (data) {
+        setSession(data as WashSession);
+        const now = Date.now();
+        const endsAt = new Date(data.ends_at).getTime();
+        const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
+
+        setStep(data.step as WashStep);
+
+        if (data.step === 'timer') {
+          if (remaining > 0) {
+            setSecondsLeft(remaining);
+            setIsActive(true);
           } else {
-            setStep('cleanup');
+            setSecondsLeft(0);
+            setIsActive(false);
+            if (isShowerStation) {
+              updateSessionStep(data.id, 'rating');
+              setStep('rating');
+            } else {
+              updateSessionStep(data.id, 'cleanup');
+              setStep('cleanup');
+            }
           }
         }
-      } else if (saved.step === 'courtesy' && saved.courtesyEndsAt) {
-        const remaining = Math.max(0, Math.round((saved.courtesyEndsAt - now) / 1000));
-        if (remaining > 0) {
-          setCourtesySeconds(remaining);
-        } else {
-          setStep('cleanup');
-        }
-      } else if (saved.step === 'sanitizing' && saved.sanitizeEndsAt) {
-        const remaining = Math.max(0, Math.round((saved.sanitizeEndsAt - now) / 1000));
-        if (remaining > 0) {
-          setSanitizeSeconds(remaining);
-        } else {
-          setStep('rating');
-        }
-      } else {
-        // For non-timer steps (rules, cleanup, rating), just restore the step
       }
-      return;
-    }
-
-    // No saved session — initialize normally
-    if (isShowerStation) {
-      setStep('timer');
-      setIsActive(true);
-    } else {
-      setStep('rules');
-    }
-  }, [station, isShowerStation, getInitialState]);
-
-  // Update total when station loads (only if no restored session)
-  useEffect(() => {
-    if (option && !loadSession(id || '', optionId)) {
-      setSecondsLeft(option.duration);
-    }
-  }, [option, id, optionId]);
-
-  // Persist session state whenever step or timers change
-  useEffect(() => {
-    if (!id || step === 'rating') return;
-    const now = Date.now();
-    const session: PersistedSession = {
-      stationId: id,
-      optionId,
-      step,
-      timerEndsAt: step === 'timer' && isActive ? now + secondsLeft * 1000 : null,
-      courtesyEndsAt: step === 'courtesy' ? now + courtesySeconds * 1000 : null,
-      sanitizeEndsAt: step === 'sanitizing' ? now + sanitizeSeconds * 1000 : null,
-      totalSeconds,
+      setLoading(false);
     };
-    saveSession(session);
-  }, [step, secondsLeft, isActive, courtesySeconds, sanitizeSeconds, id, optionId, totalSeconds]);
 
-  // Clear persisted session when reaching rating (session complete)
-  useEffect(() => {
-    if (step === 'rating') clearSession();
-  }, [step]);
+    fetchSession();
+  }, [id, user, isShowerStation]);
 
-  // Main timer
+  // Subscribe to Realtime updates on the session
   useEffect(() => {
-    if (step !== 'timer' || !isActive || secondsLeft <= 0) return;
+    if (!session?.id) return;
+
+    const channel = supabase
+      .channel(`wash_session_${session.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'wash_sessions',
+          filter: `id=eq.${session.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as WashSession;
+          setSession(updated);
+          setStep(updated.step as WashStep);
+          if (updated.status === 'COMPLETED') {
+            setStep('rating');
+            setIsActive(false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.id]);
+
+  // Update session step in DB
+  const updateSessionStep = async (sessionId: string, newStep: string, status?: string) => {
+    const updates: any = { step: newStep };
+    if (status) updates.status = status;
+    await supabase
+      .from('wash_sessions')
+      .update(updates)
+      .eq('id', sessionId);
+  };
+
+  // Main countdown timer (computed from ends_at)
+  useEffect(() => {
+    if (step !== 'timer' || !isActive || !session) return;
 
     const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          setIsActive(false);
-          if (isShowerStation) {
-            setStep('rating'); // Shower: go straight to rating
-          } else {
-            setStep('cleanup'); // Tub: ask about cleanup
-          }
-          return 0;
+      const now = Date.now();
+      const endsAt = new Date(session.ends_at).getTime();
+      const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
+
+      setSecondsLeft(remaining);
+
+      if (remaining <= 0) {
+        setIsActive(false);
+        if (isShowerStation) {
+          setStep('rating');
+          updateSessionStep(session.id, 'rating', 'COMPLETED');
+        } else {
+          setStep('cleanup');
+          updateSessionStep(session.id, 'cleanup');
         }
-        // 2-minute warning (only for TUB)
-        if (!isShowerStation && prev === 121 && !warningShown) {
-          toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
-          setWarningShown(true);
-        }
-        return prev - 1;
-      });
+      } else if (!isShowerStation && remaining === 120 && !warningShown) {
+        toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
+        setWarningShown(true);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step, isActive, secondsLeft, warningShown, isShowerStation]);
+  }, [step, isActive, session, warningShown, isShowerStation]);
 
   // Courtesy timer (TUB only)
   useEffect(() => {
@@ -196,6 +173,7 @@ const StationTimer = () => {
       setCourtesySeconds((prev) => {
         if (prev <= 1) {
           setStep('cleanup');
+          if (session) updateSessionStep(session.id, 'cleanup');
           return 0;
         }
         return prev - 1;
@@ -203,7 +181,7 @@ const StationTimer = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step, courtesySeconds]);
+  }, [step, courtesySeconds, session]);
 
   // Sanitizing countdown (TUB only, 30s)
   useEffect(() => {
@@ -214,6 +192,7 @@ const StationTimer = () => {
       setSanitizeSeconds((prev) => {
         if (prev <= 1) {
           setStep('rating');
+          if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
           return 0;
         }
         return prev - 1;
@@ -221,8 +200,9 @@ const StationTimer = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, session]);
 
+  const totalSeconds = session?.total_seconds || 300;
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   const progress = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
@@ -230,32 +210,59 @@ const StationTimer = () => {
   const handleAcceptRules = () => {
     setStep('timer');
     setIsActive(true);
+    if (session) updateSessionStep(session.id, 'timer');
   };
 
   const handleStopManual = () => {
     setIsActive(false);
     if (isShowerStation) {
       setStep('rating');
+      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
     } else {
       setStep('cleanup');
+      if (session) updateSessionStep(session.id, 'cleanup');
     }
   };
 
   const handleCleanupResponse = (clean: boolean) => {
     if (clean) {
       setStep('sanitizing');
+      if (session) updateSessionStep(session.id, 'sanitizing');
     } else {
       setCourtesySeconds(60);
       setStep('courtesy');
+      if (session) updateSessionStep(session.id, 'courtesy');
     }
   };
 
   const handleFinish = () => {
-    clearSession();
     navigate('/');
   };
 
   const StationIcon = isShowerStation ? ShowerHead : Dog;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary to-[hsl(206,100%,20%)] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary-foreground animate-spin" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary to-[hsl(206,100%,20%)] flex flex-col items-center justify-center gap-4 px-4">
+        <p className="text-primary-foreground text-lg font-bold text-center">Nessuna sessione attiva trovata</p>
+        <Button
+          variant="outline"
+          className="rounded-full bg-primary-foreground text-primary"
+          onClick={() => navigate('/')}
+        >
+          Torna alla Home
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary to-[hsl(206,100%,20%)] flex flex-col">
