@@ -40,10 +40,7 @@ export const isTub = (station: Station): boolean => station.category === 'TUB';
 const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
 export const isStationOnline = (station: Station): boolean => {
-  if (station.status !== 'AVAILABLE') return false;
-  if (!station.last_heartbeat_at) return false;
-  const lastHeartbeat = new Date(station.last_heartbeat_at).getTime();
-  return Date.now() - lastHeartbeat < HEARTBEAT_TIMEOUT_MS;
+  return station.status === 'AVAILABLE';
 };
 
 const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station => {
