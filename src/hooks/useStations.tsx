@@ -37,6 +37,11 @@ export const getStationCategory = (type: string): StationCategory =>
 export const isShower = (station: Station): boolean => station.category === 'SHOWER';
 export const isTub = (station: Station): boolean => station.category === 'TUB';
 
+export const getStationDisplayName = (station: Station): string => {
+  const typeName = station.type.charAt(0).toUpperCase() + station.type.slice(1).toLowerCase();
+  return station.structure_name ? `${typeName} – ${station.structure_name}` : typeName;
+};
+
 const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
 export const isStationOnline = (station: Station): boolean => {

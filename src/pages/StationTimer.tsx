@@ -4,7 +4,7 @@ import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Load
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useStation, isShower } from '@/hooks/useStations';
+import { useStation, isShower, getStationDisplayName } from '@/hooks/useStations';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -324,7 +324,7 @@ const StationTimer = () => {
         {station && (
           <div className="text-center mb-4">
             <p className="text-primary-foreground/80 text-sm font-light">
-              {station.structure_name || station.id}
+              {getStationDisplayName(station)}
             </p>
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-foreground/20 text-primary-foreground">
               {station.type} — {isShowerStation ? '🚿 Doccia' : '🛁 Vasca'}

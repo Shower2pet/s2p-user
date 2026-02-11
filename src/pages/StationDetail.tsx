@@ -4,7 +4,7 @@ import { StationIdentityBlock } from '@/components/station/StationIdentityBlock'
 import { MapPreview } from '@/components/station/MapPreview';
 import { SafetyInfo } from '@/components/station/SafetyInfo';
 import { AboutStation } from '@/components/station/AboutStation';
-import { useStation, isStationOnline } from '@/hooks/useStations';
+import { useStation, isStationOnline, getStationDisplayName } from '@/hooks/useStations';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useWalletForStructure } from '@/hooks/useWallet';
@@ -116,7 +116,7 @@ const StationDetail = () => {
         {/* Station Identity */}
         <div className="animate-fade-in">
           <StationIdentityBlock
-            name={station.structure_name || station.id}
+            name={getStationDisplayName(station)}
             status={displayStatus as 'available' | 'busy' | 'offline'}
             description={station.structure_description || undefined}
             stationType={station.type}
@@ -133,7 +133,7 @@ const StationDetail = () => {
         {/* Map Preview */}
         <div className="animate-fade-in" style={{ animationDelay: '0.05s' }}>
           <MapPreview
-            stationName={station.structure_name || station.id}
+            stationName={getStationDisplayName(station)}
             address={station.structure_address || undefined}
             lat={station.geo_lat || station.structure_geo_lat || undefined}
             lng={station.geo_lng || station.structure_geo_lng || undefined}
