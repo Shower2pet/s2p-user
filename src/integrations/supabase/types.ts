@@ -20,6 +20,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string | null
+          owner_id: string | null
           price_eur: number
           structure_id: string | null
         }
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string | null
+          owner_id?: string | null
           price_eur: number
           structure_id?: string | null
         }
@@ -36,10 +38,18 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string | null
+          owner_id?: string | null
           price_eur?: number
           structure_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "credit_packages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "credit_packages_structure_id_fkey"
             columns: ["structure_id"]
@@ -139,6 +149,7 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          must_change_password: boolean | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"] | null
           stripe_customer_id: string | null
@@ -149,6 +160,7 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
+          must_change_password?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_customer_id?: string | null
@@ -159,6 +171,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          must_change_password?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           stripe_customer_id?: string | null
@@ -175,6 +188,7 @@ export type Database = {
           id: string
           image_url: string | null
           last_heartbeat_at: string | null
+          owner_id: string | null
           status: Database["public"]["Enums"]["station_status"] | null
           structure_id: string | null
           type: string
@@ -190,6 +204,7 @@ export type Database = {
           id: string
           image_url?: string | null
           last_heartbeat_at?: string | null
+          owner_id?: string | null
           status?: Database["public"]["Enums"]["station_status"] | null
           structure_id?: string | null
           type: string
@@ -205,6 +220,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           last_heartbeat_at?: string | null
+          owner_id?: string | null
           status?: Database["public"]["Enums"]["station_status"] | null
           structure_id?: string | null
           type?: string
@@ -212,6 +228,13 @@ export type Database = {
           washing_options?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "stations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stations_structure_id_fkey"
             columns: ["structure_id"]
