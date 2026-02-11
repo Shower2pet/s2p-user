@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useStations, Station, isStationOnline, StationCategory } from '@/hooks/useStations';
+import { useStations, Station, isStationOnline, StationCategory, getStationDisplayName } from '@/hooks/useStations';
 import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
@@ -145,7 +145,7 @@ const Map = () => {
         .setLngLat([lng, lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<strong>${station.structure_name || station.id}</strong><br/>${station.structure_address || ''}${
+            `<strong>${getStationDisplayName(station)}</strong><br/>${station.structure_address || ''}${
               station.visibility === 'RESTRICTED' ? '<br/><em>🔒 Solo Clienti</em>' : ''
             }`
           )
@@ -230,7 +230,7 @@ const Map = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-foreground text-sm">{station.structure_name || station.id}</h3>
+                <h3 className="font-bold text-foreground text-sm">{getStationDisplayName(station)}</h3>
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary uppercase tracking-wide">
                   {station.category === 'SHOWER' ? '🚿' : '🛁'} {station.type}
                 </span>
