@@ -231,9 +231,6 @@ const Map = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-foreground text-sm">{getStationDisplayName(station)}</h3>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary uppercase tracking-wide">
-                  {station.category === 'SHOWER' ? '🚿' : '🛁'} {station.type}
-                </span>
               </div>
               <p className="text-xs text-muted-foreground">{station.structure_address || ''}</p>
               {station.visibility === 'RESTRICTED' && (
