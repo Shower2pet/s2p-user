@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { StationIdentityBlock } from '@/components/station/StationIdentityBlock';
 import { MapPreview } from '@/components/station/MapPreview';
@@ -24,14 +24,12 @@ import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
-  const qrVerified = searchParams.get('qr') === '1';
-  console.log('[StationDetail] Rendering with id:', id, 'qrVerified:', qrVerified);
+  const location = useLocation();
+  const qrVerified = !!(location.state as any)?.qrVerified;
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
   const { data: station, isLoading, error } = useStation(id);
-  console.log('[StationDetail] station:', station?.id, 'loading:', isLoading, 'error:', error);
   const { data: wallet } = useWalletForStructure(station?.structure_id);
   const { data: plans } = useSubscriptionPlans(station?.structure_owner_id);
   const { data: activeSub } = useActiveSubscriptionForOwner(station?.structure_owner_id);
