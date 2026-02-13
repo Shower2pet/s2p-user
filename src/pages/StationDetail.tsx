@@ -185,7 +185,7 @@ const StationDetail = () => {
           productName: `${pkg.name} – ${pkg.credits_value} crediti`,
           productType: 'credit_pack',
           credits: pkg.credits_value,
-          structure_id: pkg.structure_id,
+          structure_id: pkg.structure_id || station.structure_id,
           success_url: `${window.location.origin}/s/${station.id}`,
         },
       });
