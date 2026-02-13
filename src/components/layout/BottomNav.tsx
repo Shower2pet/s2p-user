@@ -1,4 +1,4 @@
-import { Home, CreditCard, History, User, MapPin } from 'lucide-react';
+import { Home, CreditCard, History, User } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLanguage } from '@/hooks/useLanguage';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,6 @@ export const BottomNav = () => {
 
   const navItems = [
     { path: '/', label: t('home'), icon: Home },
-    { path: '/map', label: t('map'), icon: MapPin },
     { path: '/credits', label: t('myCredits'), icon: CreditCard },
     { path: '/history', label: t('history'), icon: History },
     { path: '/profile', label: t('profile'), icon: User },

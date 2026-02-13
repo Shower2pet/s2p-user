@@ -1,155 +1,405 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { useStations } from '@/hooks/useStations';
-import { useWallets } from '@/hooks/useWallet';
+import { useStations, Station, isStationOnline, StationCategory, getStationDisplayName } from '@/hooks/useStations';
+import { useGeolocation, getDistanceKm } from '@/hooks/useGeolocation';
 import { QrScanner } from '@/components/scanner/QrScanner';
-import { Play, LogIn, MapPin, Unlock, ChevronRight, Coins, ScanLine } from 'lucide-react';
+import { MapPin, Navigation, ScanLine, Unlock, X, Search, AlertTriangle, Lock, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const LOCATION_PATTERN = /^[a-zA-Z0-9\s,àèéìòùÀÈÉÌÒÙ\-']+$/;
+const MAX_LOCATION_LENGTH = 100;
+
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  TUB: { bg: 'bg-sky/15', text: 'text-primary', border: 'border-primary/30' },
+  SHOWER: { bg: 'bg-emerald-500/15', text: 'text-emerald-600', border: 'border-emerald-500/30' },
+};
 
 const Index = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user, loading } = useAuth();
-  const { data: stations } = useStations();
-  const { data: wallets } = useWallets();
-  const [stationCode, setStationCode] = useState('');
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [showUnlockInput, setShowUnlockInput] = useState(false);
+  const [stationCode, setStationCode] = useState('');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [noStationsMessage, setNoStationsMessage] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<StationCategory | 'ALL'>('ALL');
   const [showQrScanner, setShowQrScanner] = useState(false);
+  const { data: stations, isLoading } = useStations();
+  const { position } = useGeolocation();
 
-  const totalBalance = wallets?.reduce((sum, w) => sum + w.balance, 0) || 0;
+  const visibleStations = useMemo(() => {
+    const filtered = (stations?.filter(s => s.visibility !== 'HIDDEN') || [])
+      .filter(s => categoryFilter === 'ALL' || s.category === categoryFilter);
+    if (position) {
+      return [...filtered].sort((a, b) => {
+        const distA = (a.geo_lat && a.geo_lng) ? getDistanceKm(position.lat, position.lng, a.geo_lat, a.geo_lng) : Infinity;
+        const distB = (b.geo_lat && b.geo_lng) ? getDistanceKm(position.lat, position.lng, b.geo_lat, b.geo_lng) : Infinity;
+        return distA - distB;
+      });
+    }
+    return filtered;
+  }, [stations, categoryFilter, position]);
+
+  const getDistanceLabel = (station: Station): string | null => {
+    if (!position || !station.geo_lat || !station.geo_lng) return null;
+    const km = getDistanceKm(position.lat, position.lng, station.geo_lat, station.geo_lng);
+    if (km < 1) return `${Math.round(km * 1000)} m`;
+    return `${km.toFixed(1)} km`;
+  };
+
+  const checkStationsNearLocation = (lng: number, lat: number, locationName: string) => {
+    if (visibleStations.length === 0) {
+      setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
+      return;
+    }
+    const nearbyStations = visibleStations.filter(s => {
+      if (!s.geo_lat || !s.geo_lng) return false;
+      const distance = Math.sqrt(Math.pow(s.geo_lat - lat, 2) + Math.pow(s.geo_lng - lng, 2));
+      return distance < 0.5;
+    });
+    if (nearbyStations.length === 0) {
+      setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
+    } else {
+      setNoStationsMessage(null);
+    }
+  };
+
+  const handleLocationSearch = async () => {
+    const trimmed = locationSearch.trim();
+    if (!trimmed || !map.current || !MAPBOX_TOKEN) return;
+    if (trimmed.length > MAX_LOCATION_LENGTH) {
+      toast.error(`Località troppo lunga (max ${MAX_LOCATION_LENGTH} caratteri)`);
+      return;
+    }
+    if (!LOCATION_PATTERN.test(trimmed)) {
+      toast.error('La località contiene caratteri non validi');
+      return;
+    }
+    setIsSearching(true);
+    setNoStationsMessage(null);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${MAPBOX_TOKEN}&country=it&limit=1`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error('Errore nella ricerca');
+      const data = await response.json();
+      if (data.features?.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        map.current.flyTo({ center: [lng, lat], zoom: 13, essential: true });
+        checkStationsNearLocation(lng, lat, data.features[0].place_name);
+      } else {
+        toast.error('Località non trovata');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Ricerca scaduta, riprova');
+      } else {
+        toast.error('Errore nella ricerca');
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleUnlockStation = () => {
     if (!stationCode.trim()) {
       toast.error(t('enterStationCode'));
       return;
     }
-    const station = stations?.find(s => s.id.toLowerCase() === stationCode.trim().toLowerCase());
+    const station = stations?.find(s => s.id.toLowerCase() === stationCode.toLowerCase().trim());
     if (station) {
       navigate(`/s/${station.id}`);
-      setStationCode('');
       setShowUnlockInput(false);
+      setStationCode('');
     } else {
       toast.error(t('stationNotFound'));
     }
   };
 
+  useEffect(() => {
+    if (!mapContainer.current || !MAPBOX_TOKEN) return;
+    if (!map.current) {
+      const center: [number, number] = position ? [position.lng, position.lat] : [9.19, 45.4642];
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center,
+        zoom: position ? 13 : 11,
+      });
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    }
+    if (position && map.current) {
+      const existingUserMarker = document.querySelector('.user-location-marker');
+      if (existingUserMarker) existingUserMarker.remove();
+      const el = document.createElement('div');
+      el.className = 'user-location-marker';
+      new mapboxgl.Marker({ element: el, color: '#ef4444', scale: 0.6 })
+        .setLngLat([position.lng, position.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 15 }).setText('La tua posizione'))
+        .addTo(map.current);
+      map.current.flyTo({ center: [position.lng, position.lat], zoom: 13, essential: true });
+    }
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+    visibleStations.forEach((station) => {
+      const lat = station.geo_lat;
+      const lng = station.geo_lng;
+      if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+      const online = isStationOnline(station);
+      const markerColor = !online ? '#9ca3af' : station.category === 'SHOWER' ? '#10b981' : '#005596';
+      const marker = new mapboxgl.Marker({ color: markerColor })
+        .setLngLat([lng, lat])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<strong>${getStationDisplayName(station)}</strong><br/>${station.structure_address || ''}${
+              station.visibility === 'RESTRICTED' ? '<br/><em>🔒 Solo Clienti</em>' : ''
+            }`
+          )
+        )
+        .addTo(map.current!);
+      marker.getElement().addEventListener('click', () => setSelectedStation(station));
+      markersRef.current.push(marker);
+    });
+  }, [visibleStations, position]);
+
+  useEffect(() => {
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  const handleActivateStation = (station: Station) => navigate(`/s/${station.id}`);
+
+  const handleNavigate = (station: Station) => {
+    const lat = station.geo_lat || station.structure_geo_lat;
+    const lng = station.geo_lng || station.structure_geo_lng;
+    if (lat && lng) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+    }
+  };
+
+  const getStatusInfo = (station: Station) => {
+    const online = isStationOnline(station);
+    if (online) return { color: 'bg-success text-success-foreground', text: t('available') };
+    if (station.status === 'BUSY') return { color: 'bg-warning text-warning-foreground', text: t('busy') };
+    return { color: 'bg-muted text-muted-foreground', text: t('offline') };
+  };
+
+  const getCategoryStyle = (category: string) => CATEGORY_COLORS[category] || CATEGORY_COLORS.TUB;
+
+  const renderStationCard = (station: Station) => {
+    const status = getStatusInfo(station);
+    const online = isStationOnline(station);
+    const catStyle = getCategoryStyle(station.category);
+    const distLabel = getDistanceLabel(station);
+
+    return (
+      <Card
+        key={station.id}
+        className={`p-4 cursor-pointer transition-all ${selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''}`}
+        onClick={() => setSelectedStation(station)}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-full ${catStyle.bg} flex items-center justify-center flex-shrink-0`}>
+              {station.visibility === 'RESTRICTED' ? (
+                <Lock className={`w-5 h-5 ${catStyle.text}`} />
+              ) : (
+                <MapPin className={`w-5 h-5 ${catStyle.text}`} />
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-foreground text-sm">{getStationDisplayName(station)}</h3>
+              <p className="text-xs text-muted-foreground">
+                {station.structure_address || ''}
+                {distLabel && <span className="ml-1 text-primary font-medium">· {distLabel}</span>}
+              </p>
+              {station.visibility === 'RESTRICTED' && (
+                <p className="text-xs text-warning mt-0.5">🔒 Solo Clienti</p>
+              )}
+            </div>
+          </div>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
+            {status.text}
+          </span>
+        </div>
+        {selectedStation?.id === station.id && (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+            <Button variant="default" size="sm" className="flex-1"
+              onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
+              disabled={!online}
+            >
+              <MapPin className="w-4 h-4" /> Scopri di più
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1"
+              onClick={(e) => { e.stopPropagation(); handleNavigate(station); }}
+            >
+              <Navigation className="w-4 h-4" /> {t('directions')}
+            </Button>
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <Skeleton className="h-10 w-48 mx-auto" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
-      <div className="container max-w-lg mx-auto px-4 py-6 space-y-6">
-        {/* Hero Title */}
-        <div className="text-center space-y-3 animate-fade-in">
+      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+        {/* Hero */}
+        <div className="text-center space-y-2 animate-fade-in">
           <h1 className="text-2xl font-bold text-primary leading-tight">{t('heroTitle')}</h1>
+          {!user && !loading && (
+            <Button onClick={() => navigate('/login')} variant="outline" size="sm" className="mt-2">
+              <LogIn className="w-4 h-4" /> {t('loginToActivate')}
+            </Button>
+          )}
         </div>
 
-        {/* User Wallet Display */}
-        {user && (
-          <Card
-            className="relative overflow-hidden p-6 rounded-3xl shadow-floating cursor-pointer hover:shadow-glow-primary transition-all duration-300 animate-slide-up bg-gradient-to-br from-card via-card to-sky/10"
-            onClick={() => navigate('/profile')}
-          >
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-sky flex items-center justify-center shadow-lg">
-                  <Coins className="w-8 h-8 text-primary-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium flex items-center gap-1">
-                    {t('yourCredits')}
-                  </p>
-                  <div className="flex items-baseline gap-1">
-                    <p className="text-4xl font-bold text-primary">€{totalBalance.toFixed(2)}</p>
-                  </div>
-                </div>
+        {/* QR Scanner Button - prominent */}
+        <Card
+          className="p-5 rounded-3xl shadow-floating bg-gradient-to-br from-primary to-primary/80 text-primary-foreground cursor-pointer hover:scale-[1.02] transition-all duration-300 animate-slide-up"
+          onClick={() => setShowQrScanner(true)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary-foreground/20 flex items-center justify-center">
+              <ScanLine className="w-7 h-7" />
+            </div>
+            <div className="flex-1">
+              <p className="text-lg font-bold">Scansiona QR Code</p>
+              <p className="text-sm opacity-80">Scansiona il codice sulla stazione per iniziare</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Search */}
+        {MAPBOX_TOKEN && (
+          <Card className="p-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder="Cerca località (es. Milano, Roma...)"
+                  className="pl-10"
+                  maxLength={MAX_LOCATION_LENGTH}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
+                />
               </div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <ChevronRight className="w-5 h-5 text-primary" />
-                </div>
-              </div>
+              <Button onClick={handleLocationSearch} disabled={isSearching}>
+                {isSearching ? '...' : 'Cerca'}
+              </Button>
             </div>
           </Card>
         )}
 
-        {/* Main CTA */}
-        <Card className="p-6 rounded-3xl shadow-floating animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          {loading ? (
-            <div className="h-14 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : user ? (
-            <Button onClick={() => navigate('/map')} size="lg" className="w-full h-14 text-base rounded-full shadow-glow-primary hover:scale-[1.02] transition-all duration-300">
-              <Play className="w-5 h-5" /> {t('activateService')}
-            </Button>
-          ) : (
-            <Button onClick={() => navigate('/login')} size="lg" className="w-full h-14 text-base rounded-full shadow-glow-primary hover:scale-[1.02] transition-all duration-300">
-              <LogIn className="w-5 h-5" /> {t('loginToActivate')}
-            </Button>
-          )}
-          {!user && (
-            <p className="text-center text-sm text-muted-foreground mt-4">{t('loginAndUseCredits')}</p>
-          )}
-        </Card>
-
-        {/* Secondary Actions */}
-        <div className="space-y-3 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-          <Button onClick={() => navigate('/map')} variant="outline" size="lg" className="w-full h-14 text-base rounded-full bg-card shadow-lifted hover:shadow-floating transition-all duration-300 border-0">
-            <MapPin className="w-5 h-5 text-primary" /> {t('findStations')}
+        {/* Category filter */}
+        <div className="flex gap-2 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+          <Button variant={categoryFilter === 'ALL' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => setCategoryFilter('ALL')}>
+            Tutte
           </Button>
-
-          {!showUnlockInput ? (
-            <Button onClick={() => setShowUnlockInput(true)} variant="ghost" size="lg" className="w-full h-14 text-base rounded-full bg-sky/20 hover:bg-sky/30 text-primary transition-all duration-300">
-              <Unlock className="w-5 h-5" /> {t('unlockStation')}
-            </Button>
-          ) : (
-            <Card className="p-5 rounded-3xl shadow-floating space-y-4">
-              <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
-              <div className="flex gap-3">
-                <Input value={stationCode} onChange={(e) => setStationCode(e.target.value)}
-                  placeholder={t('stationCodePlaceholder')} className="flex-1 h-12 rounded-xl text-base"
-                  onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()} />
-                <Button onClick={handleUnlockStation} className="h-12 px-6 rounded-xl">{t('go')}</Button>
-              </div>
-              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => { setShowUnlockInput(false); setStationCode(''); }}>
-                {t('cancel')}
-              </Button>
-            </Card>
-          )}
+          <Button
+            variant={categoryFilter === 'TUB' ? 'default' : 'outline'} size="sm"
+            className={`flex-1 ${categoryFilter !== 'TUB' ? 'border-primary/40 text-primary hover:bg-primary/10' : ''}`}
+            onClick={() => setCategoryFilter('TUB')}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-primary inline-block mr-1.5" />
+            Vasche
+          </Button>
+          <Button
+            variant={categoryFilter === 'SHOWER' ? 'default' : 'outline'} size="sm"
+            className={`flex-1 ${categoryFilter !== 'SHOWER' ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10' : ''}`}
+            onClick={() => setCategoryFilter('SHOWER')}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block mr-1.5" />
+            Docce
+          </Button>
         </div>
 
-        {/* How It Works */}
-        <Card className="p-6 rounded-3xl shadow-lifted animate-slide-up" style={{ animationDelay: '0.4s' }}>
-          <h3 className="text-base font-bold text-foreground mb-4">{t('howItWorks')}</h3>
-          <div className="flex justify-between text-center">
-            <div className="flex-1">
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold mx-auto mb-2">1</div>
-              <p className="text-xs text-muted-foreground leading-tight">{t('step1Title')}</p>
+        {noStationsMessage && (
+          <Card className="p-4 bg-warning/10 border-warning animate-fade-in">
+            <div className="flex items-start gap-3">
+              <MapPin className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground text-sm">Nessuna stazione trovata</h3>
+                <p className="text-sm text-muted-foreground mt-1">{noStationsMessage}</p>
+              </div>
+              <button onClick={() => setNoStationsMessage(null)} className="p-1 hover:bg-muted rounded-full">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
             </div>
-            <div className="flex-1">
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold mx-auto mb-2">2</div>
-              <p className="text-xs text-muted-foreground leading-tight">{t('step2Title')}</p>
-            </div>
-            <div className="flex-1">
-              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold mx-auto mb-2">3</div>
-              <p className="text-xs text-muted-foreground leading-tight">{t('step3Title')}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+          </Card>
+        )}
 
-      {/* QR Scanner FAB */}
-      <button
-        onClick={() => setShowQrScanner(true)}
-        className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-glow-primary flex items-center justify-center hover:scale-110 transition-transform duration-200"
-        aria-label="Scansiona QR"
-      >
-        <ScanLine className="w-6 h-6" />
-      </button>
+        {/* Unlock station */}
+        {!showUnlockInput ? (
+          <Button onClick={() => setShowUnlockInput(true)} variant="outline" className="w-full" size="lg">
+            <Unlock className="w-5 h-5 mr-2" /> {t('unlockStation')}
+          </Button>
+        ) : (
+          <Card className="p-4 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-foreground">{t('enterStationCode')}</h3>
+              <button onClick={() => { setShowUnlockInput(false); setStationCode(''); }} className="p-1.5 hover:bg-muted rounded-full">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
+            <div className="flex gap-2">
+              <Input value={stationCode} onChange={(e) => setStationCode(e.target.value)}
+                placeholder={t('stationCodePlaceholder')} className="flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()} />
+              <Button onClick={handleUnlockStation}>{t('go')}</Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Map */}
+        {MAPBOX_TOKEN && (
+          <Card className="overflow-hidden rounded-2xl animate-slide-up" style={{ animationDelay: '0.2s' }}>
+            <div ref={mapContainer} className="w-full h-64" />
+          </Card>
+        )}
+
+        {/* Stations List */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
+          {visibleStations.map(renderStationCard)}
+        </div>
+      </div>
 
       {/* QR Scanner Modal */}
       {showQrScanner && <QrScanner onClose={() => setShowQrScanner(false)} />}
