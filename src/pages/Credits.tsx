@@ -1,19 +1,26 @@
+import { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useWallets } from '@/hooks/useWallet';
-import { Coins, Wallet } from 'lucide-react';
+import { useMySubscriptions } from '@/hooks/useSubscriptions';
+import { Coins, Wallet, Crown, Calendar, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 
 const Credits = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: wallets, isLoading } = useWallets();
-
-  const totalBalance = wallets?.reduce((sum, w) => sum + w.balance, 0) || 0;
+  const { data: wallets, isLoading: walletsLoading } = useWallets();
+  const { data: subscriptions, isLoading: subsLoading } = useMySubscriptions();
+  const [hideExpired, setHideExpired] = useState(false);
 
   if (!user) {
     return (
@@ -27,28 +34,29 @@ const Credits = () => {
     );
   }
 
+  const filtered = hideExpired
+    ? subscriptions?.filter(s => s.status === 'active') || []
+    : subscriptions || [];
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-success text-success-foreground">Attivo</Badge>;
+      case 'cancelled':
+        return <Badge variant="secondary">Cancellato</Badge>;
+      case 'expired':
+        return <Badge variant="outline" className="text-muted-foreground">Scaduto</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   return (
     <AppShell>
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground">{t('myCredits')}</h1>
-          <p className="text-muted-foreground font-light">I tuoi saldi per struttura</p>
         </div>
-
-        {/* Total Balance */}
-        <Card className="p-8 bg-gradient-to-br from-primary/5 to-sky/10 border-2 border-sky shadow-lg">
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-              <Coins className="w-8 h-8 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground font-light uppercase tracking-wide mb-2">
-                {t('currentBalance')}
-              </p>
-              <p className="text-6xl font-bold text-foreground">€{totalBalance.toFixed(2)}</p>
-            </div>
-          </div>
-        </Card>
 
         {/* Wallets per structure */}
         <div className="space-y-3">
@@ -56,7 +64,7 @@ const Credits = () => {
             <Wallet className="w-5 h-5 text-primary" />
             Saldi per struttura
           </h2>
-          {isLoading ? (
+          {walletsLoading ? (
             <Card className="p-4 text-center text-muted-foreground">Caricamento...</Card>
           ) : wallets && wallets.length > 0 ? (
             wallets.map((w) => (
@@ -73,10 +81,68 @@ const Credits = () => {
               <p className="text-sm text-muted-foreground">
                 Puoi acquistare crediti dalla pagina di dettaglio di una stazione
               </p>
-              <Button variant="outline" onClick={() => navigate('/map')} className="mt-2">
-                Trova una stazione
-              </Button>
             </Card>
+          )}
+        </div>
+
+        {/* Subscriptions Section */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Crown className="w-5 h-5 text-accent" />
+            I Miei Abbonamenti
+          </h2>
+
+          <div className="flex items-center justify-between px-1">
+            <span className="text-sm text-muted-foreground">Nascondi scaduti</span>
+            <Switch checked={hideExpired} onCheckedChange={setHideExpired} />
+          </div>
+
+          {subsLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-24 w-full rounded-2xl" />
+              <Skeleton className="h-24 w-full rounded-2xl" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <Card className="p-6 text-center space-y-3">
+              <Crown className="w-10 h-10 text-muted-foreground mx-auto" />
+              <p className="text-muted-foreground">Nessun abbonamento trovato</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((sub) => (
+                <Card key={sub.id} className={`p-4 ${sub.status === 'active' ? 'border-accent/30' : ''}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-foreground">{sub.plan?.name || 'Piano'}</p>
+                        {getStatusBadge(sub.status)}
+                      </div>
+                      {sub.plan?.description && (
+                        <p className="text-xs text-muted-foreground mt-1">{sub.plan.description}</p>
+                      )}
+                      <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        <span>
+                          Dal {format(new Date(sub.starts_at), 'dd MMM yyyy', { locale: it })}
+                          {sub.ends_at && ` al ${format(new Date(sub.ends_at), 'dd MMM yyyy', { locale: it })}`}
+                        </span>
+                      </div>
+                      {sub.plan?.max_washes_per_month && sub.status === 'active' && (
+                        <p className="text-xs text-primary mt-1">
+                          {sub.washes_used_this_period}/{sub.plan.max_washes_per_month} lavaggi usati
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-accent">€{sub.plan?.price_eur?.toFixed(2) || '—'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        /{sub.plan?.interval === 'month' ? 'mese' : 'anno'}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
         </div>
       </div>

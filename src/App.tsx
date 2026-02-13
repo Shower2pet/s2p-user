@@ -19,7 +19,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Support from "./pages/Support";
-import Map from "./pages/Map";
+
 import NotFound from "./pages/NotFound";
 import StationDetail from "./pages/StationDetail";
 import StationTimer from "./pages/StationTimer";
@@ -50,7 +50,7 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/support" element={<Support />} />
-              <Route path="/map" element={<Map />} />
+              
               <Route path="/s/:id" element={<StationDetail />} />
               <Route path="/s/:id/timer" element={<StationTimer />} />
               <Route path="/subscriptions" element={<MySubscriptions />} />
