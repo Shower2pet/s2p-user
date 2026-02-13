@@ -7,6 +7,8 @@ import { ReportProblemDialog } from '@/components/station/ReportProblemDialog';
 import { SubscriptionPlansList } from '@/components/station/SubscriptionPlansList';
 import { useStation, isStationOnline, getStationDisplayName } from '@/hooks/useStations';
 import { useSubscriptionPlans, useActiveSubscriptionForOwner } from '@/hooks/useSubscriptions';
+import { useCreditPackagesForStructure } from '@/hooks/useCreditPackages';
+import { CreditPackagesList } from '@/components/station/CreditPackagesList';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useWalletForStructure } from '@/hooks/useWallet';
@@ -28,6 +30,7 @@ const StationDetail = () => {
   const { data: wallet } = useWalletForStructure(station?.structure_id);
   const { data: plans } = useSubscriptionPlans(station?.structure_owner_id);
   const { data: activeSub } = useActiveSubscriptionForOwner(station?.structure_owner_id);
+  const { data: creditPackages } = useCreditPackagesForStructure(station?.structure_id);
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -36,6 +39,7 @@ const StationDetail = () => {
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'stripe'>('stripe');
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -124,6 +128,34 @@ const StationDetail = () => {
       }
     } else {
       toast.info('Abbonamento non ancora configurato. Contatta la struttura.');
+    }
+  };
+
+  const handlePurchaseCredits = async (pkg: any) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setPurchasingId(pkg.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          amount: Math.round(pkg.price_eur * 100),
+          currency: 'eur',
+          productName: `${pkg.name} – ${pkg.credits_value} crediti`,
+          productType: 'credit_pack',
+          credits: pkg.credits_value,
+          structure_id: pkg.structure_id,
+          success_url: `${window.location.origin}/s/${station.id}`,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) window.location.href = data.url;
+    } catch (err) {
+      console.error('Purchase error:', err);
+      toast.error('Errore durante l\'acquisto');
+    } finally {
+      setPurchasingId(null);
     }
   };
 
@@ -233,6 +265,17 @@ const StationDetail = () => {
               activePlanId={activeSub?.plan_id}
               onSubscribe={handleSubscribe}
               isProcessing={isProcessing}
+            />
+          </div>
+        )}
+
+        {/* Credit Packages */}
+        {creditPackages && creditPackages.length > 0 && (
+          <div className="animate-fade-in" style={{ animationDelay: '0.09s' }}>
+            <CreditPackagesList
+              packages={creditPackages}
+              purchasingId={purchasingId}
+              onPurchase={handlePurchaseCredits}
             />
           </div>
         )}

@@ -33,3 +33,30 @@ export const useCreditPackages = () => {
     },
   });
 };
+
+export const useCreditPackagesForStructure = (structureId: string | null | undefined) => {
+  return useQuery({
+    queryKey: ['credit-packages', structureId],
+    queryFn: async () => {
+      if (!structureId) return [];
+      const { data, error } = await supabase
+        .from('credit_packages')
+        .select('*, structures(name)')
+        .eq('is_active', true)
+        .eq('structure_id', structureId)
+        .order('price_eur');
+
+      if (error) throw error;
+
+      return (data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price_eur: p.price_eur,
+        credits_value: p.credits_value,
+        structure_id: p.structure_id,
+        structure_name: p.structures?.name ?? null,
+      })) as CreditPackage[];
+    },
+    enabled: !!structureId,
+  });
+};
