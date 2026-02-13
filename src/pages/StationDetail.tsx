@@ -77,9 +77,11 @@ const StationDetail = () => {
         }
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
+        queryClient.invalidateQueries({ queryKey: ['station', id] });
+        queryClient.invalidateQueries({ queryKey: ['stations'] });
       });
     }
-  }, [searchParams, setSearchParams, queryClient]);
+  }, [searchParams, setSearchParams, queryClient, id]);
 
   // Auto-sync any pending credit topup transactions on page load
   useEffect(() => {
