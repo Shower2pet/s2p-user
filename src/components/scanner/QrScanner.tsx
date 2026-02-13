@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,45 +12,71 @@ interface QrScannerProps {
 export const QrScanner = ({ onClose }: QrScannerProps) => {
   const navigate = useNavigate();
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const hasScannedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const onCloseRef = useRef(onClose);
+  const navigateRef = useRef(navigate);
   const [error, setError] = useState<string | null>(null);
 
+  // Keep refs updated
+  onCloseRef.current = onClose;
+  navigateRef.current = navigate;
+
   useEffect(() => {
+    isMountedRef.current = true;
     const scannerId = 'qr-reader';
     const scanner = new Html5Qrcode(scannerId);
     scannerRef.current = scanner;
+    let stopped = false;
 
     scanner
       .start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
+          // Prevent double scan
+          if (hasScannedRef.current) return;
+          hasScannedRef.current = true;
+
           let stationId = decodedText.trim();
           const urlMatch = stationId.match(/\/s\/([^/?#]+)/);
           if (urlMatch) {
             stationId = urlMatch[1];
           }
 
-          // Stop scanner first, then navigate after a brief delay to avoid DOM conflicts
+          console.log('[QrScanner] Scanned station:', stationId);
+
+          // Stop scanner safely
+          stopped = true;
           scanner.stop().catch(() => {}).finally(() => {
+            console.log('[QrScanner] Scanner stopped, navigating to:', `/s/${stationId}`);
             toast.success('QR code letto!');
-            onClose();
-            // Use setTimeout to ensure the scanner DOM is fully cleaned up before navigation
+            // Navigate first, then close overlay
+            navigateRef.current(`/s/${stationId}`);
+            // Close the overlay after navigation is triggered
             setTimeout(() => {
-              navigate(`/s/${stationId}`);
-            }, 100);
+              if (isMountedRef.current) {
+                onCloseRef.current();
+              }
+            }, 50);
           });
         },
-        () => {} // ignore scan failures (no QR in frame)
+        () => {}
       )
       .catch((err) => {
-        console.error('QR Scanner error:', err);
-        setError('Impossibile accedere alla fotocamera. Verifica i permessi.');
+        console.error('[QrScanner] Start error:', err);
+        if (isMountedRef.current) {
+          setError('Impossibile accedere alla fotocamera. Verifica i permessi.');
+        }
       });
 
     return () => {
-      scanner.stop().catch(() => {});
+      isMountedRef.current = false;
+      if (!stopped) {
+        scanner.stop().catch(() => {});
+      }
     };
-  }, [navigate, onClose]);
+  }, []); // No dependencies - refs handle everything
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center">
@@ -68,7 +94,7 @@ export const QrScanner = ({ onClose }: QrScannerProps) => {
 
       {error && (
         <div className="mt-4 text-center px-6">
-          <p className="text-red-400 text-sm">{error}</p>
+          <p className="text-destructive text-sm">{error}</p>
           <Button variant="outline" size="sm" className="mt-3 text-white border-white/30" onClick={onClose}>
             Chiudi
           </Button>
