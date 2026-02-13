@@ -16,10 +16,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, ShieldCheck, AlertTriangle, Crown } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,9 +38,20 @@ const StationDetail = () => {
   const [guestEmail, setGuestEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'stripe'>('stripe');
-  const [isUnlocking, setIsUnlocking] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [qrVerified, setQrVerified] = useState(false);
+  const [showQrVerify, setShowQrVerify] = useState(false);
+  const [pendingOptionId, setPendingOptionId] = useState<number | null>(null);
+  const handleQrVerified = useCallback(() => {
+    setQrVerified(true);
+    setShowQrVerify(false);
+    if (pendingOptionId !== null) {
+      setSelectedOption(pendingOptionId);
+      setShowCheckout(true);
+      setPendingOptionId(null);
+    }
+  }, [pendingOptionId]);
 
   if (isLoading) {
     return (
@@ -72,29 +84,19 @@ const StationDetail = () => {
   const walletBalance = wallet?.balance || 0;
   const isRestricted = station.visibility === 'RESTRICTED';
   const hasActiveSub = !!activeSub;
+  const needsQrVerification = isRestricted && !qrVerified;
 
   const canPayWithCredits = user && walletBalance >= (chosen?.price || 0) && (chosen?.price || 0) > 0;
   const effectivePaymentMethod = hasActiveSub ? 'subscription' as const : paymentMethod === 'credits' && canPayWithCredits ? 'credits' : 'stripe';
 
-  const handleUnlockAccess = async () => {
-    if (!user) {
-      toast.error('Devi effettuare il login per sbloccare l\'accesso');
-      navigate('/login');
+  const handleWashOptionClick = (optId: number) => {
+    if (needsQrVerification) {
+      setPendingOptionId(optId);
+      setShowQrVerify(true);
       return;
     }
-    setIsUnlocking(true);
-    try {
-      const { error } = await supabase
-        .from('station_access_logs')
-        .insert({ user_id: user.id, station_id: station.id });
-      if (error) throw error;
-      toast.success('Accesso sbloccato!');
-    } catch (err: any) {
-      console.error('Unlock access error:', err);
-      toast.error('Errore nello sblocco dell\'accesso');
-    } finally {
-      setIsUnlocking(false);
-    }
+    setSelectedOption(optId);
+    setShowCheckout(true);
   };
 
   const handleSubscribe = async (plan: any) => {
@@ -227,20 +229,18 @@ const StationDetail = () => {
           />
         </div>
 
-        {/* Restricted Access */}
+        {/* Restricted station banner */}
         {isRestricted && (
-          <Card className="p-4 space-y-3 animate-fade-in border-warning/30 bg-warning/5">
+          <Card className="p-4 space-y-2 animate-fade-in border-warning/30 bg-warning/5">
             <div className="flex items-center gap-2 text-warning">
               <Lock className="w-5 h-5" />
               <span className="font-bold text-sm">Accesso Riservato</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Questa stazione è riservata ai clienti della struttura.
+              {qrVerified
+                ? '✅ Accesso verificato tramite QR code'
+                : 'Per attivare un servizio è necessario scansionare il QR code presente in struttura.'}
             </p>
-            <Button onClick={handleUnlockAccess} disabled={isUnlocking} className="w-full" variant="accent" size="sm">
-              {isUnlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-              Sblocca Accesso
-            </Button>
           </Card>
         )}
 
@@ -294,7 +294,7 @@ const StationDetail = () => {
                 className={`p-4 cursor-pointer transition-all ${
                   selectedOption === opt.id ? 'ring-2 ring-primary shadow-glow-primary' : 'hover:shadow-md'
                 }`}
-                onClick={() => { setSelectedOption(opt.id); setShowCheckout(true); }}
+                onClick={() => handleWashOptionClick(opt.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -450,6 +450,15 @@ const StationDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* QR Verify Scanner for restricted stations */}
+      {showQrVerify && (
+        <QrVerifyScanner
+          expectedStationId={station.id}
+          onVerified={handleQrVerified}
+          onClose={() => { setShowQrVerify(false); setPendingOptionId(null); }}
+        />
+      )}
     </AppShell>
   );
 };

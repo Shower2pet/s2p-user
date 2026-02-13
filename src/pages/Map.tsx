@@ -301,7 +301,7 @@ const Map = () => {
               onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
               disabled={!online}
             >
-              <Play className="w-4 h-4" /> {t('activate')}
+              <MapPin className="w-4 h-4" /> Scopri di più
             </Button>
             <Button
               variant="outline" size="sm" className="flex-1"
