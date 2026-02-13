@@ -41,7 +41,7 @@ serve(async (req) => {
     // Get station and resolve option price
     const { data: station, error: stationErr } = await supabaseClient
       .from('stations')
-      .select('structure_id, washing_options, type, category')
+      .select('structure_id, washing_options, type')
       .eq('id', station_id)
       .maybeSingle();
 
