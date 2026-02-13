@@ -32,7 +32,7 @@ export const CreditPackagesList = ({ packages, purchasingId, onPurchase }: Credi
                   <Sparkles className="w-4 h-4 text-primary" />
                   <span className="font-bold text-primary text-sm">{pkg.credits_value} crediti</span>
                   {bonus > 0 && (
-                    <span className="text-xs bg-accent/20 text-accent-foreground px-2 py-0.5 rounded-full font-medium">
+                    <span className="text-xs bg-accent text-accent-foreground px-2 py-0.5 rounded-full font-bold">
                       +{bonus.toFixed(0)} bonus
                     </span>
                   )}
