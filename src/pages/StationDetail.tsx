@@ -24,10 +24,12 @@ import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
+  console.log('[StationDetail] Rendering with id:', id);
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
   const { data: station, isLoading, error } = useStation(id);
+  console.log('[StationDetail] station:', station?.id, 'loading:', isLoading, 'error:', error);
   const { data: wallet } = useWalletForStructure(station?.structure_id);
   const { data: plans } = useSubscriptionPlans(station?.structure_owner_id);
   const { data: activeSub } = useActiveSubscriptionForOwner(station?.structure_owner_id);
