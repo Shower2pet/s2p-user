@@ -57,10 +57,8 @@ const StationDetail = () => {
 
   const handleManualCodeVerify = () => {
     if (!station || !manualCode.trim()) return;
-    // Compare manual code with station access_code or station ID
     const code = manualCode.trim().toLowerCase();
-    const stationCode = station.access_code?.toLowerCase() || station.id.toLowerCase();
-    if (code === stationCode || code === station.id.toLowerCase()) {
+    if (code === station.id.toLowerCase()) {
       setVisibilityVerified(true);
       setManualCode('');
       toast.success('Codice verificato! Ora puoi attivare i servizi.');
