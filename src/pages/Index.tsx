@@ -7,8 +7,8 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useStations } from '@/hooks/useStations';
 import { useWallets } from '@/hooks/useWallet';
-import { branding } from '@/config/branding';
-import { Play, LogIn, MapPin, Unlock, ChevronRight, Coins } from 'lucide-react';
+import { QrScanner } from '@/components/scanner/QrScanner';
+import { Play, LogIn, MapPin, Unlock, ChevronRight, Coins, ScanLine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -20,6 +20,7 @@ const Index = () => {
   const { data: wallets } = useWallets();
   const [stationCode, setStationCode] = useState('');
   const [showUnlockInput, setShowUnlockInput] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
 
   const totalBalance = wallets?.reduce((sum, w) => sum + w.balance, 0) || 0;
 
@@ -140,6 +141,18 @@ const Index = () => {
           </div>
         </Card>
       </div>
+
+      {/* QR Scanner FAB */}
+      <button
+        onClick={() => setShowQrScanner(true)}
+        className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-glow-primary flex items-center justify-center hover:scale-110 transition-transform duration-200"
+        aria-label="Scansiona QR"
+      >
+        <ScanLine className="w-6 h-6" />
+      </button>
+
+      {/* QR Scanner Modal */}
+      {showQrScanner && <QrScanner onClose={() => setShowQrScanner(false)} />}
     </AppShell>
   );
 };
