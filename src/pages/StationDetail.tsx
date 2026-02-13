@@ -54,16 +54,31 @@ const StationDetail = () => {
   // Access gate state
   const [isOpeningGate, setIsOpeningGate] = useState(false);
 
-  // Refresh wallet balance after returning from credit purchase
+  // Verify payment and refresh wallet after returning from credit purchase
   useEffect(() => {
-    if (searchParams.get('credits_updated') === '1') {
-      // Clean URL
+    const sessionId = searchParams.get('session_id');
+    const creditsUpdated = searchParams.get('credits_updated');
+    if (creditsUpdated === '1' && sessionId) {
+      // Clean URL immediately
       searchParams.delete('credits_updated');
+      searchParams.delete('session_id');
       setSearchParams(searchParams, { replace: true });
-      // Invalidate wallet cache so it refetches
-      queryClient.invalidateQueries({ queryKey: ['wallet'] });
-      queryClient.invalidateQueries({ queryKey: ['wallets'] });
-      toast.success('Crediti aggiunti al tuo saldo!');
+      // Verify the payment server-side
+      supabase.functions.invoke('verify-session', {
+        body: { session_id: sessionId },
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('Verify session error:', error);
+          toast.error('Errore nella verifica del pagamento');
+        } else if (data?.status === 'completed' || data?.status === 'already_completed') {
+          toast.success('Crediti aggiunti al tuo saldo!');
+        } else {
+          toast.info('Pagamento in attesa di conferma');
+        }
+        // Always refresh wallet
+        queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      });
     }
   }, [searchParams, setSearchParams, queryClient]);
 
@@ -202,7 +217,7 @@ const StationDetail = () => {
           productType: 'credit_pack',
           credits: pkg.credits_value,
           structure_id: pkg.structure_id || station.structure_id,
-          success_url: `${window.location.origin}/s/${station.id}?credits_updated=1`,
+          success_url: `${window.location.origin}/s/${station.id}?credits_updated=1&session_id={CHECKOUT_SESSION_ID}`,
         },
       });
       if (error) throw error;
