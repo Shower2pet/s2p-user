@@ -29,6 +29,7 @@ export interface Station {
   structure_description: string | null;
   structure_geo_lat: number | null;
   structure_geo_lng: number | null;
+  structure_owner_id: string | null;
 }
 
 export const getStationCategory = (type: string): StationCategory =>
@@ -68,6 +69,7 @@ const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station
     structure_description: struct?.description ?? null,
     structure_geo_lat: struct?.geo_lat ?? null,
     structure_geo_lng: struct?.geo_lng ?? null,
+    structure_owner_id: struct?.owner_id ?? null,
   };
 };
 
@@ -86,7 +88,7 @@ export const useStations = () => {
       if (structureIds.length > 0) {
         const { data: structs } = await supabase
           .from('structures')
-          .select('id, name, address, description, geo_lat, geo_lng')
+          .select('id, name, address, description, geo_lat, geo_lng, owner_id')
           .in('id', structureIds);
         
         (structs || []).forEach((s: any) => structuresMap.set(s.id, s));
@@ -114,7 +116,7 @@ export const useStation = (stationId: string | undefined) => {
       if (row.structure_id) {
         const { data: structs } = await supabase
           .from('structures')
-          .select('id, name, address, description, geo_lat, geo_lng')
+          .select('id, name, address, description, geo_lat, geo_lng, owner_id')
           .eq('id', row.structure_id)
           .maybeSingle();
         

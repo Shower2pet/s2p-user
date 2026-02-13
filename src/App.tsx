@@ -23,6 +23,7 @@ import Map from "./pages/Map";
 import NotFound from "./pages/NotFound";
 import StationDetail from "./pages/StationDetail";
 import StationTimer from "./pages/StationTimer";
+import MySubscriptions from "./pages/MySubscriptions";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/map" element={<Map />} />
               <Route path="/s/:id" element={<StationDetail />} />
               <Route path="/s/:id/timer" element={<StationTimer />} />
+              <Route path="/subscriptions" element={<MySubscriptions />} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
