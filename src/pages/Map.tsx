@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStations, Station, isStationOnline, StationCategory, getStationDisplayName } from '@/hooks/useStations';
+import { useGeolocation, getDistanceKm } from '@/hooks/useGeolocation';
 import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
@@ -16,7 +17,6 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const LOCATION_PATTERN = /^[a-zA-Z0-9\s,àèéìòùÀÈÉÌÒÙ\-']+$/;
 const MAX_LOCATION_LENGTH = 100;
 
-// Color-coded station types
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   TUB: { bg: 'bg-sky/15', text: 'text-primary', border: 'border-primary/30' },
   SHOWER: { bg: 'bg-emerald-500/15', text: 'text-emerald-600', border: 'border-emerald-500/30' },
@@ -36,9 +36,30 @@ const Map = () => {
   const [noStationsMessage, setNoStationsMessage] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<StationCategory | 'ALL'>('ALL');
   const { data: stations, isLoading } = useStations();
+  const { position } = useGeolocation();
 
-  const visibleStations = (stations?.filter(s => s.visibility !== 'HIDDEN') || [])
-    .filter(s => categoryFilter === 'ALL' || s.category === categoryFilter);
+  // Filter: hide HIDDEN, apply category filter
+  const visibleStations = useMemo(() => {
+    const filtered = (stations?.filter(s => s.visibility !== 'HIDDEN') || [])
+      .filter(s => categoryFilter === 'ALL' || s.category === categoryFilter);
+
+    // Sort by distance if user position is available
+    if (position) {
+      return [...filtered].sort((a, b) => {
+        const distA = (a.geo_lat && a.geo_lng) ? getDistanceKm(position.lat, position.lng, a.geo_lat, a.geo_lng) : Infinity;
+        const distB = (b.geo_lat && b.geo_lng) ? getDistanceKm(position.lat, position.lng, b.geo_lat, b.geo_lng) : Infinity;
+        return distA - distB;
+      });
+    }
+    return filtered;
+  }, [stations, categoryFilter, position]);
+
+  const getDistanceLabel = (station: Station): string | null => {
+    if (!position || !station.geo_lat || !station.geo_lng) return null;
+    const km = getDistanceKm(position.lat, position.lng, station.geo_lat, station.geo_lng);
+    if (km < 1) return `${Math.round(km * 1000)} m`;
+    return `${km.toFixed(1)} km`;
+  };
 
   const checkStationsNearLocation = (lng: number, lat: number, locationName: string) => {
     if (visibleStations.length === 0) {
@@ -120,18 +141,31 @@ const Map = () => {
     }
   };
 
+  // Initialize map, center on user position if available
   useEffect(() => {
-    if (!mapContainer.current || !visibleStations.length || !MAPBOX_TOKEN) return;
+    if (!mapContainer.current || !MAPBOX_TOKEN) return;
 
     if (!map.current) {
+      const center: [number, number] = position
+        ? [position.lng, position.lat]
+        : [9.19, 45.4642];
+
       mapboxgl.accessToken = MAPBOX_TOKEN;
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/light-v11',
-        center: [9.1900, 45.4642],
-        zoom: 11,
+        center,
+        zoom: position ? 13 : 11,
       });
       map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      // Add user location dot
+      if (position) {
+        new mapboxgl.Marker({ color: '#ef4444', scale: 0.6 })
+          .setLngLat([position.lng, position.lat])
+          .setPopup(new mapboxgl.Popup({ offset: 15 }).setText('La tua posizione'))
+          .addTo(map.current);
+      }
     }
 
     markersRef.current.forEach(marker => marker.remove());
@@ -159,7 +193,7 @@ const Map = () => {
       marker.getElement().addEventListener('click', () => setSelectedStation(station));
       markersRef.current.push(marker);
     });
-  }, [visibleStations]);
+  }, [visibleStations, position]);
 
   useEffect(() => {
     return () => {
@@ -219,6 +253,7 @@ const Map = () => {
     const status = getStatusInfo(station);
     const online = isStationOnline(station);
     const catStyle = getCategoryStyle(station.category);
+    const distLabel = getDistanceLabel(station);
 
     return (
       <Card
@@ -237,7 +272,10 @@ const Map = () => {
             </div>
             <div>
               <h3 className="font-bold text-foreground text-sm">{getStationDisplayName(station)}</h3>
-              <p className="text-xs text-muted-foreground">{station.structure_address || ''}</p>
+              <p className="text-xs text-muted-foreground">
+                {station.structure_address || ''}
+                {distLabel && <span className="ml-1 text-primary font-medium">· {distLabel}</span>}
+              </p>
               {station.visibility === 'RESTRICTED' && (
                 <p className="text-xs text-warning mt-0.5">🔒 Solo Clienti</p>
               )}
@@ -297,19 +335,13 @@ const Map = () => {
           </div>
         </Card>
 
-        {/* Category filter - color-coded, no emojis */}
+        {/* Category filter */}
         <div className="flex gap-2">
-          <Button
-            variant={categoryFilter === 'ALL' ? 'default' : 'outline'}
-            size="sm"
-            className="flex-1"
-            onClick={() => setCategoryFilter('ALL')}
-          >
+          <Button variant={categoryFilter === 'ALL' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => setCategoryFilter('ALL')}>
             Tutte
           </Button>
           <Button
-            variant={categoryFilter === 'TUB' ? 'default' : 'outline'}
-            size="sm"
+            variant={categoryFilter === 'TUB' ? 'default' : 'outline'} size="sm"
             className={`flex-1 ${categoryFilter !== 'TUB' ? 'border-primary/40 text-primary hover:bg-primary/10' : ''}`}
             onClick={() => setCategoryFilter('TUB')}
           >
@@ -317,8 +349,7 @@ const Map = () => {
             Vasche
           </Button>
           <Button
-            variant={categoryFilter === 'SHOWER' ? 'default' : 'outline'}
-            size="sm"
+            variant={categoryFilter === 'SHOWER' ? 'default' : 'outline'} size="sm"
             className={`flex-1 ${categoryFilter !== 'SHOWER' ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10' : ''}`}
             onClick={() => setCategoryFilter('SHOWER')}
           >

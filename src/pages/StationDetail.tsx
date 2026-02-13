@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer } from 'lucide-react';
+import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -29,6 +29,7 @@ const StationDetail = () => {
   const [guestEmail, setGuestEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'stripe'>('stripe');
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   if (isLoading) {
     return (
@@ -59,9 +60,33 @@ const StationDetail = () => {
   const washOptions = station.washing_options || [];
   const chosen = washOptions.find(o => o.id === selectedOption);
   const walletBalance = wallet?.balance || 0;
+  const isRestricted = station.visibility === 'RESTRICTED';
 
   const canPayWithCredits = user && walletBalance >= (chosen?.price || 0) && (chosen?.price || 0) > 0;
   const effectivePaymentMethod = paymentMethod === 'credits' && canPayWithCredits ? 'credits' : 'stripe';
+
+  const handleUnlockAccess = async () => {
+    if (!user) {
+      toast.error('Devi effettuare il login per sbloccare l\'accesso');
+      navigate('/login');
+      return;
+    }
+
+    setIsUnlocking(true);
+    try {
+      const { error } = await supabase
+        .from('station_access_logs')
+        .insert({ user_id: user.id, station_id: station.id });
+
+      if (error) throw error;
+      toast.success('Accesso sbloccato!');
+    } catch (err: any) {
+      console.error('Unlock access error:', err);
+      toast.error('Errore nello sblocco dell\'accesso');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   const handlePay = async () => {
     if (!chosen) return;
@@ -73,7 +98,6 @@ const StationDetail = () => {
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-
         toast.success(t('serviceActivated'));
         navigate(`/s/${station.id}/timer?option=${chosen.id}`);
       } else {
@@ -89,10 +113,8 @@ const StationDetail = () => {
           guest_email: !user ? guestEmail : null,
           success_url: `${window.location.origin}/s/${station.id}/timer?option=${chosen.id}`,
         };
-
         const { data, error } = await supabase.functions.invoke('create-checkout', { body });
         if (error) throw error;
-
         if (data?.url) {
           window.location.href = data.url;
         }
@@ -115,15 +137,9 @@ const StationDetail = () => {
             status={displayStatus as 'available' | 'busy' | 'offline'}
             description={station.structure_description || undefined}
           />
-          {station.visibility === 'RESTRICTED' && (
-            <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-warning/10 text-warning text-sm">
-              <Lock className="w-4 h-4" />
-              <span>Solo Clienti della struttura</span>
-            </div>
-          )}
         </div>
 
-        {/* Map Preview with Mapbox + Directions button below */}
+        {/* Map Preview with Directions button below */}
         <div className="animate-fade-in" style={{ animationDelay: '0.05s' }}>
           <MapPreview
             stationName={getStationDisplayName(station)}
@@ -132,6 +148,33 @@ const StationDetail = () => {
             lng={station.geo_lng || station.structure_geo_lng || undefined}
           />
         </div>
+
+        {/* Restricted Access Button */}
+        {isRestricted && (
+          <Card className="p-4 space-y-3 animate-fade-in border-warning/30 bg-warning/5" style={{ animationDelay: '0.07s' }}>
+            <div className="flex items-center gap-2 text-warning">
+              <Lock className="w-5 h-5" />
+              <span className="font-bold text-sm">Accesso Riservato</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Questa stazione è riservata ai clienti della struttura. Sblocca l'accesso per procedere.
+            </p>
+            <Button
+              onClick={handleUnlockAccess}
+              disabled={isUnlocking}
+              className="w-full"
+              variant="accent"
+              size="sm"
+            >
+              {isUnlocking ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              Sblocca Accesso
+            </Button>
+          </Card>
+        )}
 
         {/* Washing Options */}
         <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
