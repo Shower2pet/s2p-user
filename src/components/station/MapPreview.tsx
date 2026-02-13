@@ -1,5 +1,12 @@
 import { Card } from '@/components/ui/card';
-import { MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Navigation } from 'lucide-react';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 interface MapPreviewProps {
   stationName: string;
@@ -9,27 +16,56 @@ interface MapPreviewProps {
 }
 
 export const MapPreview = ({ stationName, address, lat, lng }: MapPreviewProps) => {
-  const handleOpenMap = () => {
+  const { t } = useLanguage();
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+
+  const handleDirections = () => {
     if (lat && lng) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
     }
   };
 
+  useEffect(() => {
+    if (!mapContainer.current || !lat || !lng || !MAPBOX_TOKEN) return;
+
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [lng, lat],
+      zoom: 15,
+      interactive: false,
+    });
+
+    new mapboxgl.Marker({ color: '#005596' })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [lat, lng]);
+
+  if (!lat || !lng || !MAPBOX_TOKEN) {
+    return null;
+  }
+
   return (
-    <Card
-      className="relative overflow-hidden rounded-2xl cursor-pointer hover:shadow-floating transition-all duration-300"
-      onClick={handleOpenMap}
-    >
-      {/* Map placeholder with gradient */}
-      <div className="aspect-[16/9] bg-gradient-to-br from-sky/20 via-primary/10 to-sky/5 flex flex-col items-center justify-center gap-2">
-        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-          <MapPin className="w-6 h-6 text-primary" />
-        </div>
-        <p className="text-sm font-medium text-primary">{stationName}</p>
-        {address && (
-          <p className="text-xs text-muted-foreground font-light">{address}</p>
-        )}
-      </div>
-    </Card>
+    <div className="space-y-3">
+      <Card className="relative overflow-hidden rounded-2xl">
+        <div ref={mapContainer} className="w-full aspect-[16/9]" />
+      </Card>
+      <Button
+        onClick={handleDirections}
+        variant="outline"
+        size="sm"
+        className="w-full rounded-full"
+      >
+        <Navigation className="w-4 h-4 text-primary" />
+        {t('getDirections')}
+      </Button>
+    </div>
   );
 };

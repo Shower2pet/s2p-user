@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStations, Station, isStationOnline, StationCategory, getStationDisplayName } from '@/hooks/useStations';
-import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock, Filter } from 'lucide-react';
+import { MapPin, Navigation, Play, Unlock, X, Search, AlertTriangle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -15,6 +15,12 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const LOCATION_PATTERN = /^[a-zA-Z0-9\s,àèéìòùÀÈÉÌÒÙ\-']+$/;
 const MAX_LOCATION_LENGTH = 100;
+
+// Color-coded station types
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  TUB: { bg: 'bg-sky/15', text: 'text-primary', border: 'border-primary/30' },
+  SHOWER: { bg: 'bg-emerald-500/15', text: 'text-emerald-600', border: 'border-emerald-500/30' },
+};
 
 const Map = () => {
   const { t } = useLanguage();
@@ -31,7 +37,6 @@ const Map = () => {
   const [categoryFilter, setCategoryFilter] = useState<StationCategory | 'ALL'>('ALL');
   const { data: stations, isLoading } = useStations();
 
-  // Filter out HIDDEN stations
   const visibleStations = (stations?.filter(s => s.visibility !== 'HIDDEN') || [])
     .filter(s => categoryFilter === 'ALL' || s.category === categoryFilter);
 
@@ -138,8 +143,7 @@ const Map = () => {
       if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
 
       const online = isStationOnline(station);
-      // Pin color: gray if offline/maintenance, blue for public, blue+lock for restricted
-      const markerColor = online ? '#005596' : '#9ca3af';
+      const markerColor = !online ? '#9ca3af' : station.category === 'SHOWER' ? '#10b981' : '#005596';
 
       const marker = new mapboxgl.Marker({ color: markerColor })
         .setLngLat([lng, lat])
@@ -209,9 +213,12 @@ const Map = () => {
     );
   }
 
+  const getCategoryStyle = (category: string) => CATEGORY_COLORS[category] || CATEGORY_COLORS.TUB;
+
   const renderStationCard = (station: Station) => {
     const status = getStatusInfo(station);
     const online = isStationOnline(station);
+    const catStyle = getCategoryStyle(station.category);
 
     return (
       <Card
@@ -221,17 +228,15 @@ const Map = () => {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <div className={`w-10 h-10 rounded-full ${catStyle.bg} flex items-center justify-center flex-shrink-0`}>
               {station.visibility === 'RESTRICTED' ? (
-                <Lock className="w-5 h-5 text-primary" />
+                <Lock className={`w-5 h-5 ${catStyle.text}`} />
               ) : (
-                <MapPin className="w-5 h-5 text-primary" />
+                <MapPin className={`w-5 h-5 ${catStyle.text}`} />
               )}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-foreground text-sm">{getStationDisplayName(station)}</h3>
-              </div>
+              <h3 className="font-bold text-foreground text-sm">{getStationDisplayName(station)}</h3>
               <p className="text-xs text-muted-foreground">{station.structure_address || ''}</p>
               {station.visibility === 'RESTRICTED' && (
                 <p className="text-xs text-warning mt-0.5">🔒 Solo Clienti</p>
@@ -292,23 +297,34 @@ const Map = () => {
           </div>
         </Card>
 
-        {/* Category filter */}
+        {/* Category filter - color-coded, no emojis */}
         <div className="flex gap-2">
-          {([
-            { value: 'ALL', label: 'Tutte', icon: '📍' },
-            { value: 'TUB', label: 'Vasche', icon: '🛁' },
-            { value: 'SHOWER', label: 'Docce', icon: '🚿' },
-          ] as const).map(({ value, label, icon }) => (
-            <Button
-              key={value}
-              variant={categoryFilter === value ? 'default' : 'outline'}
-              size="sm"
-              className="flex-1"
-              onClick={() => setCategoryFilter(value)}
-            >
-              {icon} {label}
-            </Button>
-          ))}
+          <Button
+            variant={categoryFilter === 'ALL' ? 'default' : 'outline'}
+            size="sm"
+            className="flex-1"
+            onClick={() => setCategoryFilter('ALL')}
+          >
+            Tutte
+          </Button>
+          <Button
+            variant={categoryFilter === 'TUB' ? 'default' : 'outline'}
+            size="sm"
+            className={`flex-1 ${categoryFilter !== 'TUB' ? 'border-primary/40 text-primary hover:bg-primary/10' : ''}`}
+            onClick={() => setCategoryFilter('TUB')}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-primary inline-block mr-1.5" />
+            Vasche
+          </Button>
+          <Button
+            variant={categoryFilter === 'SHOWER' ? 'default' : 'outline'}
+            size="sm"
+            className={`flex-1 ${categoryFilter !== 'SHOWER' ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10' : ''}`}
+            onClick={() => setCategoryFilter('SHOWER')}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block mr-1.5" />
+            Docce
+          </Button>
         </div>
 
         {noStationsMessage && (
