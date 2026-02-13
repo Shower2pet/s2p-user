@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { StationIdentityBlock } from '@/components/station/StationIdentityBlock';
 import { MapPreview } from '@/components/station/MapPreview';
@@ -24,7 +24,9 @@ import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
-  console.log('[StationDetail] Rendering with id:', id);
+  const [searchParams] = useSearchParams();
+  const qrVerified = searchParams.get('qr') === '1';
+  console.log('[StationDetail] Rendering with id:', id, 'qrVerified:', qrVerified);
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -43,8 +45,8 @@ const StationDetail = () => {
   const [showReport, setShowReport] = useState(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
 
-  // Visibility verification state (for RESTRICTED stations)
-  const [visibilityVerified, setVisibilityVerified] = useState(false);
+  // Visibility verification state — auto-verified if arrived via QR scan
+  const [visibilityVerified, setVisibilityVerified] = useState(qrVerified);
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [manualCode, setManualCode] = useState('');
 

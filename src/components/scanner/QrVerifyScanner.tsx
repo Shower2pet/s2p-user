@@ -12,45 +12,63 @@ interface QrVerifyScannerProps {
 
 export const QrVerifyScanner = ({ expectedStationId, onVerified, onClose }: QrVerifyScannerProps) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const hasScannedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const onVerifiedRef = useRef(onVerified);
+  const onCloseRef = useRef(onClose);
   const [error, setError] = useState<string | null>(null);
 
+  onVerifiedRef.current = onVerified;
+  onCloseRef.current = onClose;
+
   useEffect(() => {
+    isMountedRef.current = true;
     const scannerId = 'qr-verify-reader';
     const scanner = new Html5Qrcode(scannerId);
     scannerRef.current = scanner;
+    let stopped = false;
 
     scanner
       .start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
+          if (hasScannedRef.current) return;
+          hasScannedRef.current = true;
+
           let stationId = decodedText.trim();
           const urlMatch = stationId.match(/\/s\/([^/?#]+)/);
           if (urlMatch) {
             stationId = urlMatch[1];
           }
 
-          scanner.stop().catch(() => {});
-
-          if (stationId.toLowerCase() === expectedStationId.toLowerCase()) {
-            toast.success('QR verificato! Accesso sbloccato.');
-            onVerified();
-          } else {
-            toast.error('Il QR code non corrisponde a questa stazione.');
-            onClose();
-          }
+          stopped = true;
+          scanner.stop().catch(() => {}).finally(() => {
+            if (stationId.toLowerCase() === expectedStationId.toLowerCase()) {
+              toast.success('QR verificato! Accesso sbloccato.');
+              onVerifiedRef.current();
+            } else {
+              toast.error('Il QR code non corrisponde a questa stazione.');
+              onCloseRef.current();
+            }
+          });
         },
         () => {}
       )
       .catch((err) => {
-        console.error('QR Verify Scanner error:', err);
-        setError('Impossibile accedere alla fotocamera. Verifica i permessi.');
+        console.error('[QrVerifyScanner] Start error:', err);
+        if (isMountedRef.current) {
+          setError('Impossibile accedere alla fotocamera. Verifica i permessi.');
+        }
       });
 
     return () => {
-      scanner.stop().catch(() => {});
+      isMountedRef.current = false;
+      if (!stopped) {
+        scanner.stop().catch(() => {});
+      }
     };
-  }, [expectedStationId, onVerified, onClose]);
+  }, [expectedStationId]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center">
@@ -69,7 +87,7 @@ export const QrVerifyScanner = ({ expectedStationId, onVerified, onClose }: QrVe
 
       {error && (
         <div className="mt-4 text-center px-6">
-          <p className="text-red-400 text-sm">{error}</p>
+          <p className="text-destructive text-sm">{error}</p>
           <Button variant="outline" size="sm" className="mt-3 text-white border-white/30" onClick={onClose}>
             Chiudi
           </Button>
