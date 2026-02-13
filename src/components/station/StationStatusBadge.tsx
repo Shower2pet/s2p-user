@@ -12,11 +12,11 @@ export const StationStatusBadge = ({ status, className }: StationStatusBadgeProp
   const statusConfig = {
     available: {
       label: 'Available',
-      className: 'bg-success text-foreground hover:bg-success/90',
+      className: 'bg-success text-success-foreground hover:bg-success/90',
     },
     busy: {
       label: 'Busy',
-      className: 'bg-warning text-foreground hover:bg-warning/90',
+      className: 'bg-warning text-warning-foreground hover:bg-warning/90',
     },
     offline: {
       label: 'Offline',

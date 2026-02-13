@@ -299,7 +299,6 @@ const Map = () => {
             <Button
               variant="default" size="sm" className="flex-1"
               onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
-              disabled={!online}
             >
               <MapPin className="w-4 h-4" /> Scopri di più
             </Button>

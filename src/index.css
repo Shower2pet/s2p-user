@@ -25,8 +25,8 @@
     --primary-foreground: 0 0% 100%;
     
     /* Sky Blue - Light Blue #79BDE8 */
-    --sky: 200 68% 69%;
-    --sky-foreground: 206 100% 18%;
+    --sky: 200 68% 55%;
+    --sky-foreground: 0 0% 100%;
 
     /* Secondary - Very light for soft UI */
     --secondary: 210 30% 96%;
@@ -41,16 +41,18 @@
     --accent-foreground: 0 0% 100%;
     
     /* Warm Sand #FFD18B */
-    --sand: 37 100% 77%;
-    --sand-foreground: 206 100% 18%;
+    --sand: 32 95% 55%;
+    --sand-foreground: 0 0% 100%;
     
-    /* Fresh Mint/Green #A8D59D */
-    --mint: 108 43% 72%;
-    --mint-foreground: 206 100% 18%;
+    /* Fresh Mint/Green – darker for contrast */
+    --mint: 108 50% 45%;
+    --mint-foreground: 0 0% 100%;
 
-    /* Status colors */
-    --success: 108 43% 72%;
-    --warning: 37 100% 77%;
+    /* Status colors – higher contrast on white */
+    --success: 142 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 50%;
+    --warning-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
@@ -92,12 +94,14 @@
     --muted-foreground: 210 25% 60%;
     --accent: 12 88% 69%;
     --accent-foreground: 0 0% 100%;
-    --sand: 37 100% 77%;
-    --sand-foreground: 206 100% 18%;
-    --mint: 108 43% 72%;
-    --mint-foreground: 206 100% 18%;
-    --success: 108 43% 72%;
-    --warning: 37 100% 77%;
+    --sand: 32 95% 55%;
+    --sand-foreground: 0 0% 100%;
+    --mint: 108 50% 50%;
+    --mint-foreground: 0 0% 100%;
+    --success: 142 60% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 55%;
+    --warning-foreground: 0 0% 100%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 210 40% 98%;
     --border: 206 50% 18%;

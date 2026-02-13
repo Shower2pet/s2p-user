@@ -248,7 +248,6 @@ const Index = () => {
           <div className="flex gap-2 mt-3 pt-3 border-t border-border">
             <Button variant="default" size="sm" className="flex-1"
               onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
-              disabled={!online}
             >
               <MapPin className="w-4 h-4" /> Scopri di più
             </Button>

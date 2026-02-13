@@ -415,6 +415,23 @@ const StationDetail = () => {
           </div>
         )}
 
+        {/* Offline banner */}
+        {!online && (
+          <Card className="p-4 border-destructive/30 bg-destructive/5 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              <div>
+                <p className="font-bold text-foreground text-sm">Stazione non disponibile</p>
+                <p className="text-xs text-muted-foreground">
+                  {station.status === 'BUSY' ? 'La stazione è attualmente in uso. Riprova tra poco.' : 
+                   station.status === 'MAINTENANCE' ? 'La stazione è in manutenzione.' :
+                   'La stazione è attualmente offline.'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Washing Options */}
         <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <h2 className="text-lg font-bold text-foreground">{t('washingOptions') || 'Opzioni Lavaggio'}</h2>
@@ -426,12 +443,13 @@ const StationDetail = () => {
             washOptions.map((opt) => (
               <Card
                 key={opt.id}
-                className={`p-4 cursor-pointer transition-all ${
-                  needsVisibilityVerification ? 'opacity-60' : ''
+                className={`p-4 transition-all ${
+                  !online ? 'opacity-50 cursor-not-allowed' :
+                  needsVisibilityVerification ? 'opacity-60 cursor-pointer' : 'cursor-pointer'
                 } ${
-                  selectedOption === opt.id ? 'ring-2 ring-primary shadow-glow-primary' : 'hover:shadow-md'
+                  selectedOption === opt.id && online ? 'ring-2 ring-primary shadow-glow-primary' : online ? 'hover:shadow-md' : ''
                 }`}
-                onClick={() => handleWashOptionClick(opt.id)}
+                onClick={() => online && handleWashOptionClick(opt.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
