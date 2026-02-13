@@ -39,11 +39,12 @@ export const useCreditPackagesForStructure = (structureId: string | null | undef
     queryKey: ['credit-packages', structureId],
     queryFn: async () => {
       if (!structureId) return [];
+      // Fetch packages for this structure OR global packages (no structure_id)
       const { data, error } = await supabase
         .from('credit_packages')
         .select('*, structures(name)')
         .eq('is_active', true)
-        .eq('structure_id', structureId)
+        .or(`structure_id.eq.${structureId},structure_id.is.null`)
         .order('price_eur');
 
       if (error) throw error;
