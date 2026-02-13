@@ -30,6 +30,8 @@ export interface Station {
   structure_geo_lat: number | null;
   structure_geo_lng: number | null;
   structure_owner_id: string | null;
+  has_access_gate: boolean;
+  access_code: string | null;
 }
 
 export const getStationCategory = (type: string): StationCategory =>
@@ -70,6 +72,8 @@ const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station
     structure_geo_lat: struct?.geo_lat ?? null,
     structure_geo_lng: struct?.geo_lng ?? null,
     structure_owner_id: struct?.owner_id ?? null,
+    has_access_gate: row.has_access_gate ?? false,
+    access_code: row.access_code ?? null,
   };
 };
 
@@ -112,6 +116,13 @@ export const useStation = (stationId: string | undefined) => {
       const row = (stationsData || []).find((s: any) => s.id === stationId);
       if (!row) return null;
 
+      // Fetch access_code separately (not in RPC for security)
+      const { data: stationRow } = await supabase
+        .from('stations')
+        .select('access_code')
+        .eq('id', stationId)
+        .maybeSingle();
+
       const structuresMap = new Map<string, any>();
       if (row.structure_id) {
         const { data: structs } = await supabase
@@ -123,7 +134,9 @@ export const useStation = (stationId: string | undefined) => {
         if (structs) structuresMap.set(structs.id, structs);
       }
 
-      return enrichWithStructure(row, structuresMap);
+      const enriched = enrichWithStructure(row, structuresMap);
+      enriched.access_code = stationRow?.access_code ?? null;
+      return enriched;
     },
     enabled: !!stationId,
   });

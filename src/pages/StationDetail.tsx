@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown } from 'lucide-react';
+import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown, DoorOpen, ScanLine, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -40,18 +40,58 @@ const StationDetail = () => {
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'stripe'>('stripe');
   const [showReport, setShowReport] = useState(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
-  const [qrVerified, setQrVerified] = useState(false);
-  const [showQrVerify, setShowQrVerify] = useState(false);
-  const [pendingOptionId, setPendingOptionId] = useState<number | null>(null);
+
+  // Visibility verification state (for RESTRICTED stations)
+  const [visibilityVerified, setVisibilityVerified] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [manualCode, setManualCode] = useState('');
+
+  // Access gate state
+  const [isOpeningGate, setIsOpeningGate] = useState(false);
+
   const handleQrVerified = useCallback(() => {
-    setQrVerified(true);
-    setShowQrVerify(false);
-    if (pendingOptionId !== null) {
-      setSelectedOption(pendingOptionId);
-      setShowCheckout(true);
-      setPendingOptionId(null);
+    setVisibilityVerified(true);
+    setShowQrScanner(false);
+    toast.success('Accesso verificato! Ora puoi attivare i servizi.');
+  }, []);
+
+  const handleManualCodeVerify = () => {
+    if (!station || !manualCode.trim()) return;
+    // Compare manual code with station access_code or station ID
+    const code = manualCode.trim().toLowerCase();
+    const stationCode = station.access_code?.toLowerCase() || station.id.toLowerCase();
+    if (code === stationCode || code === station.id.toLowerCase()) {
+      setVisibilityVerified(true);
+      setManualCode('');
+      toast.success('Codice verificato! Ora puoi attivare i servizi.');
+    } else {
+      toast.error('Codice non valido. Riprova.');
     }
-  }, [pendingOptionId]);
+  };
+
+  const handleOpenGate = async () => {
+    if (!user) {
+      toast.error('Devi effettuare il login per aprire la porta');
+      navigate('/login');
+      return;
+    }
+    if (!station) return;
+    setIsOpeningGate(true);
+    try {
+      const { error } = await supabase.from('gate_commands').insert({
+        station_id: station.id,
+        user_id: user.id,
+        command: 'OPEN',
+      });
+      if (error) throw error;
+      toast.success('Comando di apertura inviato!');
+    } catch (err) {
+      console.error('Gate open error:', err);
+      toast.error('Errore nell\'invio del comando');
+    } finally {
+      setIsOpeningGate(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -84,15 +124,14 @@ const StationDetail = () => {
   const walletBalance = wallet?.balance || 0;
   const isRestricted = station.visibility === 'RESTRICTED';
   const hasActiveSub = !!activeSub;
-  const needsQrVerification = isRestricted && !qrVerified;
+  const needsVisibilityVerification = isRestricted && !visibilityVerified;
 
   const canPayWithCredits = user && walletBalance >= (chosen?.price || 0) && (chosen?.price || 0) > 0;
   const effectivePaymentMethod = hasActiveSub ? 'subscription' as const : paymentMethod === 'credits' && canPayWithCredits ? 'credits' : 'stripe';
 
   const handleWashOptionClick = (optId: number) => {
-    if (needsQrVerification) {
-      setPendingOptionId(optId);
-      setShowQrVerify(true);
+    if (needsVisibilityVerification) {
+      toast.error('Devi verificare il tuo accesso prima di attivare un servizio.');
       return;
     }
     setSelectedOption(optId);
@@ -107,7 +146,6 @@ const StationDetail = () => {
     }
     
     if (plan.stripe_price_id) {
-      // Use Stripe checkout for subscription
       setIsProcessing(true);
       try {
         const { data, error } = await supabase.functions.invoke('create-checkout', {
@@ -166,7 +204,6 @@ const StationDetail = () => {
     setIsProcessing(true);
     try {
       if (hasActiveSub) {
-        // Pay with subscription - just start the session directly
         const { data, error } = await supabase.functions.invoke('pay-with-credits', {
           body: { station_id: station.id, option_id: chosen.id, use_subscription: true, subscription_id: activeSub.id },
         });
@@ -229,18 +266,72 @@ const StationDetail = () => {
           />
         </div>
 
-        {/* Restricted station banner */}
+        {/* Access Gate Button */}
+        {station.has_access_gate && (
+          <Card className="p-4 space-y-2 animate-fade-in border-primary/30 bg-primary/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DoorOpen className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="font-bold text-foreground text-sm">Accesso Struttura</p>
+                  <p className="text-xs text-muted-foreground">Apri la porta per accedere alla stazione</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleOpenGate}
+                disabled={isOpeningGate}
+                size="sm"
+              >
+                {isOpeningGate ? <Loader2 className="w-4 h-4 animate-spin" /> : <DoorOpen className="w-4 h-4" />}
+                {isOpeningGate ? 'Invio...' : 'Apri Porta'}
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {/* Restricted visibility verification */}
         {isRestricted && (
-          <Card className="p-4 space-y-2 animate-fade-in border-warning/30 bg-warning/5">
+          <Card className="p-4 space-y-3 animate-fade-in border-warning/30 bg-warning/5">
             <div className="flex items-center gap-2 text-warning">
               <Lock className="w-5 h-5" />
-              <span className="font-bold text-sm">Accesso Riservato</span>
+              <span className="font-bold text-sm">Accesso Riservato ai Clienti</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {qrVerified
-                ? '✅ Accesso verificato tramite QR code'
-                : 'Per attivare un servizio è necessario scansionare il QR code presente in struttura.'}
-            </p>
+            {visibilityVerified ? (
+              <div className="flex items-center gap-2 text-success">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Accesso verificato</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Per attivare un servizio, scansiona il QR code della stazione o inserisci il codice manualmente.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowQrScanner(true)}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                    Scansiona QR
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    placeholder="Inserisci codice stazione"
+                    className="flex-1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleManualCodeVerify()}
+                  />
+                  <Button onClick={handleManualCodeVerify} size="sm" variant="secondary">
+                    <KeyRound className="w-4 h-4" />
+                    Verifica
+                  </Button>
+                </div>
+              </>
+            )}
           </Card>
         )}
 
@@ -280,7 +371,7 @@ const StationDetail = () => {
           </div>
         )}
 
-        {/* Washing Options - hide prices if user has active subscription */}
+        {/* Washing Options */}
         <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <h2 className="text-lg font-bold text-foreground">{t('washingOptions') || 'Opzioni Lavaggio'}</h2>
           {washOptions.length === 0 ? (
@@ -292,6 +383,8 @@ const StationDetail = () => {
               <Card
                 key={opt.id}
                 className={`p-4 cursor-pointer transition-all ${
+                  needsVisibilityVerification ? 'opacity-60' : ''
+                } ${
                   selectedOption === opt.id ? 'ring-2 ring-primary shadow-glow-primary' : 'hover:shadow-md'
                 }`}
                 onClick={() => handleWashOptionClick(opt.id)}
@@ -451,12 +544,12 @@ const StationDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* QR Verify Scanner for restricted stations */}
-      {showQrVerify && (
+      {/* QR Scanner for restricted visibility verification */}
+      {showQrScanner && (
         <QrVerifyScanner
           expectedStationId={station.id}
           onVerified={handleQrVerified}
-          onClose={() => { setShowQrVerify(false); setPendingOptionId(null); }}
+          onClose={() => setShowQrScanner(false)}
         />
       )}
     </AppShell>
