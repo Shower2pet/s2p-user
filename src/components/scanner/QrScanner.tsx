@@ -49,10 +49,8 @@ export const QrScanner = ({ onClose }: QrScannerProps) => {
           // Stop scanner safely
           stopped = true;
           scanner.stop().catch(() => {}).finally(() => {
-            console.log('[QrScanner] Scanner stopped, navigating to:', `/s/${stationId}`);
             toast.success('QR code letto!');
-            // Navigate first, then close overlay
-            navigateRef.current(`/s/${stationId}`);
+            navigateRef.current(`/s/${stationId}?qr=1`);
             // Close the overlay after navigation is triggered
             setTimeout(() => {
               if (isMountedRef.current) {
