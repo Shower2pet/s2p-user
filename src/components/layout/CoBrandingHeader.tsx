@@ -10,7 +10,6 @@ export const CoBrandingHeader = () => {
   const isHome = location.pathname === '/';
 
   const handleBack = () => {
-    // If there's browser history, go back; otherwise go home
     if (window.history.length > 2) {
       navigate(-1);
     } else {
@@ -39,13 +38,6 @@ export const CoBrandingHeader = () => {
       
       <div className="flex items-center gap-3">
         <LanguageSwitcher />
-        <div className="flex items-center gap-2">
-          <img 
-            src={branding.clientLogoUrl} 
-            alt={branding.clientName}
-            className="w-9 h-9 object-contain rounded-xl bg-secondary p-1.5"
-          />
-        </div>
       </div>
     </div>
   );

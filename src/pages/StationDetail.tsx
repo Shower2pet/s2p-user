@@ -3,7 +3,6 @@ import { AppShell } from '@/components/layout/AppShell';
 import { StationIdentityBlock } from '@/components/station/StationIdentityBlock';
 import { MapPreview } from '@/components/station/MapPreview';
 import { SafetyInfo } from '@/components/station/SafetyInfo';
-import { AboutStation } from '@/components/station/AboutStation';
 import { useStation, isStationOnline, getStationDisplayName } from '@/hooks/useStations';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
@@ -62,8 +61,6 @@ const StationDetail = () => {
   const walletBalance = wallet?.balance || 0;
 
   const canPayWithCredits = user && walletBalance >= (chosen?.price || 0) && (chosen?.price || 0) > 0;
-
-  // Auto-select credits if user has enough balance
   const effectivePaymentMethod = paymentMethod === 'credits' && canPayWithCredits ? 'credits' : 'stripe';
 
   const handlePay = async () => {
@@ -71,7 +68,6 @@ const StationDetail = () => {
     setIsProcessing(true);
     try {
       if (effectivePaymentMethod === 'credits') {
-        // Pay with wallet credits
         const { data, error } = await supabase.functions.invoke('pay-with-credits', {
           body: { station_id: station.id, option_id: chosen.id },
         });
@@ -81,7 +77,6 @@ const StationDetail = () => {
         toast.success(t('serviceActivated'));
         navigate(`/s/${station.id}/timer?option=${chosen.id}`);
       } else {
-        // Pay with Stripe
         const body: any = {
           station_id: station.id,
           option_id: chosen.id,
@@ -119,8 +114,6 @@ const StationDetail = () => {
             name={getStationDisplayName(station)}
             status={displayStatus as 'available' | 'busy' | 'offline'}
             description={station.structure_description || undefined}
-            stationType={station.type}
-            category={station.category}
           />
           {station.visibility === 'RESTRICTED' && (
             <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-warning/10 text-warning text-sm">
@@ -130,7 +123,7 @@ const StationDetail = () => {
           )}
         </div>
 
-        {/* Map Preview */}
+        {/* Map Preview with Mapbox + Directions button below */}
         <div className="animate-fade-in" style={{ animationDelay: '0.05s' }}>
           <MapPreview
             stationName={getStationDisplayName(station)}
@@ -183,16 +176,6 @@ const StationDetail = () => {
         <div className="animate-fade-in" style={{ animationDelay: '0.15s' }}>
           <SafetyInfo />
         </div>
-
-        {/* About Station */}
-        <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <AboutStation
-            location={station.structure_name || ''}
-            address={station.structure_address || ''}
-            lat={station.geo_lat || station.structure_geo_lat || undefined}
-            lng={station.geo_lng || station.structure_geo_lng || undefined}
-          />
-        </div>
       </div>
 
       {/* Checkout Modal */}
@@ -206,7 +189,6 @@ const StationDetail = () => {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Guest email */}
             {!user && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Email *</label>
@@ -221,7 +203,6 @@ const StationDetail = () => {
               </div>
             )}
 
-            {/* Payment method selection */}
             {user && walletBalance > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Metodo di pagamento</label>
@@ -264,7 +245,6 @@ const StationDetail = () => {
               </div>
             )}
 
-            {/* Price breakdown */}
             <Card className="p-4 space-y-2 bg-muted/30">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t('price')}</span>
