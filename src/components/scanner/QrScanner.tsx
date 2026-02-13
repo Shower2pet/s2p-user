@@ -24,17 +24,21 @@ export const QrScanner = ({ onClose }: QrScannerProps) => {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-          // Extract station ID: could be full URL like /s/xyz or just "xyz"
           let stationId = decodedText.trim();
           const urlMatch = stationId.match(/\/s\/([^/?#]+)/);
           if (urlMatch) {
             stationId = urlMatch[1];
           }
 
-          scanner.stop().catch(() => {});
-          toast.success('QR code letto!');
-          onClose();
-          navigate(`/s/${stationId}`);
+          // Stop scanner first, then navigate after a brief delay to avoid DOM conflicts
+          scanner.stop().catch(() => {}).finally(() => {
+            toast.success('QR code letto!');
+            onClose();
+            // Use setTimeout to ensure the scanner DOM is fully cleaned up before navigation
+            setTimeout(() => {
+              navigate(`/s/${stationId}`);
+            }, 100);
+          });
         },
         () => {} // ignore scan failures (no QR in frame)
       )
