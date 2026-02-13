@@ -109,19 +109,11 @@ export const useStation = (stationId: string | undefined) => {
     queryFn: async () => {
       if (!stationId) return null;
 
-      // Use RPC and filter client-side for single station
       const { data: stationsData, error } = await supabase.rpc('get_public_stations');
       if (error) throw error;
 
       const row = (stationsData || []).find((s: any) => s.id === stationId);
       if (!row) return null;
-
-      // Fetch access_code separately (not in RPC for security)
-      const { data: stationRow } = await supabase
-        .from('stations')
-        .select('access_code')
-        .eq('id', stationId)
-        .maybeSingle();
 
       const structuresMap = new Map<string, any>();
       if (row.structure_id) {
@@ -134,9 +126,7 @@ export const useStation = (stationId: string | undefined) => {
         if (structs) structuresMap.set(structs.id, structs);
       }
 
-      const enriched = enrichWithStructure(row, structuresMap);
-      enriched.access_code = stationRow?.access_code ?? null;
-      return enriched;
+      return enrichWithStructure(row, structuresMap);
     },
     enabled: !!stationId,
   });
