@@ -49,7 +49,7 @@ serve(async (req) => {
     if (station_id) {
       const { data: stationData, error: stationError } = await supabaseClient
         .from('stations')
-        .select('type, category, washing_options')
+        .select('type, washing_options')
         .eq('id', station_id)
         .maybeSingle();
       
@@ -58,7 +58,7 @@ serve(async (req) => {
       }
       if (stationData) {
         station_type = stationData.type;
-        station_category = stationData.category || (stationData.type === 'BRACCO' ? 'SHOWER' : 'TUB');
+        station_category = stationData.type === 'BRACCO' ? 'SHOWER' : 'TUB';
         logStep("Station metadata", { station_type, station_category });
 
         // Resolve price from washing_options if option_id provided
