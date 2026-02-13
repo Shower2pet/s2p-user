@@ -158,14 +158,22 @@ const Map = () => {
         zoom: position ? 13 : 11,
       });
       map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    }
 
-      // Add user location dot
-      if (position) {
-        new mapboxgl.Marker({ color: '#ef4444', scale: 0.6 })
-          .setLngLat([position.lng, position.lat])
-          .setPopup(new mapboxgl.Popup({ offset: 15 }).setText('La tua posizione'))
-          .addTo(map.current);
-      }
+    // Always update user location marker and re-center when position changes
+    if (position && map.current) {
+      // Remove old user marker if exists
+      const existingUserMarker = document.querySelector('.user-location-marker');
+      if (existingUserMarker) existingUserMarker.remove();
+
+      const el = document.createElement('div');
+      el.className = 'user-location-marker';
+      new mapboxgl.Marker({ element: el, color: '#ef4444', scale: 0.6 })
+        .setLngLat([position.lng, position.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 15 }).setText('La tua posizione'))
+        .addTo(map.current);
+
+      map.current.flyTo({ center: [position.lng, position.lat], zoom: 13, essential: true });
     }
 
     markersRef.current.forEach(marker => marker.remove());
