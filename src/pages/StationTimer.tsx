@@ -29,6 +29,7 @@ interface WashSession {
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const stripeSessionId = searchParams.get('session_id');
   const { data: station } = useStation(id);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -47,22 +48,42 @@ const StationTimer = () => {
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
   const [starting, setStarting] = useState(false);
 
-  // Fetch active session from DB
+  // Fetch active session from DB with retry for post-payment timing
   useEffect(() => {
-    if (!id || !user) return;
+    if (!id) return;
+    // Need either a user or a stripe session ID to find the session
+    if (!user && !stripeSessionId) return;
+
+    let retries = 0;
+    const maxRetries = 10;
+    let cancelled = false;
 
     const fetchSession = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('wash_sessions')
         .select('*')
         .eq('station_id', id)
-        .eq('user_id', user.id)
         .eq('status', 'ACTIVE')
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      // If we have a stripe session ID (coming from Stripe redirect), use it for a more precise match
+      if (stripeSessionId) {
+        query = supabase
+          .from('wash_sessions')
+          .select('*')
+          .eq('station_id', id)
+          .eq('stripe_session_id', stripeSessionId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+      } else if (user) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data } = await query.maybeSingle();
 
       if (data) {
+        if (cancelled) return;
         setSession(data as WashSession);
         const currentStep = data.step as WashStep;
         setStep(currentStep);
@@ -94,12 +115,19 @@ const StationTimer = () => {
             }
           }
         }
+        setLoading(false);
+      } else if (retries < maxRetries) {
+        // Session not found yet — may still be creating (post-payment redirect)
+        retries++;
+        setTimeout(() => { if (!cancelled) fetchSession(); }, 1500);
+      } else {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchSession();
-  }, [id, user, isShowerStation]);
+    return () => { cancelled = true; };
+  }, [id, user, stripeSessionId, isShowerStation]);
 
   // Subscribe to Realtime updates on the session
   useEffect(() => {
