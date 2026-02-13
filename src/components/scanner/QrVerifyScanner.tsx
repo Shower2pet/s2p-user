@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface QrVerifyScannerProps {
@@ -14,48 +14,49 @@ export const QrVerifyScanner = ({ expectedStationId, onVerified, onClose }: QrVe
   const hasScannedRef = useRef(false);
   const onVerifiedRef = useRef(onVerified);
   const onCloseRef = useRef(onClose);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scannerReady, setScannerReady] = useState(false);
-  const scannerInstanceRef = useRef<Html5Qrcode | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   onVerifiedRef.current = onVerified;
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    let cancelled = false;
+    let mounted = true;
     let scanner: Html5Qrcode | null = null;
+    let stopped = false;
 
-    // Small delay to ensure DOM element is rendered
     const initTimeout = setTimeout(() => {
-      if (cancelled) return;
-      
+      if (!mounted) return;
+
       const el = document.getElementById('qr-verify-reader');
       if (!el) {
-        console.error('[QrVerifyScanner] DOM element not found');
         setError('Errore di inizializzazione dello scanner.');
         return;
       }
 
       scanner = new Html5Qrcode('qr-verify-reader');
-      scannerInstanceRef.current = scanner;
+      scannerRef.current = scanner;
 
       scanner
         .start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
-            if (hasScannedRef.current || cancelled) return;
+            if (hasScannedRef.current) return;
             hasScannedRef.current = true;
 
             let stationId = decodedText.trim();
             const urlMatch = stationId.match(/\/s\/([^/?#]+)/);
-            if (urlMatch) {
-              stationId = urlMatch[1];
-            }
+            if (urlMatch) stationId = urlMatch[1];
 
-            // Stop then callback with delay for DOM cleanup
+            if (mounted) setProcessing(true);
+
+            // Stop scanner, then fire callbacks regardless of mount state
+            stopped = true;
             scanner?.stop().catch(() => {}).finally(() => {
-              if (cancelled) return;
+              // Always fire the callback — even if unmounted, the parent ref handles it
               setTimeout(() => {
                 if (stationId.toLowerCase() === expectedStationId.toLowerCase()) {
                   toast.success('QR verificato! Accesso sbloccato.');
@@ -64,29 +65,27 @@ export const QrVerifyScanner = ({ expectedStationId, onVerified, onClose }: QrVe
                   toast.error('Il QR code non corrisponde a questa stazione.');
                   onCloseRef.current();
                 }
-              }, 150);
+              }, 100);
             });
           },
           () => {}
         )
         .then(() => {
-          if (!cancelled) setScannerReady(true);
+          if (mounted) setScannerReady(true);
         })
         .catch((err) => {
           console.error('[QrVerifyScanner] Start error:', err);
-          if (!cancelled) {
-            setError('Impossibile accedere alla fotocamera. Verifica i permessi.');
-          }
+          if (mounted) setError('Impossibile accedere alla fotocamera. Verifica i permessi.');
         });
-    }, 200);
+    }, 300);
 
     return () => {
-      cancelled = true;
+      mounted = false;
       clearTimeout(initTimeout);
-      if (scannerInstanceRef.current) {
-        scannerInstanceRef.current.stop().catch(() => {});
-        scannerInstanceRef.current = null;
+      if (scannerRef.current && !stopped) {
+        scannerRef.current.stop().catch(() => {});
       }
+      scannerRef.current = null;
     };
   }, [expectedStationId]);
 
@@ -103,9 +102,10 @@ export const QrVerifyScanner = ({ expectedStationId, onVerified, onClose }: QrVe
 
       <div className="w-[300px] h-[300px] relative rounded-2xl overflow-hidden bg-black">
         <div id="qr-verify-reader" className="w-full h-full" />
-        {!scannerReady && !error && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        {(!scannerReady || processing) && !error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+            {processing && <p className="text-white/80 text-xs">Verifica in corso...</p>}
           </div>
         )}
       </div>
