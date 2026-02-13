@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { StationIdentityBlock } from '@/components/station/StationIdentityBlock';
 import { MapPreview } from '@/components/station/MapPreview';
@@ -12,23 +12,26 @@ import { CreditPackagesList } from '@/components/station/CreditPackagesList';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useWalletForStructure } from '@/hooks/useWallet';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown, DoorOpen, ScanLine, KeyRound, CheckCircle2 } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const qrVerified = !!(location.state as any)?.qrVerified;
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: station, isLoading, error } = useStation(id);
   const { data: wallet } = useWalletForStructure(station?.structure_id);
   const { data: plans } = useSubscriptionPlans(station?.structure_owner_id);
@@ -50,6 +53,19 @@ const StationDetail = () => {
 
   // Access gate state
   const [isOpeningGate, setIsOpeningGate] = useState(false);
+
+  // Refresh wallet balance after returning from credit purchase
+  useEffect(() => {
+    if (searchParams.get('credits_updated') === '1') {
+      // Clean URL
+      searchParams.delete('credits_updated');
+      setSearchParams(searchParams, { replace: true });
+      // Invalidate wallet cache so it refetches
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      toast.success('Crediti aggiunti al tuo saldo!');
+    }
+  }, [searchParams, setSearchParams, queryClient]);
 
   const handleQrVerified = useCallback(() => {
     setVisibilityVerified(true);
@@ -186,7 +202,7 @@ const StationDetail = () => {
           productType: 'credit_pack',
           credits: pkg.credits_value,
           structure_id: pkg.structure_id || station.structure_id,
-          success_url: `${window.location.origin}/s/${station.id}`,
+          success_url: `${window.location.origin}/s/${station.id}?credits_updated=1`,
         },
       });
       if (error) throw error;
@@ -210,7 +226,7 @@ const StationDetail = () => {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         toast.success(t('serviceActivated'));
-        navigate(`/s/${station.id}/timer?option=${chosen.id}`);
+        navigate(`/s/${station.id}/timer`);
       } else if (effectivePaymentMethod === 'credits') {
         const { data, error } = await supabase.functions.invoke('pay-with-credits', {
           body: { station_id: station.id, option_id: chosen.id },
@@ -218,7 +234,7 @@ const StationDetail = () => {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         toast.success(t('serviceActivated'));
-        navigate(`/s/${station.id}/timer?option=${chosen.id}`);
+        navigate(`/s/${station.id}/timer`);
       } else {
         const body: any = {
           station_id: station.id,
@@ -230,7 +246,7 @@ const StationDetail = () => {
           productType: 'session',
           user_id: user?.id || null,
           guest_email: !user ? guestEmail : null,
-          success_url: `${window.location.origin}/s/${station.id}/timer?option=${chosen.id}`,
+          success_url: `${window.location.origin}/s/${station.id}/timer?session_id={CHECKOUT_SESSION_ID}`,
         };
         const { data, error } = await supabase.functions.invoke('create-checkout', { body });
         if (error) throw error;
