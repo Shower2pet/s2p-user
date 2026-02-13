@@ -63,7 +63,7 @@ const StationDetail = () => {
       searchParams.delete('credits_updated');
       searchParams.delete('session_id');
       setSearchParams(searchParams, { replace: true });
-      // Verify the payment server-side
+      // Verify the specific payment server-side
       supabase.functions.invoke('verify-session', {
         body: { session_id: sessionId },
       }).then(({ data, error }) => {
@@ -75,12 +75,25 @@ const StationDetail = () => {
         } else {
           toast.info('Pagamento in attesa di conferma');
         }
-        // Always refresh wallet
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
       });
     }
   }, [searchParams, setSearchParams, queryClient]);
+
+  // Auto-sync any pending credit topup transactions on page load
+  useEffect(() => {
+    if (!user) return;
+    supabase.functions.invoke('verify-session', {
+      body: { process_all_pending: true },
+    }).then(({ data, error }) => {
+      if (!error && data?.credits_added > 0) {
+        toast.success(`${data.credits_added} crediti sincronizzati!`);
+        queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      }
+    });
+  }, [user, queryClient]);
 
   const handleQrVerified = useCallback(() => {
     setVisibilityVerified(true);
