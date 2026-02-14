@@ -29,7 +29,7 @@ async function publishMqttCommand(
     throw new Error("MQTT configuration missing");
   }
 
-  const topic = `stations/${stationId}/command`;
+  const topic = `shower2pet/${stationId}/relay1/pulse`;
   const payload = JSON.stringify({
     command,
     duration_minutes: durationMinutes,
