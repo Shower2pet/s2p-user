@@ -166,39 +166,63 @@ const StationTimer = () => {
     await supabase.from('wash_sessions').update(updates).eq('id', sessionId);
   };
 
-  // Handle "Avvia Servizio" — recalculate ends_at from NOW
+  // Handle "Avvia Servizio" — activate hardware + recalculate ends_at from NOW
   const handleStartService = async () => {
     if (!session) return;
     setStarting(true);
 
-    const now = new Date();
-    const endsAt = new Date(now.getTime() + session.total_seconds * 1000);
+    try {
+      // 1. Call station-control to activate the physical machine
+      const durationMinutes = Math.ceil(session.total_seconds / 60);
+      const { data: hwData, error: hwError } = await supabase.functions.invoke('station-control', {
+        body: {
+          station_id: session.station_id,
+          command: 'PULSE',
+          duration_minutes: durationMinutes,
+        },
+      });
 
-    const { error } = await supabase
-      .from('wash_sessions')
-      .update({
-        started_at: now.toISOString(),
-        ends_at: endsAt.toISOString(),
-        step: isShowerStation ? 'timer' : 'rules',
-      })
-      .eq('id', session.id);
+      if (hwError || !hwData?.success) {
+        toast.error('La stazione non risponde. Riprova o contatta il supporto.');
+        setStarting(false);
+        return;
+      }
 
-    if (error) {
-      toast.error('Errore nell\'avvio del servizio');
+      // 2. Hardware OK — update session timing
+      const now = new Date();
+      const endsAt = new Date(now.getTime() + session.total_seconds * 1000);
+
+      const { error } = await supabase
+        .from('wash_sessions')
+        .update({
+          started_at: now.toISOString(),
+          ends_at: endsAt.toISOString(),
+          step: isShowerStation ? 'timer' : 'rules',
+        })
+        .eq('id', session.id);
+
+      if (error) {
+        toast.error('Errore nell\'avvio del servizio');
+        setStarting(false);
+        return;
+      }
+
+      toast.success("🚿 Stazione attivata! L'acqua è in erogazione.");
+      setSession({ ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() });
+      setSecondsLeft(session.total_seconds);
+
+      if (isShowerStation) {
+        setStep('timer');
+        setIsActive(true);
+      } else {
+        setStep('rules');
+      }
+    } catch (err) {
+      console.error('Hardware activation error:', err);
+      toast.error('Errore di connessione alla stazione');
+    } finally {
       setStarting(false);
-      return;
     }
-
-    setSession({ ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() });
-    setSecondsLeft(session.total_seconds);
-
-    if (isShowerStation) {
-      setStep('timer');
-      setIsActive(true);
-    } else {
-      setStep('rules');
-    }
-    setStarting(false);
   };
 
   // Main countdown timer
