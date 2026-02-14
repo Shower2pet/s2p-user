@@ -230,7 +230,7 @@ const StationTimer = () => {
   };
 
   // Visual countdown synced to session.ends_at (survives page refresh)
-  // Backend is the master — it handles the actual relay OFF via waitUntil
+  // Frontend sends OFF command when timer expires (waitUntil doesn't survive in serverless)
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session?.ends_at) return;
 
@@ -242,9 +242,17 @@ const StationTimer = () => {
 
       if (remaining <= 0) {
         setIsActive(false);
+        // Frontend sends OFF command — waitUntil doesn't survive in serverless
+        supabase.functions.invoke('station-control', {
+          body: { station_id: session.station_id, command: 'OFF' },
+        }).then(() => {
+          console.log('[TIMER] OFF command sent on expiry');
+        }).catch((err) => {
+          console.error('[TIMER] Failed to send OFF on expiry:', err);
+        });
         if (isShowerStation) {
           setStep('rating');
-          // Session will be marked completed by the backend via waitUntil
+          updateSessionStep(session.id, 'rating', 'COMPLETED');
         } else {
           setStep('cleanup');
           updateSessionStep(session.id, 'cleanup');
