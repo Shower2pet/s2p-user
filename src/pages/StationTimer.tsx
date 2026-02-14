@@ -110,7 +110,7 @@ const StationTimer = () => {
               updateSessionStep(data.id, 'cleanup');
               setStep('cleanup');
             } else if (isShowerStation) {
-              updateSessionStep(data.id, 'rating', 'COMPLETED');
+              // Don't mark COMPLETED — cron will do it after sending OFF
               setStep('rating');
             } else {
               updateSessionStep(data.id, 'cleanup');
