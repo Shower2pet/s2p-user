@@ -121,24 +121,15 @@ serve(async (req) => {
     console.log("A-Cube login successful, token obtained.");
 
     // --- STEP 2: Send Receipt ---
-    const taxRate = 22.00;
-    const netPrice = Number((amountFloat / (1 + (taxRate / 100))).toFixed(5));
-
     const acubePayload = {
       fiscal_id: fiscalId,
-      type: "sale",
+      electronic_payment_amount: amountFloat,
       items: [
         {
           description: "Servizio di lavaggio pet",
           quantity: 1,
-          unit_price: netPrice,
-          vat_rate: taxRate,
-        },
-      ],
-      payments: [
-        {
-          amount: amountFloat,
-          payment_type: "electronic",
+          unit_price: amountFloat,
+          vat_rate_code: "22",
         },
       ],
     };
