@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2, Play } from 'lucide-react';
+import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2, Play, StopCircle } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -47,6 +48,8 @@ const StationTimer = () => {
   const [rating, setRating] = useState(0);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
   const [starting, setStarting] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   // Fetch active session from DB with retry for post-payment timing
   useEffect(() => {
@@ -226,30 +229,31 @@ const StationTimer = () => {
     }
   };
 
-  // Main countdown timer
+  // Visual-only countdown timer (backend handles the actual relay OFF)
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session) return;
 
     const interval = setInterval(() => {
-      const now = Date.now();
-      const endsAt = new Date(session.ends_at).getTime();
-      const remaining = Math.max(0, Math.round((endsAt - now) / 1000));
-
-      setSecondsLeft(remaining);
-
-      if (remaining <= 0) {
-        setIsActive(false);
-        if (isShowerStation) {
-          setStep('rating');
-          updateSessionStep(session.id, 'rating', 'COMPLETED');
-        } else {
-          setStep('cleanup');
-          updateSessionStep(session.id, 'cleanup');
+      setSecondsLeft((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          setIsActive(false);
+          // Timer reached zero — backend will handle relay OFF
+          if (isShowerStation) {
+            setStep('rating');
+            // Session will be marked completed by the backend via waitUntil
+          } else {
+            setStep('cleanup');
+            updateSessionStep(session.id, 'cleanup');
+          }
+          return 0;
         }
-      } else if (!isShowerStation && remaining === 120 && !warningShown) {
-        toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
-        setWarningShown(true);
-      }
+        if (!isShowerStation && next === 120 && !warningShown) {
+          toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
+          setWarningShown(true);
+        }
+        return next;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
@@ -306,15 +310,38 @@ const StationTimer = () => {
     if (session) updateSessionStep(session.id, 'timer');
   };
 
-  const handleStopManual = () => {
+  const handleStopManual = async () => {
+    if (!session) return;
+    setStopping(true);
+    try {
+      // Send OFF command to the backend to kill the relay immediately
+      const { data, error } = await supabase.functions.invoke('station-control', {
+        body: { station_id: session.station_id, command: 'OFF' },
+      });
+      if (error || !data?.success) {
+        toast.error('Errore nello spegnimento. Riprova.');
+        setStopping(false);
+        return;
+      }
+    } catch (_) {
+      toast.error('Errore di connessione');
+      setStopping(false);
+      return;
+    }
+
     setIsActive(false);
+    setSecondsLeft(0);
+    setStopping(false);
+    setShowStopConfirm(false);
+
     if (isShowerStation) {
       setStep('rating');
-      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
+      updateSessionStep(session.id, 'rating', 'COMPLETED');
     } else {
       setStep('cleanup');
-      if (session) updateSessionStep(session.id, 'cleanup');
+      updateSessionStep(session.id, 'cleanup');
     }
+    toast.success('Lavaggio terminato.');
   };
 
   const handleCleanupResponse = async (clean: boolean) => {
@@ -547,14 +574,38 @@ const StationTimer = () => {
 
         {/* Bottom buttons */}
         {step === 'timer' && (
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full h-14 text-base rounded-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-0"
-            onClick={handleStopManual}
-          >
-            ⏹ Stop
-          </Button>
+          <>
+            <Button
+              variant="destructive"
+              size="lg"
+              className="w-full h-14 text-base rounded-full"
+              onClick={() => setShowStopConfirm(true)}
+              disabled={stopping}
+            >
+              {stopping ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <StopCircle className="w-5 h-5 mr-2" />}
+              Termina Lavaggio
+            </Button>
+
+            <AlertDialog open={showStopConfirm} onOpenChange={setShowStopConfirm}>
+              <AlertDialogContent className="max-w-sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>⚠️ Terminare il lavaggio?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Il lavaggio verrà interrotto immediatamente. Non è previsto alcun rimborso per l'interruzione anticipata.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleStopManual}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Conferma e Termina
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
         )}
 
         {step === 'rating' && (
