@@ -173,15 +173,14 @@ const StationTimer = () => {
     if (autoStopFiredRef.current) return;
     autoStopFiredRef.current = true;
 
-    console.log('[AUTO-STOP] Timer expired, sending OFF for station:', sess.station_id);
+    console.log('[AUTO-STOP] Timer expired, sending OFF for station:', sess.station_id, 'isShower:', shower);
 
+    // ALWAYS send OFF command regardless of station type
     try {
-      if (shower) {
-        const { data, error } = await supabase.functions.invoke('station-control', {
-          body: { station_id: sess.station_id, command: 'OFF' },
-        });
-        console.log('[AUTO-STOP] OFF result:', JSON.stringify({ data, error: error?.message }));
-      }
+      const { data, error } = await supabase.functions.invoke('station-control', {
+        body: { station_id: sess.station_id, command: 'OFF' },
+      });
+      console.log('[AUTO-STOP] OFF result:', JSON.stringify({ data, error: error?.message }));
     } catch (e) {
       console.error('[AUTO-STOP] OFF failed:', e);
     }
