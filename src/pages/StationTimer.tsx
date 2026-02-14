@@ -52,100 +52,13 @@ const StationTimer = () => {
   const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   // ══════════════════════════════════════════════════════════════
-  // CRITICAL: Deterministic OFF scheduler — completely decoupled from React state
-  // Uses setTimeout + refs so it survives re-renders and effect re-runs
+  // SIMPLE guard: prevents auto-stop from firing more than once
   // ══════════════════════════════════════════════════════════════
-  const offTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const offSentRef = useRef(false);
-  // Store session data in a ref so the timeout callback always has fresh data
-  const sessionRef = useRef<WashSession | null>(null);
-
-  // Keep sessionRef in sync
-  useEffect(() => {
-    sessionRef.current = session;
-  }, [session]);
-
-  // Send OFF command to hardware (idempotent via offSentRef)
-  const sendOff = useCallback(async (stationId: string) => {
-    if (offSentRef.current) {
-      console.log('[RELAY] OFF already sent, skipping');
-      return;
-    }
-    offSentRef.current = true;
-    console.log('[RELAY] >>> Sending OFF command for station:', stationId);
-    try {
-      const { data, error } = await supabase.functions.invoke('station-control', {
-        body: { station_id: stationId, command: 'OFF' },
-      });
-      console.log('[RELAY] OFF result:', JSON.stringify({ data, error: error?.message }));
-    } catch (e) {
-      console.error('[RELAY] OFF failed:', e);
-      // Reset so cron can retry or user can retry
-      offSentRef.current = false;
-    }
-  }, []);
-
-  // Mark session completed in DB
-  const markCompleted = useCallback(async (sessionId: string) => {
-    console.log('[RELAY] Marking session COMPLETED:', sessionId);
-    const { error } = await supabase
-      .from('wash_sessions')
-      .update({ status: 'COMPLETED', step: 'rating' })
-      .eq('id', sessionId)
-      .eq('status', 'ACTIVE');
-    if (error) console.error('[RELAY] DB update error:', error.message);
-    else console.log('[RELAY] Session marked COMPLETED OK');
-  }, []);
-
-  // Schedule the OFF command at a specific absolute time
-  const scheduleOff = useCallback((stationId: string, sessionId: string, endsAtMs: number) => {
-    // Clear any existing timer
-    if (offTimeoutRef.current) {
-      clearTimeout(offTimeoutRef.current);
-      offTimeoutRef.current = null;
-    }
-
-    const delayMs = Math.max(0, endsAtMs - Date.now());
-    console.log('[RELAY] Scheduling OFF in', Math.round(delayMs / 1000), 'seconds for station:', stationId);
-
-    if (delayMs <= 0) {
-      // Already expired — send OFF immediately
-      console.log('[RELAY] Timer already expired, sending OFF NOW');
-      sendOff(stationId);
-      markCompleted(sessionId);
-      setIsActive(false);
-      setSecondsLeft(0);
-      setStep('rating');
-      return;
-    }
-
-    offTimeoutRef.current = setTimeout(async () => {
-      console.log('[RELAY] ⏰ Timer expired! Executing OFF sequence');
-      await sendOff(stationId);
-      await markCompleted(sessionId);
-      setIsActive(false);
-      setSecondsLeft(0);
-      setStep('rating');
-    }, delayMs);
-  }, [sendOff, markCompleted]);
-
-  // Cancel scheduled OFF (e.g., manual stop)
-  const cancelScheduledOff = useCallback(() => {
-    if (offTimeoutRef.current) {
-      clearTimeout(offTimeoutRef.current);
-      offTimeoutRef.current = null;
-    }
-  }, []);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (offTimeoutRef.current) clearTimeout(offTimeoutRef.current);
-    };
-  }, []);
+  const autoStopFiredRef = useRef(false);
 
   // ══════════════════════════════════════════════════════════════
   // Fetch active session from DB
+  // NOTE: isShowerStation intentionally NOT in deps to prevent re-runs
   // ══════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!id) return;
@@ -195,27 +108,11 @@ const StationTimer = () => {
             } else {
               setSecondsLeft(remaining);
               setIsActive(true);
-              // CRITICAL: Schedule the OFF command for this session
-              if (isShowerStation) {
-                scheduleOff(ws.station_id, ws.id, endsAt);
-              }
             }
           } else {
-            // Timer already expired
+            // Timer already expired — just update UI, auto-stop will fire from countdown effect
             setSecondsLeft(0);
-            setIsActive(false);
-            if (currentStep === 'courtesy') {
-              updateSessionStep(ws.id, 'cleanup');
-              setStep('cleanup');
-            } else if (isShowerStation) {
-              // Expired shower session — send OFF now
-              setStep('rating');
-              sendOff(ws.station_id);
-              markCompleted(ws.id);
-            } else {
-              updateSessionStep(ws.id, 'cleanup');
-              setStep('cleanup');
-            }
+            setIsActive(true); // Let the countdown effect handle the auto-stop
           }
         }
         setLoading(false);
@@ -229,7 +126,7 @@ const StationTimer = () => {
 
     fetchSession();
     return () => { cancelled = true; };
-  }, [id, user, stripeSessionId, isShowerStation]);
+  }, [id, user, stripeSessionId]);
 
   // Subscribe to Realtime updates on the session
   useEffect(() => {
@@ -252,7 +149,6 @@ const StationTimer = () => {
           if (updated.status === 'COMPLETED') {
             setStep('rating');
             setIsActive(false);
-            cancelScheduledOff(); // No need to send OFF, already handled
           }
         }
       )
@@ -261,13 +157,46 @@ const StationTimer = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session?.id, cancelScheduledOff]);
+  }, [session?.id]);
 
   const updateSessionStep = async (sessionId: string, newStep: string, status?: string) => {
     const updates: any = { step: newStep };
     if (status) updates.status = status;
     await supabase.from('wash_sessions').update(updates).eq('id', sessionId);
   };
+
+  // ══════════════════════════════════════════════════════════════
+  // AUTO-STOP: same logic as manual stop, triggered by countdown
+  // This is the CORE fix: uses the exact same approach as handleStopManual
+  // ══════════════════════════════════════════════════════════════
+  const handleAutoStop = useCallback(async (sess: WashSession, shower: boolean) => {
+    if (autoStopFiredRef.current) return;
+    autoStopFiredRef.current = true;
+
+    console.log('[AUTO-STOP] Timer expired, sending OFF for station:', sess.station_id);
+
+    try {
+      if (shower) {
+        const { data, error } = await supabase.functions.invoke('station-control', {
+          body: { station_id: sess.station_id, command: 'OFF' },
+        });
+        console.log('[AUTO-STOP] OFF result:', JSON.stringify({ data, error: error?.message }));
+      }
+    } catch (e) {
+      console.error('[AUTO-STOP] OFF failed:', e);
+    }
+
+    setIsActive(false);
+    setSecondsLeft(0);
+
+    if (shower) {
+      setStep('rating');
+      updateSessionStep(sess.id, 'rating', 'COMPLETED');
+    } else {
+      setStep('cleanup');
+      updateSessionStep(sess.id, 'cleanup');
+    }
+  }, []);
 
   // Handle "Avvia Servizio" — activate hardware + recalculate ends_at from NOW
   const handleStartService = async () => {
@@ -315,12 +244,12 @@ const StationTimer = () => {
       setSession(updatedSession);
       setSecondsLeft(session.total_seconds);
 
+      // Reset auto-stop guard for new session
+      autoStopFiredRef.current = false;
+
       if (isShowerStation) {
         setStep('timer');
         setIsActive(true);
-        // CRITICAL: Schedule the deterministic OFF
-        offSentRef.current = false; // Reset for new session start
-        scheduleOff(session.station_id, session.id, endsAt.getTime());
       } else {
         setStep('rules');
       }
@@ -333,7 +262,8 @@ const StationTimer = () => {
   };
 
   // ══════════════════════════════════════════════════════════════
-  // Visual countdown — DISPLAY ONLY, does NOT trigger OFF
+  // Visual countdown + auto-stop trigger
+  // When remaining hits 0, calls handleAutoStop (same as manual stop)
   // ══════════════════════════════════════════════════════════════
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session?.ends_at) return;
@@ -350,22 +280,17 @@ const StationTimer = () => {
         setWarningShown(true);
       }
 
-      // When visual countdown hits 0, just update display
-      // The actual OFF command is handled by the scheduled setTimeout
-      if (remaining <= 0) {
-        setIsActive(false);
-        if (!isShowerStation) {
-          setStep('cleanup');
-          updateSessionStep(session.id, 'cleanup');
-        }
-        // For shower: the scheduleOff timeout handles everything
+      // When countdown hits 0 → auto-stop (same logic as manual stop button)
+      if (remaining <= 0 && !autoStopFiredRef.current) {
+        console.log('[COUNTDOWN] Reached zero, triggering auto-stop');
+        handleAutoStop(session, isShowerStation);
       }
     };
 
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [step, isActive, session?.ends_at, warningShown, isShowerStation]);
+  }, [step, isActive, session?.ends_at, warningShown, isShowerStation, session, handleAutoStop]);
 
   // Courtesy timer (TUB only)
   useEffect(() => {
@@ -422,9 +347,6 @@ const StationTimer = () => {
     if (!session) return;
     setStopping(true);
 
-    // Cancel the scheduled OFF timeout
-    cancelScheduledOff();
-
     try {
       const { data, error } = await supabase.functions.invoke('station-control', {
         body: { station_id: session.station_id, command: 'OFF' },
@@ -434,7 +356,7 @@ const StationTimer = () => {
         setStopping(false);
         return;
       }
-      offSentRef.current = true; // Mark as sent
+      autoStopFiredRef.current = true; // Prevent auto-stop from also firing
     } catch (_) {
       toast.error('Errore di connessione');
       setStopping(false);
