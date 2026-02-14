@@ -230,7 +230,7 @@ const StationTimer = () => {
   };
 
   // Visual countdown synced to session.ends_at (survives page refresh)
-  // Frontend sends OFF command when timer expires (waitUntil doesn't survive in serverless)
+  // Backend pg_cron handles the actual relay OFF — frontend is display-only
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session?.ends_at) return;
 
@@ -242,17 +242,9 @@ const StationTimer = () => {
 
       if (remaining <= 0) {
         setIsActive(false);
-        // Frontend sends OFF command — waitUntil doesn't survive in serverless
-        supabase.functions.invoke('station-control', {
-          body: { station_id: session.station_id, command: 'OFF' },
-        }).then(() => {
-          console.log('[TIMER] OFF command sent on expiry');
-        }).catch((err) => {
-          console.error('[TIMER] Failed to send OFF on expiry:', err);
-        });
+        // Backend cron job will send OFF and mark session COMPLETED
         if (isShowerStation) {
           setStep('rating');
-          updateSessionStep(session.id, 'rating', 'COMPLETED');
         } else {
           setStep('cleanup');
           updateSessionStep(session.id, 'cleanup');
