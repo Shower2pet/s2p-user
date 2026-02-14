@@ -85,8 +85,23 @@ serve(async (req) => {
     for (const session of expired) {
       log("Processing", { id: session.id, station: session.station_id });
 
-      const ok = await publishMqttOff(session.station_id);
-      log("OFF result", { station: session.station_id, success: ok });
+      // Check if there's a NEWER active session on the same station
+      // If so, don't send OFF — just mark this old session as completed
+      const { data: newerActive } = await supabase
+        .from('wash_sessions')
+        .select('id')
+        .eq('station_id', session.station_id)
+        .eq('status', 'ACTIVE')
+        .gt('ends_at', new Date().toISOString())
+        .neq('id', session.id)
+        .limit(1);
+
+      if (newerActive && newerActive.length > 0) {
+        log("Skipping OFF — newer active session exists", { station: session.station_id, newer: newerActive[0].id });
+      } else {
+        const ok = await publishMqttOff(session.station_id);
+        log("OFF result", { station: session.station_id, success: ok });
+      }
 
       await supabase
         .from('wash_sessions')
