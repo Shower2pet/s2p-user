@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import mqtt from "npm:mqtt@5.10.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,8 +12,8 @@ const logStep = (step: string, details?: any) => {
 };
 
 /**
- * Publishes an MQTT message via WebSocket to control a physical station.
- * Returns true if the command was sent successfully, false otherwise.
+ * Publishes an MQTT message to control a physical station via HiveMQ Cloud.
+ * Uses npm:mqtt with mqtts:// (TLS on port 8883).
  */
 async function publishMqttCommand(
   stationId: string,
@@ -25,7 +25,7 @@ async function publishMqttCommand(
   const mqttPassword = Deno.env.get("MQTT_PASSWORD");
 
   if (!mqttHost || !mqttUser || !mqttPassword) {
-    logStep("MQTT credentials missing");
+    logStep("MQTT credentials missing", { host: !!mqttHost, user: !!mqttUser, pass: !!mqttPassword });
     throw new Error("MQTT configuration missing");
   }
 
@@ -36,153 +36,53 @@ async function publishMqttCommand(
     timestamp: new Date().toISOString(),
   });
 
-  logStep("Publishing MQTT command", { topic, payload });
-
-  // Use WebSocket-based MQTT connection
-  // Try common MQTT-over-WebSocket ports
-  const wsUrl = Deno.env.get("MQTT_WS_URL") || `wss://${mqttHost}:8884/mqtt`;
+  // Use WSS (WebSocket Secure) - port 8884 for HiveMQ Cloud
+  // Edge functions block raw TLS on 8883, but WSS over HTTPS (8884) works
+  const brokerUrl = Deno.env.get("MQTT_WS_URL") || `wss://${mqttHost}:8884/mqtt`;
+  logStep("Connecting to MQTT broker", { brokerUrl, topic });
 
   return new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
-      logStep("MQTT connection timeout");
-      try { ws.close(); } catch (_) { /* ignore */ }
+      logStep("MQTT connection timeout (15s)");
+      try { client.end(true); } catch (_) { /* ignore */ }
       resolve(false);
-    }, 15000); // 15s timeout
+    }, 15000);
 
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl, ["mqtt"]);
-    } catch (err) {
-      logStep("WebSocket creation failed", { error: String(err) });
-      clearTimeout(timeout);
-      resolve(false);
-      return;
-    }
+    const client = mqtt.connect(brokerUrl, {
+      username: mqttUser,
+      password: mqttPassword,
+      clientId: `s2p-edge-${Date.now()}`,
+      connectTimeout: 10000,
+      protocolVersion: 4,
+    });
 
-    ws.binaryType = "arraybuffer";
-
-    ws.onopen = () => {
-      logStep("WebSocket connected, sending MQTT CONNECT");
-      try {
-        // Build MQTT CONNECT packet
-        const connectPacket = buildMqttConnectPacket(mqttUser, mqttPassword);
-        ws.send(connectPacket);
-      } catch (err) {
-        logStep("Error sending CONNECT", { error: String(err) });
+    client.on('connect', () => {
+      logStep("Connected to MQTT broker, publishing command");
+      client.publish(topic, payload, { qos: 1 }, (err) => {
         clearTimeout(timeout);
-        ws.close();
-        resolve(false);
-      }
-    };
-
-    ws.onmessage = (event) => {
-      const data = new Uint8Array(event.data as ArrayBuffer);
-      const packetType = (data[0] >> 4) & 0x0f;
-
-      if (packetType === 2) {
-        // CONNACK received
-        const returnCode = data[3];
-        if (returnCode === 0) {
-          logStep("MQTT connected, publishing");
-          try {
-            const publishPacket = buildMqttPublishPacket(topic, payload);
-            ws.send(publishPacket);
-            // Send DISCONNECT
-            ws.send(new Uint8Array([0xe0, 0x00]));
-            clearTimeout(timeout);
-            ws.close();
-            logStep("Command published successfully");
-            resolve(true);
-          } catch (err) {
-            logStep("Error publishing", { error: String(err) });
-            clearTimeout(timeout);
-            ws.close();
-            resolve(false);
-          }
-        } else {
-          logStep("MQTT CONNACK error", { returnCode });
-          clearTimeout(timeout);
-          ws.close();
+        if (err) {
+          logStep("Publish error", { error: String(err) });
+          client.end(true);
           resolve(false);
+        } else {
+          logStep("Command published successfully", { topic, command });
+          client.end(true);
+          resolve(true);
         }
-      }
-    };
+      });
+    });
 
-    ws.onerror = (event) => {
-      logStep("WebSocket error", { error: String(event) });
+    client.on('error', (err) => {
+      logStep("MQTT client error", { error: String(err) });
       clearTimeout(timeout);
+      client.end(true);
       resolve(false);
-    };
+    });
 
-    ws.onclose = () => {
-      clearTimeout(timeout);
-    };
+    client.on('offline', () => {
+      logStep("MQTT client went offline");
+    });
   });
-}
-
-/** Build a minimal MQTT v3.1.1 CONNECT packet */
-function buildMqttConnectPacket(username: string, password: string): ArrayBuffer {
-  const protocolName = encodeUtf8String("MQTT");
-  const protocolLevel = 4; // MQTT 3.1.1
-  const connectFlags = 0xc2; // username + password + clean session
-  const keepAlive = 60;
-  const clientId = encodeUtf8String(`s2p-edge-${Date.now()}`);
-  const userBytes = encodeUtf8String(username);
-  const passBytes = encodeUtf8String(password);
-
-  const variableHeader = new Uint8Array([
-    ...protocolName, protocolLevel, connectFlags,
-    (keepAlive >> 8) & 0xff, keepAlive & 0xff,
-  ]);
-
-  const payloadBytes = new Uint8Array([...clientId, ...userBytes, ...passBytes]);
-  const remainingLength = variableHeader.length + payloadBytes.length;
-  const rl = encodeRemainingLength(remainingLength);
-
-  const packet = new Uint8Array(1 + rl.length + remainingLength);
-  packet[0] = 0x10; // CONNECT
-  packet.set(rl, 1);
-  packet.set(variableHeader, 1 + rl.length);
-  packet.set(payloadBytes, 1 + rl.length + variableHeader.length);
-
-  return packet.buffer;
-}
-
-/** Build a minimal MQTT PUBLISH packet (QoS 0) */
-function buildMqttPublishPacket(topic: string, payload: string): ArrayBuffer {
-  const topicBytes = encodeUtf8String(topic);
-  const payloadBytes = new TextEncoder().encode(payload);
-  const remainingLength = topicBytes.length + payloadBytes.length;
-  const rl = encodeRemainingLength(remainingLength);
-
-  const packet = new Uint8Array(1 + rl.length + remainingLength);
-  packet[0] = 0x30; // PUBLISH, QoS 0
-  packet.set(rl, 1);
-  packet.set(topicBytes, 1 + rl.length);
-  packet.set(payloadBytes, 1 + rl.length + topicBytes.length);
-
-  return packet.buffer;
-}
-
-function encodeUtf8String(str: string): Uint8Array {
-  const encoded = new TextEncoder().encode(str);
-  const result = new Uint8Array(2 + encoded.length);
-  result[0] = (encoded.length >> 8) & 0xff;
-  result[1] = encoded.length & 0xff;
-  result.set(encoded, 2);
-  return result;
-}
-
-function encodeRemainingLength(length: number): Uint8Array {
-  const bytes: number[] = [];
-  let x = length;
-  do {
-    let encodedByte = x % 128;
-    x = Math.floor(x / 128);
-    if (x > 0) encodedByte |= 0x80;
-    bytes.push(encodedByte);
-  } while (x > 0);
-  return new Uint8Array(bytes);
 }
 
 serve(async (req) => {
@@ -191,7 +91,6 @@ serve(async (req) => {
   }
 
   try {
-    // Auth check - accept service role key or user token
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Authorization required");
 
