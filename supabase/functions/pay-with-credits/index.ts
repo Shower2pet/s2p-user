@@ -31,14 +31,14 @@ serve(async (req) => {
     const user = authData.user;
     if (!user) throw new Error("User not authenticated");
 
-    const { station_id, option_id } = await req.json();
+    const { station_id, option_id, use_subscription, subscription_id } = await req.json();
     if (!station_id || option_id === undefined) {
       throw new Error("station_id and option_id are required");
     }
 
-    logStep("Request", { userId: user.id, station_id, option_id });
+    logStep("Request", { userId: user.id, station_id, option_id, use_subscription });
 
-    // Get station and resolve option price
+    // Get station and resolve option
     const { data: station, error: stationErr } = await supabaseClient
       .from('stations')
       .select('structure_id, washing_options, type')
@@ -55,50 +55,196 @@ serve(async (req) => {
     const price = option.price;
     const optionName = option.name || 'Wash session';
     const optionDuration = option.duration || 300;
+    const durationMinutes = Math.ceil(optionDuration / 60);
 
     logStep("Option resolved", { price, optionName, optionDuration });
 
-    // Check wallet balance
-    const { data: wallet, error: walletErr } = await supabaseClient
-      .from('structure_wallets')
-      .select('id, balance')
-      .eq('user_id', user.id)
-      .eq('structure_id', station.structure_id)
-      .maybeSingle();
+    // ─── PAYMENT PHASE ─────────────────────────────────────
+    let walletId: string | null = null;
+    let oldBalance = 0;
 
-    if (walletErr) throw new Error("Error checking wallet");
+    if (use_subscription && subscription_id) {
+      // Subscription payment: increment washes_used_this_period
+      const { data: sub, error: subErr } = await supabaseClient
+        .from('user_subscriptions')
+        .select('id, washes_used_this_period, plan_id')
+        .eq('id', subscription_id)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
 
-    const balance = wallet?.balance || 0;
-    if (balance < price) {
-      return new Response(JSON.stringify({ error: "Insufficient credits", balance, required: price }), {
+      if (subErr || !sub) throw new Error("Active subscription not found");
+
+      // Check wash limit
+      const { data: plan } = await supabaseClient
+        .from('subscription_plans')
+        .select('max_washes_per_month')
+        .eq('id', sub.plan_id)
+        .maybeSingle();
+
+      const usedWashes = sub.washes_used_this_period || 0;
+      if (plan?.max_washes_per_month && usedWashes >= plan.max_washes_per_month) {
+        return new Response(JSON.stringify({ error: "Monthly wash limit reached" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      await supabaseClient
+        .from('user_subscriptions')
+        .update({ washes_used_this_period: usedWashes + 1 })
+        .eq('id', sub.id);
+
+      logStep("Subscription wash counted", { usedWashes: usedWashes + 1 });
+    } else {
+      // Credit payment
+      const { data: wallet, error: walletErr } = await supabaseClient
+        .from('structure_wallets')
+        .select('id, balance')
+        .eq('user_id', user.id)
+        .eq('structure_id', station.structure_id)
+        .maybeSingle();
+
+      if (walletErr) throw new Error("Error checking wallet");
+
+      const balance = wallet?.balance || 0;
+      if (balance < price) {
+        return new Response(JSON.stringify({ error: "Insufficient credits", balance, required: price }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      walletId = wallet!.id;
+      oldBalance = balance;
+      const newBalance = balance - price;
+
+      const { error: updateErr } = await supabaseClient
+        .from('structure_wallets')
+        .update({ balance: newBalance, updated_at: new Date().toISOString() })
+        .eq('id', walletId);
+
+      if (updateErr) throw new Error("Error deducting credits");
+      logStep("Wallet deducted", { oldBalance, newBalance });
+    }
+
+    // ─── HARDWARE PHASE ─────────────────────────────────────
+    logStep("Calling station-control for hardware activation");
+
+    let hardwareSuccess = false;
+    try {
+      const controlResponse = await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/station-control`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            station_id,
+            command: 'PULSE',
+            duration_minutes: durationMinutes,
+          }),
+        }
+      );
+
+      const controlData = await controlResponse.json();
+      hardwareSuccess = controlData.success === true;
+      logStep("station-control response", { status: controlResponse.status, hardwareSuccess });
+    } catch (hwErr) {
+      logStep("station-control call failed", { error: String(hwErr) });
+      hardwareSuccess = false;
+    }
+
+    // ─── ROLLBACK IF HARDWARE FAILED ────────────────────────
+    if (!hardwareSuccess) {
+      logStep("HARDWARE FAILED — initiating rollback");
+
+      // 1. Refund credits
+      if (walletId && !use_subscription) {
+        await supabaseClient
+          .from('structure_wallets')
+          .update({ balance: oldBalance, updated_at: new Date().toISOString() })
+          .eq('id', walletId);
+        logStep("Credits refunded", { balance: oldBalance });
+
+        // Create refund transaction
+        await supabaseClient
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            total_value: price,
+            amount_paid_wallet: price,
+            amount_paid_stripe: 0,
+            transaction_type: 'WASH_SERVICE',
+            station_id,
+            structure_id: station.structure_id,
+            status: 'REFUNDED',
+            payment_method: 'CREDITS',
+          });
+        logStep("Refund transaction created");
+      }
+
+      // If subscription, decrement the wash count back
+      if (use_subscription && subscription_id) {
+        const { data: sub } = await supabaseClient
+          .from('user_subscriptions')
+          .select('washes_used_this_period')
+          .eq('id', subscription_id)
+          .maybeSingle();
+        if (sub) {
+          await supabaseClient
+            .from('user_subscriptions')
+            .update({ washes_used_this_period: Math.max(0, (sub.washes_used_this_period || 1) - 1) })
+            .eq('id', subscription_id);
+          logStep("Subscription wash count reverted");
+        }
+      }
+
+      // 2. Create maintenance ticket
+      await supabaseClient
+        .from('maintenance_logs')
+        .insert({
+          station_id,
+          severity: 'high',
+          reason: 'La stazione non ha risposto al comando di avvio dopo un pagamento',
+          status: 'to_resolve',
+          performed_by: user.id,
+        });
+      logStep("Maintenance ticket created");
+
+      // 3. Set station offline
+      await supabaseClient
+        .from('stations')
+        .update({ status: 'OFFLINE' })
+        .eq('id', station_id);
+      logStep("Station set to OFFLINE");
+
+      return new Response(JSON.stringify({
+        success: false,
+        hardware_failed: true,
+        error: "La stazione non ha risposto. I tuoi crediti sono stati rimborsati.",
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: 503,
       });
     }
 
-    // Deduct from wallet
-    const newBalance = balance - price;
-    const { error: updateErr } = await supabaseClient
-      .from('structure_wallets')
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('id', wallet!.id);
-
-    if (updateErr) throw new Error("Error deducting credits");
-    logStep("Wallet deducted", { oldBalance: balance, newBalance });
-
+    // ─── SUCCESS: CREATE RECORDS ────────────────────────────
     // Create transaction
     const { error: txErr } = await supabaseClient
       .from('transactions')
       .insert({
         user_id: user.id,
-        total_value: price,
-        amount_paid_wallet: price,
+        total_value: use_subscription ? 0 : price,
+        amount_paid_wallet: use_subscription ? 0 : price,
         amount_paid_stripe: 0,
         transaction_type: 'WASH_SERVICE',
         station_id,
         structure_id: station.structure_id,
         status: 'COMPLETED',
-        payment_method: 'CREDITS',
+        payment_method: use_subscription ? 'CREDITS' : 'CREDITS',
       });
 
     if (txErr) logStep("Error creating transaction", { error: txErr.message });
@@ -124,7 +270,9 @@ serve(async (req) => {
     if (wsErr) logStep("Error creating wash session", { error: wsErr.message });
     else logStep("Wash session created");
 
-    return new Response(JSON.stringify({ success: true, newBalance }), {
+    const newBalance = walletId ? oldBalance - price : undefined;
+
+    return new Response(JSON.stringify({ success: true, newBalance, hardware_ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
