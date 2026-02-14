@@ -252,11 +252,10 @@ const StationDetail = () => {
   const handlePay = async () => {
     if (!chosen) return;
 
-    // For credits or subscription: full hardware flow
+    // For credits or subscription: deduct and go to timer
     if (hasActiveSub || effectivePaymentMethod === 'credits') {
       setIsProcessing(true);
       setShowCheckout(false);
-      setHardwareConnecting(true);
 
       try {
         const body: any = { station_id: station.id, option_id: chosen.id };
@@ -268,30 +267,16 @@ const StationDetail = () => {
         const { data, error } = await supabase.functions.invoke('pay-with-credits', { body });
 
         if (error) throw error;
-
-        // Check for hardware failure (rollback already happened server-side)
-        if (data?.hardware_failed) {
-          setHardwareConnecting(false);
-          setShowRefundDialog(true);
-          queryClient.invalidateQueries({ queryKey: ['wallet'] });
-          queryClient.invalidateQueries({ queryKey: ['wallets'] });
-          queryClient.invalidateQueries({ queryKey: ['station', id] });
-          queryClient.invalidateQueries({ queryKey: ['stations'] });
-          return;
-        }
-
         if (data?.error) throw new Error(data.error);
 
-        // Hardware success!
-        setHardwareConnecting(false);
-        toast.success("🚿 Lavaggio Avviato! L'acqua è in erogazione.");
+        // Payment success — go to timer page where hardware is activated
+        toast.success("Pagamento confermato! Vai alla stazione per avviare il servizio.");
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
         navigate(`/s/${station.id}/timer`);
       } catch (err: any) {
         console.error('Payment error:', err);
-        setHardwareConnecting(false);
-        toast.error(t('paymentError'));
+        toast.error(err.message || t('paymentError'));
       } finally {
         setIsProcessing(false);
       }
