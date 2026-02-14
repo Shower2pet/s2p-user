@@ -24,7 +24,40 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Fetch partner fiscal data
+    const amountFloat = Number(parseFloat(amount).toFixed(2));
+
+    // --- INSERT PENDING row upfront ---
+    console.log("Tentativo di inserimento PENDING per sessione:", session_id);
+    const { data: insertedData, error: insertError } = await supabase
+      .from("transaction_receipts")
+      .insert({
+        session_id,
+        partner_id,
+        amount: amountFloat,
+        status: "PENDING",
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("ERRORE FATALE INSERIMENTO DB:", insertError);
+      return new Response(JSON.stringify({ error: "Errore inserimento ricevuta", details: insertError }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const receiptRowId = insertedData.id;
+    console.log("Riga PENDING creata con id:", receiptRowId);
+
+    // Helper to update the receipt row
+    const updateReceipt = async (updates: Record<string, unknown>) => {
+      const { error } = await supabase
+        .from("transaction_receipts")
+        .update(updates)
+        .eq("id", receiptRowId);
+      if (error) console.error("Errore update transaction_receipts:", error);
+    };
+
+    // --- Fetch partner fiscal data ---
     const { data: partner, error: partnerErr } = await supabase
       .from("partners_fiscal_data")
       .select("vat_number, business_name, sdi_code")
@@ -33,7 +66,6 @@ serve(async (req) => {
 
     if (partnerErr) console.error("Error fetching partner fiscal data:", partnerErr);
 
-    // Also fetch profile for fiscal_code fallback
     const { data: profile } = await supabase
       .from("profiles")
       .select("vat_number, fiscal_code")
@@ -43,11 +75,7 @@ serve(async (req) => {
     const fiscalId = partner?.vat_number || profile?.vat_number || profile?.fiscal_code;
     if (!fiscalId) {
       console.error("No fiscal_id found for partner:", partner_id);
-      // Log to transaction_receipts
-      await supabase.from("transaction_receipts").insert({
-        session_id, partner_id, amount: parseFloat(amount),
-        status: "error", error_details: "fiscal_id mancante per il partner",
-      });
+      await updateReceipt({ status: "error", error_details: "fiscal_id mancante per il partner" });
       return new Response(JSON.stringify({ error: "fiscal_id mancante" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -59,6 +87,7 @@ serve(async (req) => {
 
     if (!acubeEmail || !acubePassword) {
       console.error("ACUBE_EMAIL or ACUBE_PASSWORD not configured");
+      await updateReceipt({ status: "error", error_details: "A-Cube credentials missing" });
       return new Response(JSON.stringify({ error: "A-Cube credentials missing" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -74,10 +103,7 @@ serve(async (req) => {
     if (!loginRes.ok) {
       const loginErr = await loginRes.text();
       console.error("A-Cube login failed:", loginRes.status, loginErr);
-      await supabase.from("transaction_receipts").insert({
-        session_id, partner_id, amount: parseFloat(amount),
-        status: "error", error_details: `A-Cube login failed: ${loginRes.status}`,
-      });
+      await updateReceipt({ status: "error", error_details: `A-Cube login failed: ${loginRes.status}` });
       return new Response(JSON.stringify({ error: "A-Cube login failed" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -87,6 +113,7 @@ serve(async (req) => {
     const token = loginData.token;
     if (!token) {
       console.error("A-Cube login response missing token:", loginData);
+      await updateReceipt({ status: "error", error_details: "A-Cube token missing from login response" });
       return new Response(JSON.stringify({ error: "A-Cube token missing" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -94,7 +121,6 @@ serve(async (req) => {
     console.log("A-Cube login successful, token obtained.");
 
     // --- STEP 2: Send Receipt ---
-    const amountFloat = Number(parseFloat(amount).toFixed(2));
     const acubePayload = {
       fiscal_id: fiscalId,
       type: "sale",
@@ -136,10 +162,7 @@ serve(async (req) => {
         console.error("A-Cube Error Text:", errorDetails);
       }
 
-      await supabase.from("transaction_receipts").insert({
-        session_id, partner_id, amount: amountFloat,
-        status: "error", error_details: `A-Cube ${receiptRes.status}: ${errorDetails.slice(0, 500)}`,
-      });
+      await updateReceipt({ status: "error", error_details: `A-Cube ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
 
       return new Response(JSON.stringify({ success: false, error: "A-Cube Error", details: errorDetails }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -150,8 +173,7 @@ serve(async (req) => {
     const receiptData = await receiptRes.json();
     console.log("A-Cube receipt success:", receiptData);
 
-    await supabase.from("transaction_receipts").insert({
-      session_id, partner_id, amount: amountFloat,
+    await updateReceipt({
       status: "sent",
       acube_transaction_id: receiptData?.id || receiptData?.uuid || null,
     });
