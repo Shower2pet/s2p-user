@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.check-expired-sessions]
 verify_jwt = false
+
+[functions.generate-receipt]
+verify_jwt = false
