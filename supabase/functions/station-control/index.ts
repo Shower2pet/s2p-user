@@ -146,19 +146,9 @@ serve(async (req) => {
         });
       }
 
-      // Schedule background OFF after duration
-      const delayMs = duration_minutes * 60 * 1000;
-      // Use EdgeRuntime.waitUntil if available, otherwise fire-and-forget
-      const offPromise = scheduleOff(station_id, delayMs, session_id);
-      try {
-        // @ts-ignore — Deno Deploy / Supabase Edge Runtime
-        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-          // @ts-ignore
-          EdgeRuntime.waitUntil(offPromise);
-        }
-      } catch (_) {
-        // fire-and-forget fallback — the promise runs in background
-      }
+      // NOTE: waitUntil does NOT survive for multi-minute delays in serverless.
+      // The frontend is responsible for sending the OFF command when the timer expires.
+      // The scheduleOff here is a best-effort safety net only.
 
       logStep("START_TIMED_WASH success, OFF scheduled", { delayMs });
       return new Response(JSON.stringify({
