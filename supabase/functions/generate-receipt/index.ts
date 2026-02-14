@@ -94,7 +94,7 @@ serve(async (req) => {
     console.log("A-Cube login successful, token obtained.");
 
     // --- STEP 2: Send Receipt ---
-    const amountFloat = parseFloat(amount);
+    const amountFloat = Number(parseFloat(amount).toFixed(2));
     const acubePayload = {
       fiscal_id: fiscalId,
       type: "sale",
@@ -104,6 +104,7 @@ serve(async (req) => {
           quantity: 1,
           unit_price: amountFloat,
           vat_rate: 22.0,
+          gross_price: true,
         },
       ],
       payments: [
@@ -124,23 +125,31 @@ serve(async (req) => {
       body: JSON.stringify(acubePayload),
     });
 
-    const receiptBody = await receiptRes.text();
-    console.log("A-Cube receipt response:", receiptRes.status, receiptBody);
-
-    let receiptData: any = null;
-    try { receiptData = JSON.parse(receiptBody); } catch { /* not json */ }
-
     if (!receiptRes.ok) {
+      let errorDetails: string;
+      try {
+        const errorJson = await receiptRes.json();
+        errorDetails = JSON.stringify(errorJson);
+        console.error("A-Cube Error Data:", errorJson);
+      } catch {
+        errorDetails = await receiptRes.text();
+        console.error("A-Cube Error Text:", errorDetails);
+      }
+
       await supabase.from("transaction_receipts").insert({
         session_id, partner_id, amount: amountFloat,
-        status: "error", error_details: `A-Cube ${receiptRes.status}: ${receiptBody.slice(0, 500)}`,
+        status: "error", error_details: `A-Cube ${receiptRes.status}: ${errorDetails.slice(0, 500)}`,
       });
-      return new Response(JSON.stringify({ error: "A-Cube receipt failed", details: receiptBody }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+      return new Response(JSON.stringify({ success: false, error: "A-Cube Error", details: errorDetails }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Success — save receipt reference
+    // Success
+    const receiptData = await receiptRes.json();
+    console.log("A-Cube receipt success:", receiptData);
+
     await supabase.from("transaction_receipts").insert({
       session_id, partner_id, amount: amountFloat,
       status: "sent",
