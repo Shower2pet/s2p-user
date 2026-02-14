@@ -35,7 +35,7 @@ export interface Station {
 }
 
 export const getStationCategory = (type: string): StationCategory =>
-  type === 'BRACCO' ? 'SHOWER' : 'TUB';
+  type.toUpperCase() === 'BRACCO' ? 'SHOWER' : 'TUB';
 
 export const isShower = (station: Station): boolean => station.category === 'SHOWER';
 export const isTub = (station: Station): boolean => station.category === 'TUB';
