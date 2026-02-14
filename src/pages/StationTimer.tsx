@@ -229,35 +229,36 @@ const StationTimer = () => {
     }
   };
 
-  // Visual-only countdown timer (backend handles the actual relay OFF)
+  // Visual countdown synced to session.ends_at (survives page refresh)
+  // Backend is the master — it handles the actual relay OFF via waitUntil
   useEffect(() => {
-    if (step !== 'timer' || !isActive || !session) return;
+    if (step !== 'timer' || !isActive || !session?.ends_at) return;
 
-    const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          setIsActive(false);
-          // Timer reached zero — backend will handle relay OFF
-          if (isShowerStation) {
-            setStep('rating');
-            // Session will be marked completed by the backend via waitUntil
-          } else {
-            setStep('cleanup');
-            updateSessionStep(session.id, 'cleanup');
-          }
-          return 0;
-        }
-        if (!isShowerStation && next === 120 && !warningShown) {
-          toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
-          setWarningShown(true);
-        }
-        return next;
-      });
-    }, 1000);
+    const endsAt = new Date(session.ends_at).getTime();
 
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+
+      if (remaining <= 0) {
+        setIsActive(false);
+        if (isShowerStation) {
+          setStep('rating');
+          // Session will be marked completed by the backend via waitUntil
+        } else {
+          setStep('cleanup');
+          updateSessionStep(session.id, 'cleanup');
+        }
+      } else if (!isShowerStation && remaining === 120 && !warningShown) {
+        toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
+        setWarningShown(true);
+      }
+    };
+
+    tick(); // sync immediately
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [step, isActive, session, warningShown, isShowerStation]);
+  }, [step, isActive, session?.ends_at, warningShown, isShowerStation]);
 
   // Courtesy timer (TUB only) — uses ends_at from DB
   useEffect(() => {
