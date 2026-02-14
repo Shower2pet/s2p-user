@@ -29,12 +29,10 @@ async function publishMqttCommand(
     throw new Error("MQTT configuration missing");
   }
 
+  const durationSeconds = durationMinutes * 60;
   const topic = `shower2pet/${stationId}/relay1/pulse`;
-  const payload = JSON.stringify({
-    command,
-    duration_minutes: durationMinutes,
-    timestamp: new Date().toISOString(),
-  });
+  // The device expects a plain number (seconds) on the pulse topic
+  const payload = String(durationSeconds);
 
   // Use WSS (WebSocket Secure) - port 8884 for HiveMQ Cloud
   // Edge functions block raw TLS on 8883, but WSS over HTTPS (8884) works
