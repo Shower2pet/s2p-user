@@ -241,6 +241,20 @@ const StationTimer = () => {
       toast.success("🚿 Stazione attivata! L'acqua è in erogazione.");
       const updatedSession = { ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() };
       setSession(updatedSession);
+
+      // Fire-and-forget: generate fiscal receipt in background
+      // Do NOT await — must never block the user experience
+      if (station?.structure_owner_id) {
+        const selectedOption = station.washing_options?.find(o => o.id === session.option_id);
+        const amountPaid = selectedOption?.price ?? (session.total_seconds / 60); // fallback
+        supabase.functions.invoke('generate-receipt', {
+          body: {
+            session_id: session.id,
+            partner_id: station.structure_owner_id,
+            amount: amountPaid,
+          },
+        }).catch(() => { /* silent — errors handled in DB by partner */ });
+      }
       setSecondsLeft(session.total_seconds);
 
       // Reset auto-stop guard for new session
