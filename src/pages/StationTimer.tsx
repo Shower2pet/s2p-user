@@ -213,7 +213,10 @@ const StationTimer = () => {
         },
       });
 
+      console.log('[START] station-control response:', JSON.stringify({ hwData, hwError: hwError?.message }));
+
       if (hwError || !hwData?.success) {
+        console.error('[START] Station control failed:', { hwData, hwError });
         toast.error('La stazione non risponde. Riprova o contatta il supporto.');
         setStarting(false);
         return;
