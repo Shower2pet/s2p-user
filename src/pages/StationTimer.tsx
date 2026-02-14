@@ -110,8 +110,9 @@ const StationTimer = () => {
               updateSessionStep(data.id, 'cleanup');
               setStep('cleanup');
             } else if (isShowerStation) {
-              // Don't mark COMPLETED — cron will do it after sending OFF
+              // Send OFF and mark completed on page load with expired timer
               setStep('rating');
+              sendOffAndComplete(data as WashSession);
             } else {
               updateSessionStep(data.id, 'cleanup');
               setStep('cleanup');
@@ -229,8 +230,23 @@ const StationTimer = () => {
     }
   };
 
+  // Send OFF command and mark session completed
+  const sendOffAndComplete = async (sessionToEnd: WashSession) => {
+    try {
+      await supabase.functions.invoke('station-control', {
+        body: { station_id: sessionToEnd.station_id, command: 'OFF' },
+      });
+    } catch (e) {
+      console.error('Failed to send OFF command:', e);
+    }
+    // Mark completed in DB
+    await supabase.from('wash_sessions')
+      .update({ status: 'COMPLETED', step: 'rating' })
+      .eq('id', sessionToEnd.id)
+      .eq('status', 'ACTIVE');
+  };
+
   // Visual countdown synced to session.ends_at (survives page refresh)
-  // Backend pg_cron handles the actual relay OFF — frontend is display-only
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session?.ends_at) return;
 
@@ -242,9 +258,9 @@ const StationTimer = () => {
 
       if (remaining <= 0) {
         setIsActive(false);
-        // Backend cron job will send OFF and mark session COMPLETED
         if (isShowerStation) {
           setStep('rating');
+          sendOffAndComplete(session);
         } else {
           setStep('cleanup');
           updateSessionStep(session.id, 'cleanup');
