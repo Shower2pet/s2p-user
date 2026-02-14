@@ -247,16 +247,35 @@ const StationTimer = () => {
 
       // Fire-and-forget: generate fiscal receipt in background
       // Do NOT await — must never block the user experience
-      if (station?.structure_owner_id) {
-        const selectedOption = station.washing_options?.find(o => o.id === session.option_id);
-        const amountPaid = selectedOption?.price ?? (session.total_seconds / 60); // fallback
+      const receiptPartnerId = station?.structure_owner_id;
+      const selectedOption = station?.washing_options?.find(o => o.id === session.option_id);
+      const receiptAmount = selectedOption?.price ?? (session.total_seconds / 60);
+
+      console.log("Inizio chiamata asincrona per scontrino A-Cube...", {
+        sessionId: session.id,
+        partnerId: receiptPartnerId,
+        amount: receiptAmount,
+        hasPartner: !!receiptPartnerId,
+      });
+
+      if (receiptPartnerId) {
         supabase.functions.invoke('generate-receipt', {
           body: {
             session_id: session.id,
-            partner_id: station.structure_owner_id,
-            amount: amountPaid,
+            partner_id: receiptPartnerId,
+            amount: receiptAmount,
           },
-        }).catch(() => { /* silent — errors handled in DB by partner */ });
+        }).then(({ data, error }) => {
+          if (error) {
+            console.error("Errore (silenzioso) durante la generazione scontrino:", error);
+          } else {
+            console.log("Scontrino inviato con successo ad A-Cube:", data);
+          }
+        }).catch(err => {
+          console.error("Eccezione durante la chiamata scontrino:", err);
+        });
+      } else {
+        console.warn("generate-receipt NON invocata: partner_id mancante (structure_owner_id è null)");
       }
       setSecondsLeft(session.total_seconds);
 
