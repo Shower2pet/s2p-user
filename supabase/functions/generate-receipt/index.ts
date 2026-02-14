@@ -25,8 +25,6 @@ serve(async (req) => {
     );
 
     const amountFloat = Number(parseFloat(amount).toFixed(2));
-    const taxRate = 22.0;
-    const netPrice = Number((amountFloat / (1 + (taxRate / 100))).toFixed(5));
 
     // --- INSERT PENDING row upfront ---
     console.log("Tentativo di inserimento PENDING per sessione:", session_id);
@@ -126,12 +124,14 @@ serve(async (req) => {
     const acubePayload = {
       fiscal_id: fiscalId,
       type: "sale",
+      amount_paid: amountFloat,
       items: [
         {
           description: "Servizio di lavaggio pet",
           quantity: 1,
-          unit_price: netPrice,
-          vat_rate: taxRate,
+          unit_price: amountFloat,
+          gross_price: true,
+          vat_rate: 22.00,
         },
       ],
       payments: [
