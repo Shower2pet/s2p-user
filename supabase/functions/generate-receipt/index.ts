@@ -25,6 +25,8 @@ serve(async (req) => {
     );
 
     const amountFloat = Number(parseFloat(amount).toFixed(2));
+    const taxRate = 22.0;
+    const netPrice = Number((amountFloat / (1 + (taxRate / 100))).toFixed(5));
 
     // --- INSERT PENDING row upfront ---
     console.log("Tentativo di inserimento PENDING per sessione:", session_id);
@@ -75,7 +77,7 @@ serve(async (req) => {
     const fiscalId = partner?.vat_number || profile?.vat_number || profile?.fiscal_code;
     if (!fiscalId) {
       console.error("No fiscal_id found for partner:", partner_id);
-      await updateReceipt({ status: "error", error_details: "fiscal_id mancante per il partner" });
+      await updateReceipt({ status: "ERROR", error_details: "fiscal_id mancante per il partner" });
       return new Response(JSON.stringify({ error: "fiscal_id mancante" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -87,7 +89,7 @@ serve(async (req) => {
 
     if (!acubeEmail || !acubePassword) {
       console.error("ACUBE_EMAIL or ACUBE_PASSWORD not configured");
-      await updateReceipt({ status: "error", error_details: "A-Cube credentials missing" });
+      await updateReceipt({ status: "ERROR", error_details: "A-Cube credentials missing" });
       return new Response(JSON.stringify({ error: "A-Cube credentials missing" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -103,7 +105,7 @@ serve(async (req) => {
     if (!loginRes.ok) {
       const loginErr = await loginRes.text();
       console.error("A-Cube login failed:", loginRes.status, loginErr);
-      await updateReceipt({ status: "error", error_details: `A-Cube login failed: ${loginRes.status}` });
+      await updateReceipt({ status: "ERROR", error_details: `A-Cube login failed: ${loginRes.status}` });
       return new Response(JSON.stringify({ error: "A-Cube login failed" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -113,7 +115,7 @@ serve(async (req) => {
     const token = loginData.token;
     if (!token) {
       console.error("A-Cube login response missing token:", loginData);
-      await updateReceipt({ status: "error", error_details: "A-Cube token missing from login response" });
+      await updateReceipt({ status: "ERROR", error_details: "A-Cube token missing from login response" });
       return new Response(JSON.stringify({ error: "A-Cube token missing" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -128,9 +130,8 @@ serve(async (req) => {
         {
           description: "Servizio di lavaggio pet",
           quantity: 1,
-          unit_price: amountFloat,
-          vat_rate: 22.0,
-          gross_price: true,
+          unit_price: netPrice,
+          vat_rate: taxRate,
         },
       ],
       payments: [
@@ -162,7 +163,7 @@ serve(async (req) => {
         console.error("A-Cube Error Text:", errorDetails);
       }
 
-      await updateReceipt({ status: "error", error_details: `A-Cube ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
+      await updateReceipt({ status: "ERROR", error_details: `A-Cube ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
 
       return new Response(JSON.stringify({ success: false, error: "A-Cube Error", details: errorDetails }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -174,8 +175,8 @@ serve(async (req) => {
     console.log("A-Cube receipt success:", receiptData);
 
     await updateReceipt({
-      status: "sent",
-      acube_transaction_id: receiptData?.id || receiptData?.uuid || null,
+      status: "SENT",
+      acube_transaction_id: receiptData?.id || receiptData?.uuid || "SUCCESS_NO_ID",
     });
 
     return new Response(JSON.stringify({ success: true, data: receiptData }), {
