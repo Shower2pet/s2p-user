@@ -10,7 +10,15 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { session_id, partner_id, amount } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid or empty request body" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { session_id, partner_id, amount } = body;
     console.log("generate-receipt called:", { session_id, partner_id, amount });
 
     if (!session_id || !partner_id || !amount) {
@@ -72,7 +80,9 @@ serve(async (req) => {
       .eq("id", partner_id)
       .maybeSingle();
 
-    const fiscalId = partner?.vat_number || profile?.vat_number || profile?.fiscal_code;
+    // Remove country prefix (e.g. "IT") - A-Cube wants only the numeric VAT number
+    const rawFiscalId = partner?.vat_number || profile?.vat_number || profile?.fiscal_code;
+    const fiscalId = rawFiscalId?.replace(/^[A-Za-z]{2}/, "") || null;
     if (!fiscalId) {
       console.error("No fiscal_id found for partner:", partner_id);
       await updateReceipt({ status: "ERROR", error_details: "fiscal_id mancante per il partner" });
