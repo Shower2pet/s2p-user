@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2, Play, StopCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -230,20 +230,31 @@ const StationTimer = () => {
     }
   };
 
-  // Send OFF command and mark session completed
+  // Ref to prevent duplicate OFF sends
+  const offSentRef = useRef(false);
+
+  // Send OFF command and mark session completed (guarded against double-fire)
   const sendOffAndComplete = async (sessionToEnd: WashSession) => {
+    if (offSentRef.current) {
+      console.log('[TIMER] OFF already sent, skipping');
+      return;
+    }
+    offSentRef.current = true;
+    console.log('[TIMER] Sending OFF command for', sessionToEnd.station_id);
     try {
-      await supabase.functions.invoke('station-control', {
+      const { data, error } = await supabase.functions.invoke('station-control', {
         body: { station_id: sessionToEnd.station_id, command: 'OFF' },
       });
+      console.log('[TIMER] OFF command result:', { data, error: error?.message });
     } catch (e) {
-      console.error('Failed to send OFF command:', e);
+      console.error('[TIMER] Failed to send OFF command:', e);
     }
     // Mark completed in DB
-    await supabase.from('wash_sessions')
+    const { error: dbError } = await supabase.from('wash_sessions')
       .update({ status: 'COMPLETED', step: 'rating' })
       .eq('id', sessionToEnd.id)
       .eq('status', 'ACTIVE');
+    console.log('[TIMER] Session marked COMPLETED:', { sessionId: sessionToEnd.id, dbError: dbError?.message });
   };
 
   // Visual countdown synced to session.ends_at (survives page refresh)
@@ -251,12 +262,16 @@ const StationTimer = () => {
     if (step !== 'timer' || !isActive || !session?.ends_at) return;
 
     const endsAt = new Date(session.ends_at).getTime();
+    let fired = false; // local guard for this effect instance
+    let interval: ReturnType<typeof setInterval>;
 
     const tick = () => {
       const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
       setSecondsLeft(remaining);
 
-      if (remaining <= 0) {
+      if (remaining <= 0 && !fired) {
+        fired = true;
+        if (interval) clearInterval(interval);
         setIsActive(false);
         if (isShowerStation) {
           setStep('rating');
@@ -272,7 +287,7 @@ const StationTimer = () => {
     };
 
     tick(); // sync immediately
-    const interval = setInterval(tick, 1000);
+    interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [step, isActive, session?.ends_at, warningShown, isShowerStation]);
 
