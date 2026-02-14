@@ -2,3 +2,6 @@ project_id = "rbdzinajiyswzdeoenil"
 
 [functions.pay-with-credits]
 verify_jwt = false
+
+[functions.station-control]
+verify_jwt = false

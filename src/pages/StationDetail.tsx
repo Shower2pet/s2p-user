@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown, DoorOpen, ScanLine, KeyRound, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown, DoorOpen, ScanLine, KeyRound, CheckCircle2, WifiOff, ShieldAlert } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -45,6 +45,10 @@ const StationDetail = () => {
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'stripe'>('stripe');
   const [showReport, setShowReport] = useState(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+
+  // Hardware activation states
+  const [hardwareConnecting, setHardwareConnecting] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
 
   // Visibility verification state — auto-verified if arrived via QR scan
   const [visibilityVerified, setVisibilityVerified] = useState(qrVerified);
@@ -247,25 +251,54 @@ const StationDetail = () => {
 
   const handlePay = async () => {
     if (!chosen) return;
-    setIsProcessing(true);
-    try {
-      if (hasActiveSub) {
-        const { data, error } = await supabase.functions.invoke('pay-with-credits', {
-          body: { station_id: station.id, option_id: chosen.id, use_subscription: true, subscription_id: activeSub.id },
-        });
+
+    // For credits or subscription: full hardware flow
+    if (hasActiveSub || effectivePaymentMethod === 'credits') {
+      setIsProcessing(true);
+      setShowCheckout(false);
+      setHardwareConnecting(true);
+
+      try {
+        const body: any = { station_id: station.id, option_id: chosen.id };
+        if (hasActiveSub) {
+          body.use_subscription = true;
+          body.subscription_id = activeSub.id;
+        }
+
+        const { data, error } = await supabase.functions.invoke('pay-with-credits', { body });
+
         if (error) throw error;
+
+        // Check for hardware failure (rollback already happened server-side)
+        if (data?.hardware_failed) {
+          setHardwareConnecting(false);
+          setShowRefundDialog(true);
+          queryClient.invalidateQueries({ queryKey: ['wallet'] });
+          queryClient.invalidateQueries({ queryKey: ['wallets'] });
+          queryClient.invalidateQueries({ queryKey: ['station', id] });
+          queryClient.invalidateQueries({ queryKey: ['stations'] });
+          return;
+        }
+
         if (data?.error) throw new Error(data.error);
-        toast.success(t('serviceActivated'));
+
+        // Hardware success!
+        setHardwareConnecting(false);
+        toast.success("🚿 Lavaggio Avviato! L'acqua è in erogazione.");
+        queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        queryClient.invalidateQueries({ queryKey: ['wallets'] });
         navigate(`/s/${station.id}/timer`);
-      } else if (effectivePaymentMethod === 'credits') {
-        const { data, error } = await supabase.functions.invoke('pay-with-credits', {
-          body: { station_id: station.id, option_id: chosen.id },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        toast.success(t('serviceActivated'));
-        navigate(`/s/${station.id}/timer`);
-      } else {
+      } catch (err: any) {
+        console.error('Payment error:', err);
+        setHardwareConnecting(false);
+        toast.error(t('paymentError'));
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      // Stripe card flow — redirect to checkout (hardware handled on webhook/timer page)
+      setIsProcessing(true);
+      try {
         const body: any = {
           station_id: station.id,
           option_id: chosen.id,
@@ -281,12 +314,12 @@ const StationDetail = () => {
         const { data, error } = await supabase.functions.invoke('create-checkout', { body });
         if (error) throw error;
         if (data?.url) window.location.href = data.url;
+      } catch (err: any) {
+        console.error('Payment error:', err);
+        toast.error(t('paymentError'));
+      } finally {
+        setIsProcessing(false);
       }
-    } catch (err: any) {
-      console.error('Payment error:', err);
-      toast.error(t('paymentError'));
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -616,6 +649,52 @@ const StationDetail = () => {
           onClose={() => setShowQrScanner(false)}
         />
       )}
+
+      {/* Hardware Connecting Overlay — blocks all interaction */}
+      {hardwareConnecting && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center gap-6">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full border-4 border-primary/20 flex items-center justify-center">
+              <Loader2 className="w-10 h-10 text-primary animate-spin" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center animate-pulse">
+              <WifiOff className="w-3 h-3 text-primary-foreground" />
+            </div>
+          </div>
+          <div className="text-center space-y-2 px-6">
+            <h2 className="text-xl font-bold text-foreground">Connessione alla stazione in corso...</h2>
+            <p className="text-sm text-muted-foreground">Stiamo attivando la stazione. Non chiudere questa pagina.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Refund Dialog — shown when hardware fails */}
+      <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <ShieldAlert className="w-6 h-6 text-destructive" />
+              </div>
+              <DialogTitle className="text-left">Stazione non raggiungibile</DialogTitle>
+            </div>
+            <DialogDescription className="text-left">
+              Ci scusiamo, la stazione sembra non rispondere. I tuoi crediti sono stati rimborsati istantaneamente e il gestore è stato avvisato del problema.
+            </DialogDescription>
+          </DialogHeader>
+          <Card className="p-4 bg-success/5 border-success/20">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-success" />
+              <span className="text-sm font-bold text-foreground">Crediti rimborsati con successo</span>
+            </div>
+          </Card>
+          <DialogFooter>
+            <Button onClick={() => { setShowRefundDialog(false); navigate('/'); }} className="w-full" size="lg">
+              Torna alla Home
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 };
