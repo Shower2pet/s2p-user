@@ -128,108 +128,8 @@ serve(async (req) => {
       logStep("Wallet deducted", { oldBalance, newBalance });
     }
 
-    // ─── HARDWARE PHASE ─────────────────────────────────────
-    logStep("Calling station-control for hardware activation");
-
-    let hardwareSuccess = false;
-    try {
-      const controlResponse = await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/station-control`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          },
-          body: JSON.stringify({
-            station_id,
-            command: 'PULSE',
-            duration_minutes: durationMinutes,
-          }),
-        }
-      );
-
-      const controlData = await controlResponse.json();
-      hardwareSuccess = controlData.success === true;
-      logStep("station-control response", { status: controlResponse.status, hardwareSuccess });
-    } catch (hwErr) {
-      logStep("station-control call failed", { error: String(hwErr) });
-      hardwareSuccess = false;
-    }
-
-    // ─── ROLLBACK IF HARDWARE FAILED ────────────────────────
-    if (!hardwareSuccess) {
-      logStep("HARDWARE FAILED — initiating rollback");
-
-      // 1. Refund credits
-      if (walletId && !use_subscription) {
-        await supabaseClient
-          .from('structure_wallets')
-          .update({ balance: oldBalance, updated_at: new Date().toISOString() })
-          .eq('id', walletId);
-        logStep("Credits refunded", { balance: oldBalance });
-
-        // Create refund transaction
-        await supabaseClient
-          .from('transactions')
-          .insert({
-            user_id: user.id,
-            total_value: price,
-            amount_paid_wallet: price,
-            amount_paid_stripe: 0,
-            transaction_type: 'WASH_SERVICE',
-            station_id,
-            structure_id: station.structure_id,
-            status: 'REFUNDED',
-            payment_method: 'CREDITS',
-          });
-        logStep("Refund transaction created");
-      }
-
-      // If subscription, decrement the wash count back
-      if (use_subscription && subscription_id) {
-        const { data: sub } = await supabaseClient
-          .from('user_subscriptions')
-          .select('washes_used_this_period')
-          .eq('id', subscription_id)
-          .maybeSingle();
-        if (sub) {
-          await supabaseClient
-            .from('user_subscriptions')
-            .update({ washes_used_this_period: Math.max(0, (sub.washes_used_this_period || 1) - 1) })
-            .eq('id', subscription_id);
-          logStep("Subscription wash count reverted");
-        }
-      }
-
-      // 2. Create maintenance ticket
-      await supabaseClient
-        .from('maintenance_logs')
-        .insert({
-          station_id,
-          severity: 'high',
-          reason: 'La stazione non ha risposto al comando di avvio dopo un pagamento',
-          status: 'to_resolve',
-          performed_by: user.id,
-        });
-      logStep("Maintenance ticket created");
-
-      // 3. Set station offline
-      await supabaseClient
-        .from('stations')
-        .update({ status: 'OFFLINE' })
-        .eq('id', station_id);
-      logStep("Station set to OFFLINE");
-
-      return new Response(JSON.stringify({
-        success: false,
-        hardware_failed: true,
-        error: "La stazione non ha risposto. I tuoi crediti sono stati rimborsati.",
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 503,
-      });
-    }
+    // Hardware activation is now handled by the frontend (StationTimer "Avvia Servizio")
+    // This function only handles payment/deduction
 
     // ─── SUCCESS: CREATE RECORDS ────────────────────────────
     // Create transaction
@@ -272,7 +172,7 @@ serve(async (req) => {
 
     const newBalance = walletId ? oldBalance - price : undefined;
 
-    return new Response(JSON.stringify({ success: true, newBalance, hardware_ok: true }), {
+    return new Response(JSON.stringify({ success: true, newBalance }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
