@@ -177,8 +177,9 @@ const StationTimer = () => {
       const { data: hwData, error: hwError } = await supabase.functions.invoke('station-control', {
         body: {
           station_id: session.station_id,
-          command: 'PULSE',
+          command: 'START_TIMED_WASH',
           duration_minutes: durationMinutes,
+          session_id: session.id,
         },
       });
 
