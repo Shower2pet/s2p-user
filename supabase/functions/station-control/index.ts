@@ -150,7 +150,7 @@ serve(async (req) => {
       // The frontend is responsible for sending the OFF command when the timer expires.
       // The scheduleOff here is a best-effort safety net only.
 
-      logStep("START_TIMED_WASH success, OFF scheduled", { delayMs });
+      logStep("START_TIMED_WASH success, relay ON sent", { duration_minutes });
       return new Response(JSON.stringify({
         success: true,
         message: "Lavaggio avviato",
