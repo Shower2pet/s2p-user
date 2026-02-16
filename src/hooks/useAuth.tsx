@@ -1,17 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { Profile } from '@/types/database';
 
-export interface Profile {
-  id: string;
-  email: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  role: 'admin' | 'partner' | 'manager' | 'user' | null;
-  stripe_customer_id: string | null;
-  created_at: string | null;
-}
+export type { Profile };
 
 interface AuthContextType {
   user: User | null;
