@@ -19,9 +19,10 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ArrowLeft, Loader2, CreditCard, Coins, Lock, Timer, AlertTriangle, Crown, DoorOpen, ScanLine, KeyRound, CheckCircle2, WifiOff, ShieldAlert } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
+import { sendGateCommand } from '@/services/stationService';
+import { createCheckout, payWithCredits, verifySession } from '@/services/paymentService';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -68,13 +69,8 @@ const StationDetail = () => {
       searchParams.delete('session_id');
       setSearchParams(searchParams, { replace: true });
       // Verify the specific payment server-side
-      supabase.functions.invoke('verify-session', {
-        body: { session_id: sessionId },
-      }).then(({ data, error }) => {
-        if (error) {
-          console.error('Verify session error:', error);
-          toast.error('Errore nella verifica del pagamento');
-        } else if (data?.status === 'completed' || data?.status === 'already_completed') {
+      verifySession({ session_id: sessionId }).then((data) => {
+        if (data?.status === 'completed' || data?.status === 'already_completed') {
           toast.success('Crediti aggiunti al tuo saldo!');
         } else {
           toast.info('Pagamento in attesa di conferma');
@@ -83,6 +79,9 @@ const StationDetail = () => {
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
         queryClient.invalidateQueries({ queryKey: ['station', id] });
         queryClient.invalidateQueries({ queryKey: ['stations'] });
+      }).catch((error) => {
+        console.error('Verify session error:', error);
+        toast.error('Errore nella verifica del pagamento');
       });
     }
   }, [searchParams, setSearchParams, queryClient, id]);
@@ -90,15 +89,13 @@ const StationDetail = () => {
   // Auto-sync any pending credit topup transactions on page load
   useEffect(() => {
     if (!user) return;
-    supabase.functions.invoke('verify-session', {
-      body: { process_all_pending: true },
-    }).then(({ data, error }) => {
-      if (!error && data?.credits_added > 0) {
+    verifySession({ process_all_pending: true }).then((data) => {
+      if (data?.credits_added > 0) {
         toast.success(`${data.credits_added} crediti sincronizzati!`);
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
       }
-    });
+    }).catch(() => {});
   }, [user, queryClient]);
 
   const handleQrVerified = useCallback(() => {
@@ -128,12 +125,7 @@ const StationDetail = () => {
     if (!station) return;
     setIsOpeningGate(true);
     try {
-      const { error } = await supabase.from('gate_commands').insert({
-        station_id: station.id,
-        user_id: user.id,
-        command: 'OPEN',
-      });
-      if (error) throw error;
+      await sendGateCommand(station.id, user.id, 'OPEN');
       toast.success('Comando di apertura inviato!');
     } catch (err) {
       console.error('Gate open error:', err);
@@ -198,17 +190,14 @@ const StationDetail = () => {
     if (plan.stripe_price_id) {
       setIsProcessing(true);
       try {
-        const { data, error } = await supabase.functions.invoke('create-checkout', {
-          body: {
-            mode: 'subscription',
-            price_id: plan.stripe_price_id,
-            productName: plan.name,
-            productType: 'subscription',
-            plan_id: plan.id,
-            success_url: `${window.location.origin}/subscriptions`,
-          },
+        const data = await createCheckout({
+          mode: 'subscription',
+          price_id: plan.stripe_price_id,
+          productName: plan.name,
+          productType: 'subscription',
+          plan_id: plan.id,
+          success_url: `${window.location.origin}/subscriptions`,
         });
-        if (error) throw error;
         if (data?.url) window.location.href = data.url;
       } catch (err: any) {
         console.error('Subscription error:', err);
@@ -228,18 +217,16 @@ const StationDetail = () => {
     }
     setPurchasingId(pkg.id);
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: {
-          amount: Math.round(pkg.price_eur * 100),
-          currency: 'eur',
-          productName: `${pkg.name} – ${pkg.credits_value} crediti`,
-          productType: 'credit_pack',
-          credits: pkg.credits_value,
-          structure_id: pkg.structure_id || station.structure_id,
-          success_url: `${window.location.origin}/s/${station.id}?credits_updated=1&session_id={CHECKOUT_SESSION_ID}`,
-        },
+      const data = await createCheckout({
+        amount: Math.round(pkg.price_eur * 100),
+        currency: 'eur',
+        productName: `${pkg.name} – ${pkg.credits_value} crediti`,
+        productType: 'credit_pack',
+        credits: pkg.credits_value,
+        structure_id: pkg.structure_id || station.structure_id,
+        success_url: `${window.location.origin}/s/${station.id}?credits_updated=1&session_id={CHECKOUT_SESSION_ID}`,
+        mode: 'payment',
       });
-      if (error) throw error;
       if (data?.url) window.location.href = data.url;
     } catch (err) {
       console.error('Purchase error:', err);
@@ -264,10 +251,7 @@ const StationDetail = () => {
           body.subscription_id = activeSub.id;
         }
 
-        const { data, error } = await supabase.functions.invoke('pay-with-credits', { body });
-
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+        await payWithCredits(body);
 
         // Payment success — go to timer page where hardware is activated
         toast.success("Pagamento confermato! Vai alla stazione per avviare il servizio.");
@@ -296,8 +280,7 @@ const StationDetail = () => {
           guest_email: !user ? guestEmail : null,
           success_url: `${window.location.origin}/s/${station.id}/timer?session_id={CHECKOUT_SESSION_ID}`,
         };
-        const { data, error } = await supabase.functions.invoke('create-checkout', { body });
-        if (error) throw error;
+        const data = await createCheckout(body);
         if (data?.url) window.location.href = data.url;
       } catch (err: any) {
         console.error('Payment error:', err);

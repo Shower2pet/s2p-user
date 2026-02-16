@@ -7,15 +7,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useLanguage } from '@/hooks/useLanguage';
 import { useStation, isShower, getStationDisplayName } from '@/hooks/useStations';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/shower2pet-logo.png';
+
+import { WashSession } from '@/types/database';
+import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession } from '@/services/sessionService';
+import { sendStationCommand } from '@/services/stationService';
+import { generateReceipt } from '@/services/paymentService';
 
 type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
 
 const SANITIZE_SECONDS = 30;
-
-import { WashSession } from '@/types/database';
 
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,15 +43,9 @@ const StationTimer = () => {
   const [stopping, setStopping] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
 
-  // ══════════════════════════════════════════════════════════════
-  // SIMPLE guard: prevents auto-stop from firing more than once
-  // ══════════════════════════════════════════════════════════════
   const autoStopFiredRef = useRef(false);
 
-  // ══════════════════════════════════════════════════════════════
   // Fetch active session from DB
-  // NOTE: isShowerStation intentionally NOT in deps to prevent re-runs
-  // ══════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!id) return;
     if (!user && !stripeSessionId) return;
@@ -58,38 +54,20 @@ const StationTimer = () => {
     const maxRetries = 10;
     let cancelled = false;
 
-    const fetchSession = async () => {
-      let query = supabase
-        .from('wash_sessions')
-        .select('*')
-        .eq('station_id', id)
-        .eq('status', 'ACTIVE')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (stripeSessionId) {
-        query = supabase
-          .from('wash_sessions')
-          .select('*')
-          .eq('station_id', id)
-          .eq('stripe_session_id', stripeSessionId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-      } else if (user) {
-        query = query.eq('user_id', user.id);
-      }
-
-      const { data } = await query.maybeSingle();
+    const doFetch = async () => {
+      const data = await fetchActiveSession(id, {
+        stripeSessionId,
+        userId: user?.id ?? null,
+      });
 
       if (data) {
         if (cancelled) return;
-        const ws = data as WashSession;
-        setSession(ws);
-        const currentStep = ws.step as WashStep;
+        setSession(data);
+        const currentStep = data.step as WashStep;
         setStep(currentStep);
 
         if (currentStep === 'timer' || currentStep === 'courtesy') {
-          const endsAt = new Date(ws.ends_at).getTime();
+          const endsAt = new Date(data.ends_at).getTime();
           const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
 
           if (remaining > 0) {
@@ -100,21 +78,20 @@ const StationTimer = () => {
               setIsActive(true);
             }
           } else {
-            // Timer already expired — just update UI, auto-stop will fire from countdown effect
             setSecondsLeft(0);
-            setIsActive(true); // Let the countdown effect handle the auto-stop
+            setIsActive(true);
           }
         }
         setLoading(false);
       } else if (retries < maxRetries) {
         retries++;
-        setTimeout(() => { if (!cancelled) fetchSession(); }, 1500);
+        setTimeout(() => { if (!cancelled) doFetch(); }, 1500);
       } else {
         if (!cancelled) setLoading(false);
       }
     };
 
-    fetchSession();
+    doFetch();
     return () => { cancelled = true; };
   }, [id, user, stripeSessionId]);
 
@@ -122,55 +99,28 @@ const StationTimer = () => {
   useEffect(() => {
     if (!session?.id) return;
 
-    const channel = supabase
-      .channel(`wash_session_${session.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'wash_sessions',
-          filter: `id=eq.${session.id}`,
-        },
-        (payload) => {
-          const updated = payload.new as WashSession;
-          setSession(updated);
-          setStep(updated.step as WashStep);
-          if (updated.status === 'COMPLETED') {
-            setStep('rating');
-            setIsActive(false);
-          }
-        }
-      )
-      .subscribe();
+    const unsubscribe = subscribeToSession(session.id, (updated) => {
+      setSession(updated);
+      setStep(updated.step as WashStep);
+      if (updated.status === 'COMPLETED') {
+        setStep('rating');
+        setIsActive(false);
+      }
+    });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return unsubscribe;
   }, [session?.id]);
 
-  const updateSessionStep = async (sessionId: string, newStep: string, status?: string) => {
-    const updates: any = { step: newStep };
-    if (status) updates.status = status;
-    await supabase.from('wash_sessions').update(updates).eq('id', sessionId);
-  };
-
-  // ══════════════════════════════════════════════════════════════
-  // AUTO-STOP: same logic as manual stop, triggered by countdown
-  // This is the CORE fix: uses the exact same approach as handleStopManual
-  // ══════════════════════════════════════════════════════════════
+  // AUTO-STOP
   const handleAutoStop = useCallback(async (sess: WashSession, shower: boolean) => {
     if (autoStopFiredRef.current) return;
     autoStopFiredRef.current = true;
 
     console.log('[AUTO-STOP] Timer expired, sending OFF for station:', sess.station_id, 'isShower:', shower);
 
-    // ALWAYS send OFF command regardless of station type
     try {
-      const { data, error } = await supabase.functions.invoke('station-control', {
-        body: { station_id: sess.station_id, command: 'OFF' },
-      });
-      console.log('[AUTO-STOP] OFF result:', JSON.stringify({ data, error: error?.message }));
+      const result = await sendStationCommand(sess.station_id, 'OFF');
+      console.log('[AUTO-STOP] OFF result:', JSON.stringify(result));
     } catch (e) {
       console.error('[AUTO-STOP] OFF failed:', e);
     }
@@ -187,26 +137,22 @@ const StationTimer = () => {
     }
   }, []);
 
-  // Handle "Avvia Servizio" — activate hardware + recalculate ends_at from NOW
+  // Handle "Avvia Servizio"
   const handleStartService = async () => {
     if (!session) return;
     setStarting(true);
 
     try {
       const durationMinutes = Math.ceil(session.total_seconds / 60);
-      const { data: hwData, error: hwError } = await supabase.functions.invoke('station-control', {
-        body: {
-          station_id: session.station_id,
-          command: 'START_TIMED_WASH',
-          duration_minutes: durationMinutes,
-          session_id: session.id,
-        },
+      const hwData = await sendStationCommand(session.station_id, 'START_TIMED_WASH', {
+        duration_minutes: durationMinutes,
+        session_id: session.id,
       });
 
-      console.log('[START] station-control response:', JSON.stringify({ hwData, hwError: hwError?.message }));
+      console.log('[START] station-control response:', JSON.stringify(hwData));
 
-      if (hwError || !hwData?.success) {
-        console.error('[START] Station control failed:', { hwData, hwError });
+      if (!hwData?.success) {
+        console.error('[START] Station control failed:', hwData);
         toast.error('La stazione non risponde. Riprova o contatta il supporto.');
         setStarting(false);
         return;
@@ -216,27 +162,18 @@ const StationTimer = () => {
       const now = new Date();
       const endsAt = new Date(now.getTime() + session.total_seconds * 1000);
 
-      const { error } = await supabase
-        .from('wash_sessions')
-        .update({
-          started_at: now.toISOString(),
-          ends_at: endsAt.toISOString(),
-          step: isShowerStation ? 'timer' : 'rules',
-        })
-        .eq('id', session.id);
-
-      if (error) {
-        toast.error('Errore nell\'avvio del servizio');
-        setStarting(false);
-        return;
-      }
+      await updateSessionTiming(
+        session.id,
+        now.toISOString(),
+        endsAt.toISOString(),
+        isShowerStation ? 'timer' : 'rules',
+      );
 
       toast.success("🚿 Stazione attivata! L'acqua è in erogazione.");
       const updatedSession = { ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() };
       setSession(updatedSession);
 
       // Fire-and-forget: generate fiscal receipt in background
-      // Do NOT await — must never block the user experience
       const receiptPartnerId = station?.structure_owner_id;
       const selectedOption = station?.washing_options?.find(o => o.id === session.option_id);
       const receiptAmount = selectedOption?.price ?? (session.total_seconds / 60);
@@ -249,27 +186,14 @@ const StationTimer = () => {
       });
 
       if (receiptPartnerId) {
-        supabase.functions.invoke('generate-receipt', {
-          body: {
-            session_id: session.id,
-            partner_id: receiptPartnerId,
-            amount: receiptAmount,
-          },
-        }).then(({ data, error }) => {
-          if (error) {
-            console.error("Errore (silenzioso) durante la generazione scontrino:", error);
-          } else {
-            console.log("Scontrino inviato con successo ad A-Cube:", data);
-          }
-        }).catch(err => {
-          console.error("Eccezione durante la chiamata scontrino:", err);
-        });
+        generateReceipt(session.id, receiptPartnerId, receiptAmount)
+          .then((data) => console.log("Scontrino inviato con successo ad A-Cube:", data))
+          .catch((err) => console.error("Errore (silenzioso) durante la generazione scontrino:", err));
       } else {
         console.warn("generate-receipt NON invocata: partner_id mancante (structure_owner_id è null)");
       }
       setSecondsLeft(session.total_seconds);
 
-      // Reset auto-stop guard for new session
       autoStopFiredRef.current = false;
 
       if (isShowerStation) {
@@ -286,10 +210,7 @@ const StationTimer = () => {
     }
   };
 
-  // ══════════════════════════════════════════════════════════════
   // Visual countdown + auto-stop trigger
-  // When remaining hits 0, calls handleAutoStop (same as manual stop)
-  // ══════════════════════════════════════════════════════════════
   useEffect(() => {
     if (step !== 'timer' || !isActive || !session?.ends_at) return;
 
@@ -299,13 +220,11 @@ const StationTimer = () => {
       const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
       setSecondsLeft(remaining);
 
-      // Warning for TUB stations
       if (!isShowerStation && remaining === 120 && !warningShown) {
         toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
         setWarningShown(true);
       }
 
-      // When countdown hits 0 → auto-stop (same logic as manual stop button)
       if (remaining <= 0 && !autoStopFiredRef.current) {
         console.log('[COUNTDOWN] Reached zero, triggering auto-stop');
         handleAutoStop(session, isShowerStation);
@@ -373,15 +292,13 @@ const StationTimer = () => {
     setStopping(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('station-control', {
-        body: { station_id: session.station_id, command: 'OFF' },
-      });
-      if (error || !data?.success) {
+      const result = await sendStationCommand(session.station_id, 'OFF');
+      if (!result?.success) {
         toast.error('Errore nello spegnimento. Riprova.');
         setStopping(false);
         return;
       }
-      autoStopFiredRef.current = true; // Prevent auto-stop from also firing
+      autoStopFiredRef.current = true;
     } catch (_) {
       toast.error('Errore di connessione');
       setStopping(false);
@@ -413,7 +330,7 @@ const StationTimer = () => {
       setStep('courtesy');
       if (session) {
         const courtesyEndsAt = new Date(Date.now() + courtesyDuration * 1000).toISOString();
-        await supabase.from('wash_sessions').update({ step: 'courtesy', ends_at: courtesyEndsAt }).eq('id', session.id);
+        await updateCourtesyEnd(session.id, courtesyEndsAt);
         setSession({ ...session, ends_at: courtesyEndsAt });
       }
     }

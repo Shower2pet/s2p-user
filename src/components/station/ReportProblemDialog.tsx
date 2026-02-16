@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { reportProblem } from '@/services/maintenanceService';
 
 interface ReportProblemDialogProps {
   open: boolean;
@@ -34,17 +34,7 @@ export const ReportProblemDialog = ({ open, onOpenChange, stationId }: ReportPro
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('maintenance_logs')
-        .insert({
-          station_id: stationId,
-          performed_by: user.id,
-          reason: description.trim(),
-          severity: 'low',
-          status: 'open',
-        });
-
-      if (error) throw error;
+      await reportProblem(stationId, user.id, description.trim(), 'low');
       toast.success('Segnalazione inviata con successo!');
       setDescription('');
       onOpenChange(false);
@@ -68,34 +58,18 @@ export const ReportProblemDialog = ({ open, onOpenChange, stationId }: ReportPro
             Descrivi il problema riscontrato con questa stazione. Il team lo prenderà in carico.
           </DialogDescription>
         </DialogHeader>
-
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Descrizione *</label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrivi il problema riscontrato..."
-              rows={4}
-              maxLength={500}
-            />
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descrivi il problema riscontrato..." rows={4} maxLength={500} />
             <p className="text-xs text-muted-foreground text-right">{description.length}/500</p>
           </div>
         </div>
-
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Annulla
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !description.trim()}
-          >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <AlertTriangle className="w-4 h-4" />
-            )}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !description.trim()}>
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
             Invia Segnalazione
           </Button>
         </DialogFooter>
