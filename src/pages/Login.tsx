@@ -110,7 +110,7 @@ const Login = () => {
           </div>
 
           <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
-            {loading ? 'Logging in...' : t('login')}
+            {loading ? 'Accesso in corso...' : t('login')}
           </Button>
         </form>
 
