@@ -6,9 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/hooks/useLanguage';
 import { registerSchema } from '@/lib/validation';
+import { signUp } from '@/services/authService';
 import { z } from 'zod';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
 
@@ -32,7 +32,6 @@ const Register = () => {
       return;
     }
 
-    // Validate input with zod
     try {
       const validated = registerSchema.parse({
         name: formData.name,
@@ -45,36 +44,25 @@ const Register = () => {
 
       const redirectUrl = `${window.location.origin}/`;
       
-      const { data, error } = await supabase.auth.signUp({
-        email: validated.email,
-        password: validated.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: validated.name,
-          },
-        },
+      const data = await signUp(validated.email, validated.password, redirectUrl, {
+        full_name: validated.name,
       });
-
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast.error('Questa email è già registrata. Effettua il login.');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
 
       if (data.user) {
         toast.success('Account creato con successo! Controlla la tua email per confermare.');
         navigate('/login');
       }
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
         return;
       }
-      toast.error('Si è verificato un errore imprevisto');
+      const msg = error?.message ?? '';
+      if (msg.includes('already registered')) {
+        toast.error('Questa email è già registrata. Effettua il login.');
+      } else {
+        toast.error(msg || 'Si è verificato un errore imprevisto');
+      }
     } finally {
       setLoading(false);
     }
@@ -98,73 +86,36 @@ const Register = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">{t('fullName')}</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="John Doe"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              disabled={loading}
-            />
+            <Input id="name" type="text" placeholder="John Doe"
+              value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required disabled={loading} />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="email">{t('email')}</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="your@email.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              disabled={loading}
-            />
+            <Input id="email" type="email" placeholder="your@email.com"
+              value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required disabled={loading} />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="password">{t('password')}</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-              disabled={loading}
-            />
+            <Input id="password" type="password" placeholder="••••••••"
+              value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required disabled={loading} />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              required
-              disabled={loading}
-            />
+            <Input id="confirmPassword" type="password" placeholder="••••••••"
+              value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              required disabled={loading} />
           </div>
-
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="terms"
-              checked={formData.acceptTerms}
-              onCheckedChange={(checked) => 
-                setFormData({ ...formData, acceptTerms: checked as boolean })
-              }
-              disabled={loading}
-            />
-            <label
-              htmlFor="terms"
-              className="text-sm font-light text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
+            <Checkbox id="terms" checked={formData.acceptTerms}
+              onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}
+              disabled={loading} />
+            <label htmlFor="terms" className="text-sm font-light text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
               {t('acceptTerms')}
             </label>
           </div>
-
           <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
             {loading ? 'Creazione account...' : t('createAccount')}
           </Button>
@@ -172,11 +123,7 @@ const Register = () => {
 
         <div className="text-center text-sm text-muted-foreground font-light">
           {t('alreadyHaveAccount')}{' '}
-          <button
-            onClick={() => navigate('/login')}
-            className="text-primary hover:underline font-bold"
-            disabled={loading}
-          >
+          <button onClick={() => navigate('/login')} className="text-primary hover:underline font-bold" disabled={loading}>
             {t('login')}
           </button>
         </div>

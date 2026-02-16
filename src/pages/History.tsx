@@ -3,12 +3,12 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Calendar, Clock, MapPin, CreditCard, Loader2, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Transaction } from '@/types/database';
+import { fetchTransactions } from '@/services/transactionService';
 
 const History = () => {
   const { t } = useLanguage();
@@ -22,16 +22,10 @@ const History = () => {
       return;
     }
 
-    const fetchTransactions = async () => {
+    const load = async () => {
       try {
-        const { data, error } = await supabase
-          .from('transactions')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (error) throw error;
-        setTransactions((data || []) as Transaction[]);
+        const data = await fetchTransactions(50);
+        setTransactions(data);
       } catch (err) {
         console.error('Fetch transactions error:', err);
         toast.error('Errore nel caricamento delle transazioni');
@@ -40,7 +34,7 @@ const History = () => {
       }
     };
 
-    fetchTransactions();
+    load();
   }, [user]);
 
   const getStatusColor = (status: string | null) => {

@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { loginSchema } from '@/lib/validation';
+import { signInWithPassword } from '@/services/authService';
 import { z } from 'zod';
 import shower2petLogo from '@/assets/shower2pet-logo.png';
 
@@ -34,33 +34,23 @@ const Login = () => {
       
       setLoading(true);
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: validated.email,
-        password: validated.password,
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Email o password non validi');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
+      const data = await signInWithPassword(validated.email, validated.password);
 
       if (data.user) {
         toast.success('Accesso effettuato con successo');
       }
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
         return;
       }
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
+      const msg = error?.message ?? String(error);
+      if (msg.includes('Invalid login credentials')) {
+        toast.error('Email o password non validi');
+      } else if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
         toast.error('Errore di connessione. Controlla la tua connessione internet e riprova.');
       } else {
-        toast.error('Si è verificato un errore imprevisto');
+        toast.error(msg || 'Si è verificato un errore imprevisto');
       }
     } finally {
       setLoading(false);

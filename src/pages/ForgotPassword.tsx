@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { resetPasswordForEmail } from '@/services/authService';
 import { z } from 'zod';
 
 const emailSchema = z.string().trim().email('Indirizzo email non valido');
@@ -22,24 +22,14 @@ const ForgotPassword = () => {
     
     try {
       const validatedEmail = emailSchema.parse(email);
-      
       setLoading(true);
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(validatedEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      
+      await resetPasswordForEmail(validatedEmail, `${window.location.origin}/reset-password`);
       setSubmitted(true);
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error('Si è verificato un errore');
+        toast.error((error as Error).message || 'Si è verificato un errore');
       }
     } finally {
       setLoading(false);
@@ -57,12 +47,7 @@ const ForgotPassword = () => {
           <p className="text-muted-foreground font-light">
             We've sent a password reset link to <strong>{email}</strong>
           </p>
-          <Button
-            onClick={() => navigate('/login')}
-            variant="default"
-            size="lg"
-            className="w-full"
-          >
+          <Button onClick={() => navigate('/login')} variant="default" size="lg" className="w-full">
             Back to Login
           </Button>
         </Card>
@@ -73,36 +58,19 @@ const ForgotPassword = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md p-8 space-y-6">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/login')}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
+        <Button variant="ghost" onClick={() => navigate('/login')} className="mb-4">
+          <ArrowLeft className="w-4 h-4" /> Back
         </Button>
-
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Forgot Password?</h1>
-          <p className="text-muted-foreground font-light">
-            Enter your email and we'll send you a reset link
-          </p>
+          <p className="text-muted-foreground font-light">Enter your email and we'll send you a reset link</p>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
+            <Input id="email" type="email" placeholder="your@email.com"
+              value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading} />
           </div>
-
           <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
             {loading ? 'Invio in corso...' : 'Invia Link di Reset'}
           </Button>
