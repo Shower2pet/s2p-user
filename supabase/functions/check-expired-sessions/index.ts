@@ -12,10 +12,13 @@ const log = (msg: string, details?: any) => {
 };
 
 function publishMqttOff(stationId: string): Promise<boolean> {
-  const mqttHost = Deno.env.get("MQTT_HOST");
+  let mqttHost = Deno.env.get("MQTT_HOST") || "";
   const mqttUser = Deno.env.get("MQTT_USER");
   const mqttPassword = Deno.env.get("MQTT_PASSWORD");
   if (!mqttHost || !mqttUser || !mqttPassword) return Promise.resolve(false);
+
+  // Normalize: strip any protocol prefix
+  mqttHost = mqttHost.replace(/^wss?:\/\//, "").replace(/\/.*$/, "").replace(/:.*$/, "");
 
   const brokerUrl = Deno.env.get("MQTT_WS_URL") || `wss://${mqttHost}:8884/mqtt`;
   const topic = `shower2pet/${stationId}/relay1/command`;

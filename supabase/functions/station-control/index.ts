@@ -12,7 +12,7 @@ const logStep = (step: string, details?: any) => {
 };
 
 function getMqttConfig() {
-  const mqttHost = Deno.env.get("MQTT_HOST");
+  let mqttHost = Deno.env.get("MQTT_HOST") || "";
   const mqttUser = Deno.env.get("MQTT_USER");
   const mqttPassword = Deno.env.get("MQTT_PASSWORD");
 
@@ -20,7 +20,11 @@ function getMqttConfig() {
     throw new Error("MQTT configuration missing");
   }
 
+  // Normalize: strip any protocol prefix the user may have added
+  mqttHost = mqttHost.replace(/^wss?:\/\//, "").replace(/\/.*$/, "").replace(/:.*$/, "");
+
   const brokerUrl = Deno.env.get("MQTT_WS_URL") || `wss://${mqttHost}:8884/mqtt`;
+  logStep("MQTT config resolved", { brokerUrl, host: mqttHost });
   return { brokerUrl, mqttUser, mqttPassword };
 }
 
