@@ -116,11 +116,8 @@ const StationTimer = () => {
     if (autoStopFiredRef.current) return;
     autoStopFiredRef.current = true;
 
-    console.log('[AUTO-STOP] Timer expired, sending OFF for station:', sess.station_id, 'isShower:', shower);
-
     try {
-      const result = await sendStationCommand(sess.station_id, 'OFF');
-      console.log('[AUTO-STOP] OFF result:', JSON.stringify(result));
+      await sendStationCommand(sess.station_id, 'OFF');
     } catch (e) {
       console.error('[AUTO-STOP] OFF failed:', e);
     }
@@ -149,10 +146,7 @@ const StationTimer = () => {
         session_id: session.id,
       });
 
-      console.log('[START] station-control response:', JSON.stringify(hwData));
-
       if (!hwData?.success) {
-        console.error('[START] Station control failed:', hwData);
         toast.error('La stazione non risponde. Riprova o contatta il supporto.');
         setStarting(false);
         return;
@@ -178,19 +172,9 @@ const StationTimer = () => {
       const selectedOption = station?.washing_options?.find(o => o.id === session.option_id);
       const receiptAmount = selectedOption?.price ?? (session.total_seconds / 60);
 
-      console.log("Inizio chiamata asincrona per scontrino A-Cube...", {
-        sessionId: session.id,
-        partnerId: receiptPartnerId,
-        amount: receiptAmount,
-        hasPartner: !!receiptPartnerId,
-      });
-
       if (receiptPartnerId) {
         generateReceipt(session.id, receiptPartnerId, receiptAmount)
-          .then((data) => console.log("Scontrino inviato con successo ad A-Cube:", data))
-          .catch((err) => console.error("Errore (silenzioso) durante la generazione scontrino:", err));
-      } else {
-        console.warn("generate-receipt NON invocata: partner_id mancante (structure_owner_id è null)");
+          .catch((err) => console.error("Errore generazione scontrino:", err));
       }
       setSecondsLeft(session.total_seconds);
 
@@ -226,7 +210,6 @@ const StationTimer = () => {
       }
 
       if (remaining <= 0 && !autoStopFiredRef.current) {
-        console.log('[COUNTDOWN] Reached zero, triggering auto-stop');
         handleAutoStop(session, isShowerStation);
       }
     };

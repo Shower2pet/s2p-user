@@ -44,8 +44,6 @@ export const QrScanner = ({ onClose }: QrScannerProps) => {
             stationId = urlMatch[1];
           }
 
-          console.log('[QrScanner] Scanned station:', stationId);
-
           // Stop scanner safely
           stopped = true;
           scanner.stop().catch(() => {}).finally(() => {

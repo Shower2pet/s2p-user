@@ -55,8 +55,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async (event, newSession) => {
         if (!isMounted) return;
         
-        console.log('[AUTH] onAuthStateChange:', event, !!newSession?.user);
-        
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
@@ -77,8 +75,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         if (!isMounted) return;
-
-        console.log('[AUTH] Initial session:', !!initialSession?.user);
 
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
