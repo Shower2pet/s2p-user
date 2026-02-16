@@ -7,19 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Calendar, Clock, MapPin, CreditCard, Loader2, Coins } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-
-interface Transaction {
-  id: string;
-  total_value: number;
-  transaction_type: string;
-  status: string | null;
-  created_at: string | null;
-  station_id: string | null;
-  payment_method: string | null;
-  credits_purchased: number | null;
-  amount_paid_stripe: number | null;
-  amount_paid_wallet: number | null;
-}
+import { Transaction } from '@/types/database';
 
 const History = () => {
   const { t } = useLanguage();

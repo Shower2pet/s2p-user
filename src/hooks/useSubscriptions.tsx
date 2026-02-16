@@ -1,33 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { SubscriptionPlan, UserSubscription } from '@/types/database';
 
-export interface SubscriptionPlan {
-  id: string;
-  owner_id: string;
-  structure_id: string | null;
-  name: string;
-  description: string | null;
-  price_eur: number;
-  interval: string;
-  max_washes_per_month: number | null;
-  is_active: boolean;
-  stripe_price_id: string | null;
-  stripe_product_id: string | null;
-}
-
-export interface UserSubscription {
-  id: string;
-  user_id: string;
-  plan_id: string;
-  status: string;
-  starts_at: string;
-  ends_at: string | null;
-  washes_used_this_period: number;
-  current_period_start: string;
-  created_at: string;
-  plan?: SubscriptionPlan;
-}
+export type { SubscriptionPlan, UserSubscription };
 
 /** Fetch subscription plans for a given structure owner */
 export const useSubscriptionPlans = (structureOwnerId: string | null | undefined) => {

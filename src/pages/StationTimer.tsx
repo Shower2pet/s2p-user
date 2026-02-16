@@ -15,17 +15,7 @@ type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizi
 
 const SANITIZE_SECONDS = 30;
 
-interface WashSession {
-  id: string;
-  station_id: string;
-  option_id: number;
-  option_name: string;
-  total_seconds: number;
-  started_at: string;
-  ends_at: string;
-  step: string;
-  status: string;
-}
+import { WashSession } from '@/types/database';
 
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
