@@ -35,7 +35,7 @@ export const MapPreview = ({ stationName, address, lat, lng }: MapPreviewProps) 
       style: 'mapbox://styles/mapbox/light-v11',
       center: [lng, lat],
       zoom: 15,
-      interactive: false,
+      interactive: true,
     });
 
     new mapboxgl.Marker({ color: '#005596' })
