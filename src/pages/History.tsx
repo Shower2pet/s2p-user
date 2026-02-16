@@ -5,6 +5,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar, Clock, MapPin, CreditCard, Loader2, Coins } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Transaction } from '@/types/database';
@@ -22,16 +23,21 @@ const History = () => {
     }
 
     const fetchTransactions = async () => {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-      if (!error && data) {
-        setTransactions(data as Transaction[]);
+        if (error) throw error;
+        setTransactions((data || []) as Transaction[]);
+      } catch (err) {
+        console.error('Fetch transactions error:', err);
+        toast.error('Errore nel caricamento delle transazioni');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchTransactions();

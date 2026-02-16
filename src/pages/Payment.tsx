@@ -36,7 +36,7 @@ const Payment = () => {
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
-      toast.error('Error processing payment');
+      toast.error('Errore durante il pagamento. Riprova.');
     } finally {
       setIsLoading(false);
     }

@@ -166,7 +166,7 @@ const Register = () => {
           </div>
 
           <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
-            {loading ? 'Creating account...' : t('createAccount')}
+            {loading ? 'Creazione account...' : t('createAccount')}
           </Button>
         </form>
 
