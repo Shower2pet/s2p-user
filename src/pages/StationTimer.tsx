@@ -172,9 +172,13 @@ const StationTimer = () => {
       const selectedOption = station?.washing_options?.find(o => o.id === session.option_id);
       const receiptAmount = selectedOption?.price ?? (session.total_seconds / 60);
 
+      console.log('[RECEIPT] partner:', receiptPartnerId, 'amount:', receiptAmount, 'station:', station?.id, 'session:', session.id);
+
       if (receiptPartnerId) {
         generateReceipt(session.id, receiptPartnerId, receiptAmount)
           .catch((err) => console.error("Errore generazione scontrino:", err));
+      } else {
+        console.warn('[RECEIPT] Skipped: no structure_owner_id found for station', station?.id);
       }
       setSecondsLeft(session.total_seconds);
 
