@@ -42,7 +42,7 @@ export interface Profile {
   vat_number: string | null;
   fiscal_code: string | null;
   legal_name: string | null;
-  acube_company_id: string | null;
+  fiskaly_system_id: string | null;
 }
 
 export interface WashSession {
@@ -88,7 +88,7 @@ export interface TransactionReceipt {
   amount: number;
   tax_rate: number;
   status: ReceiptStatus;
-  acube_transaction_id: string | null;
+  fiskaly_record_id: string | null;
   error_details: string | null;
   created_at: string;
   updated_at: string;
