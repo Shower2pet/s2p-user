@@ -6,11 +6,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * Fiskaly SIGN IT – generate-receipt
+ *
+ * Flow:
+ *  1. Insert PENDING row in transaction_receipts
+ *  2. Authenticate with Fiskaly (POST /tokens)
+ *  3. Create INTENTION::TRANSACTION record
+ *  4. Create TRANSACTION::RECEIPT record
+ *  5. Update row to SENT or ERROR
+ */
+
+const API_VERSION = "2025-08-12";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    let body;
+    let body: Record<string, unknown>;
     try {
       body = await req.json();
     } catch {
@@ -18,8 +31,11 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { session_id, partner_id, amount } = body;
-    console.log("generate-receipt called:", { session_id, partner_id, amount });
+
+    const { session_id, partner_id, amount } = body as {
+      session_id: string; partner_id: string; amount: number;
+    };
+    console.log("generate-receipt (Fiskaly) called:", { session_id, partner_id, amount });
 
     if (!session_id || !partner_id || !amount) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -32,126 +48,206 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const amountFloat = Number(parseFloat(amount).toFixed(2));
+    const amountFloat = Number(parseFloat(String(amount)).toFixed(2));
 
-    // --- INSERT PENDING row upfront ---
-    console.log("Tentativo di inserimento PENDING per sessione:", session_id);
+    // --- INSERT PENDING row ---
     const { data: insertedData, error: insertError } = await supabase
       .from("transaction_receipts")
-      .insert({
-        session_id,
-        partner_id,
-        amount: amountFloat,
-        status: "PENDING",
-      })
+      .insert({ session_id, partner_id, amount: amountFloat, status: "PENDING" })
       .select()
       .single();
 
     if (insertError) {
-      console.error("ERRORE FATALE INSERIMENTO DB:", insertError);
-      return new Response(JSON.stringify({ error: "Errore inserimento ricevuta", details: insertError }), {
+      console.error("DB insert error:", insertError);
+      return new Response(JSON.stringify({ error: "DB insert failed", details: insertError }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const receiptRowId = insertedData.id;
-    console.log("Riga PENDING creata con id:", receiptRowId);
 
-    // Helper to update the receipt row
+    const receiptRowId = insertedData.id;
+    console.log("PENDING row created:", receiptRowId);
+
     const updateReceipt = async (updates: Record<string, unknown>) => {
       const { error } = await supabase
         .from("transaction_receipts")
         .update(updates)
         .eq("id", receiptRowId);
-      if (error) console.error("Errore update transaction_receipts:", error);
+      if (error) console.error("Error updating receipt row:", error);
     };
 
-    // --- Fetch partner fiscal data ---
-    const { data: partner, error: partnerErr } = await supabase
-      .from("partners_fiscal_data")
-      .select("vat_number, business_name, sdi_code")
-      .eq("profile_id", partner_id)
-      .maybeSingle();
-
-    if (partnerErr) console.error("Error fetching partner fiscal data:", partnerErr);
-
+    // --- Fetch partner fiskaly_system_id ---
     const { data: profile } = await supabase
       .from("profiles")
-      .select("vat_number, fiscal_code")
+      .select("fiskaly_system_id")
       .eq("id", partner_id)
       .maybeSingle();
 
-    // Remove country prefix (e.g. "IT") - A-Cube wants only the numeric VAT number
-    const rawFiscalId = partner?.vat_number || profile?.vat_number || profile?.fiscal_code;
-    const fiscalId = rawFiscalId?.replace(/^[A-Za-z]{2}/, "") || null;
-    if (!fiscalId) {
-      console.error("No fiscal_id found for partner:", partner_id);
-      await updateReceipt({ status: "ERROR", error_details: "fiscal_id mancante per il partner" });
-      return new Response(JSON.stringify({ error: "fiscal_id mancante" }), {
+    const systemId = profile?.fiskaly_system_id;
+    if (!systemId) {
+      console.error("No fiskaly_system_id for partner:", partner_id);
+      await updateReceipt({ status: "ERROR", error_details: "fiskaly_system_id mancante per il partner" });
+      return new Response(JSON.stringify({ error: "fiskaly_system_id mancante" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // --- STEP 1: A-Cube Login ---
-    const acubeEmail = Deno.env.get("ACUBE_EMAIL");
-    const acubePassword = Deno.env.get("ACUBE_PASSWORD");
+    // --- Determine environment ---
+    const fiskalyEnv = (Deno.env.get("FISKALY_ENV") || "test").toLowerCase();
+    const baseUrl = fiskalyEnv === "live"
+      ? "https://live.api.fiskaly.com"
+      : "https://test.api.fiskaly.com";
 
-    if (!acubeEmail || !acubePassword) {
-      console.error("ACUBE_EMAIL or ACUBE_PASSWORD not configured");
-      await updateReceipt({ status: "ERROR", error_details: "A-Cube credentials missing" });
-      return new Response(JSON.stringify({ error: "A-Cube credentials missing" }), {
+    const apiKey = Deno.env.get("FISKALY_API_KEY");
+    const apiSecret = Deno.env.get("FISKALY_API_SECRET");
+
+    if (!apiKey || !apiSecret) {
+      console.error("FISKALY_API_KEY or FISKALY_API_SECRET not configured");
+      await updateReceipt({ status: "ERROR", error_details: "Fiskaly credentials missing" });
+      return new Response(JSON.stringify({ error: "Fiskaly credentials missing" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log("Step 1: Logging in to A-Cube...");
-    const loginRes = await fetch("https://common-sandbox.api.acubeapi.com/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: acubeEmail, password: acubePassword }),
-    });
-
-    if (!loginRes.ok) {
-      const loginErr = await loginRes.text();
-      console.error("A-Cube login failed:", loginRes.status, loginErr);
-      await updateReceipt({ status: "ERROR", error_details: `A-Cube login failed: ${loginRes.status}` });
-      return new Response(JSON.stringify({ error: "A-Cube login failed" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const loginData = await loginRes.json();
-    const token = loginData.token;
-    if (!token) {
-      console.error("A-Cube login response missing token:", loginData);
-      await updateReceipt({ status: "ERROR", error_details: "A-Cube token missing from login response" });
-      return new Response(JSON.stringify({ error: "A-Cube token missing" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    console.log("A-Cube login successful, token obtained.");
-
-    // --- STEP 2: Send Receipt ---
-    const acubePayload = {
-      fiscal_id: fiscalId,
-      electronic_payment_amount: amountFloat,
-      items: [
-        {
-          description: "Servizio di lavaggio pet",
-          quantity: 1,
-          unit_price: amountFloat,
-          vat_rate_code: "22",
-        },
-      ],
-    };
-
-    console.log("Step 2: Sending receipt to A-Cube:", JSON.stringify(acubePayload));
-    const receiptRes = await fetch("https://api-sandbox.acubeapi.com/receipts", {
+    // --- STEP 1: Create Token (authenticate) ---
+    console.log("Step 1: Authenticating with Fiskaly...");
+    const tokenRes = await fetch(`${baseUrl}/tokens`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        "X-Api-Version": API_VERSION,
+        "X-Idempotency-Key": crypto.randomUUID(),
       },
-      body: JSON.stringify(acubePayload),
+      body: JSON.stringify({
+        content: {
+          type: "API_KEY",
+          key: apiKey,
+          secret: apiSecret,
+        },
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      console.error("Fiskaly auth failed:", tokenRes.status, errText);
+      await updateReceipt({ status: "ERROR", error_details: `Fiskaly auth failed: ${tokenRes.status}` });
+      return new Response(JSON.stringify({ error: "Fiskaly auth failed" }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const tokenData = await tokenRes.json();
+    const bearer = tokenData?.content?.authentication?.bearer;
+    if (!bearer) {
+      console.error("Fiskaly token response missing bearer:", tokenData);
+      await updateReceipt({ status: "ERROR", error_details: "Fiskaly bearer token missing" });
+      return new Response(JSON.stringify({ error: "Fiskaly bearer missing" }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    console.log("Fiskaly auth OK.");
+
+    const authHeaders = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${bearer}`,
+      "X-Api-Version": API_VERSION,
+    };
+
+    // --- STEP 2: Create INTENTION::TRANSACTION record ---
+    console.log("Step 2: Creating INTENTION record...");
+    const intentionRes = await fetch(`${baseUrl}/records`, {
+      method: "POST",
+      headers: { ...authHeaders, "X-Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({
+        content: {
+          type: "INTENTION",
+          system: { id: systemId },
+          operation: { type: "TRANSACTION" },
+        },
+        metadata: {
+          session_id: session_id,
+          source: "shower2pet",
+        },
+      }),
+    });
+
+    if (!intentionRes.ok) {
+      const errText = await intentionRes.text();
+      console.error("Fiskaly INTENTION failed:", intentionRes.status, errText);
+      await updateReceipt({ status: "ERROR", error_details: `Fiskaly INTENTION ${intentionRes.status}: ${errText.slice(0, 500)}` });
+      return new Response(JSON.stringify({ error: "Fiskaly INTENTION failed", details: errText }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const intentionData = await intentionRes.json();
+    const intentionId = intentionData?.content?.id;
+    console.log("INTENTION created:", intentionId);
+
+    // --- STEP 3: Create TRANSACTION::RECEIPT record ---
+    // Calculate VAT breakdown (22% standard Italian rate)
+    const vatRate = 22;
+    const grossAmount = amountFloat;
+    const netAmount = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
+    const vatAmount = Number((grossAmount - netAmount).toFixed(2));
+    const transactionDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    console.log("Step 3: Creating TRANSACTION::RECEIPT record...", { grossAmount, netAmount, vatAmount });
+
+    const transactionPayload = {
+      content: {
+        type: "TRANSACTION",
+        record: { id: intentionId },
+        operation: {
+          type: "RECEIPT",
+          document: {
+            date: transactionDate,
+            number: 0, // Fiskaly auto-assigns progressive number
+            amounts: {
+              total: {
+                including_vat: String(grossAmount.toFixed(2)),
+                excluding_vat: String(netAmount.toFixed(2)),
+              },
+            },
+          },
+          entries: [
+            {
+              number: 1,
+              type: "SALE",
+              description: "Servizio di lavaggio pet",
+              commodity: "SERVICE",
+              quantity: "1.000",
+              amounts: {
+                unit: {
+                  including_vat: String(grossAmount.toFixed(2)),
+                },
+                total: {
+                  including_vat: String(grossAmount.toFixed(2)),
+                },
+              },
+              vat_rate: {
+                code: "STANDARD",
+                percentage: String(vatRate),
+              },
+            },
+          ],
+          payments: [
+            {
+              type: "ELECTRONIC",
+              amount: String(grossAmount.toFixed(2)),
+            },
+          ],
+        },
+      },
+      metadata: {
+        session_id: session_id,
+        source: "shower2pet",
+      },
+    };
+
+    const receiptRes = await fetch(`${baseUrl}/records`, {
+      method: "POST",
+      headers: { ...authHeaders, "X-Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(transactionPayload),
     });
 
     if (!receiptRes.ok) {
@@ -159,26 +255,26 @@ serve(async (req) => {
       try {
         const errorJson = await receiptRes.json();
         errorDetails = JSON.stringify(errorJson);
-        console.error("A-Cube Error Data:", errorJson);
+        console.error("Fiskaly RECEIPT Error:", errorJson);
       } catch {
         errorDetails = await receiptRes.text();
-        console.error("A-Cube Error Text:", errorDetails);
+        console.error("Fiskaly RECEIPT Error Text:", errorDetails);
       }
 
-      await updateReceipt({ status: "ERROR", error_details: `A-Cube ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
-
-      return new Response(JSON.stringify({ success: false, error: "A-Cube Error", details: errorDetails }), {
+      await updateReceipt({ status: "ERROR", error_details: `Fiskaly RECEIPT ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
+      return new Response(JSON.stringify({ success: false, error: "Fiskaly RECEIPT Error", details: errorDetails }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Success
     const receiptData = await receiptRes.json();
-    console.log("A-Cube receipt success:", receiptData);
+    const fiskalyRecordId = receiptData?.content?.id || "SUCCESS_NO_ID";
+    console.log("Fiskaly receipt success:", fiskalyRecordId);
 
     await updateReceipt({
       status: "SENT",
-      acube_transaction_id: receiptData?.id || receiptData?.uuid || "SUCCESS_NO_ID",
+      fiskaly_record_id: fiskalyRecordId,
     });
 
     return new Response(JSON.stringify({ success: true, data: receiptData }), {
@@ -187,7 +283,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("generate-receipt unhandled error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
