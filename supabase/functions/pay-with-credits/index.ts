@@ -170,26 +170,9 @@ serve(async (req) => {
       .single();
 
     if (wsErr) logStep("Error creating wash session", { error: wsErr.message });
-    else {
-      logStep("Wash session created", { sessionId: wsData?.id });
-
-      // Fire-and-forget: emit Fiskaly fiscal receipt
-      if (wsData?.id) {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL");
-        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-        if (supabaseUrl && serviceKey) {
-          fetch(`${supabaseUrl}/functions/v1/generate-receipt`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${serviceKey}`,
-            },
-            body: JSON.stringify({ session_id: wsData.id }),
-          }).catch((e) => logStep("generate-receipt fire-and-forget error", { error: String(e) }));
-          logStep("generate-receipt triggered", { sessionId: wsData.id });
-        }
-      }
-    }
+    else logStep("Wash session created", { sessionId: wsData?.id });
+    // Nota: i pagamenti con crediti NON generano scontrino fiscale.
+    // Lo scontrino viene emesso solo per pagamenti Stripe (gestito dal stripe-webhook).
 
     const newBalance = walletId ? oldBalance - price : undefined;
 

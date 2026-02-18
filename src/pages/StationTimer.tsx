@@ -13,7 +13,7 @@ import logo from '@/assets/shower2pet-logo.png';
 import { WashSession } from '@/types/database';
 import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession } from '@/services/sessionService';
 import { sendStationCommand } from '@/services/stationService';
-import { sendFiskalyReceipt } from '@/services/receiptService';
+// receiptService rimosso: gli scontrini Fiskaly vengono triggerati solo dal stripe-webhook server-side
 
 type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
 
@@ -175,9 +175,7 @@ const StationTimer = () => {
         ).catch((e) => console.warn('[SESSION] timing update fallback failed:', e));
       }
 
-      // Fire-and-forget: generate fiscal receipt in background (edge function resolves partner autonomously)
-      console.log('[RECEIPT] Triggering generate-receipt for session:', session.id);
-      sendFiskalyReceipt(session.id);
+      // Nota: lo scontrino fiscale viene generato dal stripe-webhook server-side, non qui
       setSecondsLeft(session.total_seconds);
 
       autoStopFiredRef.current = false;

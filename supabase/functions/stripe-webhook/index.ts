@@ -53,6 +53,20 @@ serve(async (req) => {
     
     logStep("Webhook verified and received", { type: event.type });
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    // Helper: fire-and-forget generate-receipt
+    const triggerReceipt = (payload: Record<string, unknown>) => {
+      if (!supabaseUrl || !serviceKey) return;
+      fetch(`${supabaseUrl}/functions/v1/generate-receipt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+        body: JSON.stringify(payload),
+      }).catch((e) => logStep("generate-receipt trigger error", { error: String(e) }));
+      logStep("generate-receipt triggered", payload);
+    };
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -61,9 +75,7 @@ serve(async (req) => {
         // Update transaction status
         const { error } = await supabaseClient
           .from('transactions')
-          .update({ 
-            status: 'COMPLETED',
-          })
+          .update({ status: 'COMPLETED' })
           .eq('stripe_payment_id', session.id);
 
         if (error) {
@@ -109,9 +121,50 @@ serve(async (req) => {
             .update({ credits_purchased: creditsFromMeta, structure_id: structureId })
             .eq('stripe_payment_id', session.id);
 
+          // ── Scontrino fiscale per acquisto crediti ──
+          const amountCents = session.amount_total || 0;
+          triggerReceipt({
+            stripe_session_id: session.id,
+            product_type: "credit_pack",
+            amount: amountCents / 100,
+          });
+
           logStep("Credit pack processing complete");
+
         } else if (productType === 'session') {
-          logStep("Session payment - no credits to add");
+          logStep("Session payment - resolving wash_session for receipt");
+
+          // Trova la wash_session associata alla stripe_session
+          const { data: washSession } = await supabaseClient
+            .from('wash_sessions')
+            .select('id')
+            .eq('stripe_session_id', session.id)
+            .maybeSingle();
+
+          if (washSession?.id) {
+            // ── Scontrino fiscale per pagamento sessione lavaggio ──
+            triggerReceipt({ session_id: washSession.id });
+          } else {
+            // Fallback: usa stripe_session_id direttamente
+            const amountCents = session.amount_total || 0;
+            triggerReceipt({
+              stripe_session_id: session.id,
+              product_type: "session",
+              amount: amountCents / 100,
+            });
+          }
+
+        } else if (session.mode === 'subscription') {
+          logStep("Subscription payment");
+          // ── Scontrino fiscale per abbonamento ──
+          const amountCents = session.amount_total || 0;
+          if (amountCents > 0) {
+            triggerReceipt({
+              stripe_session_id: session.id,
+              product_type: "subscription",
+              amount: amountCents / 100,
+            });
+          }
         }
         break;
       }
