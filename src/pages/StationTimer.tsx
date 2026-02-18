@@ -152,20 +152,28 @@ const StationTimer = () => {
         return;
       }
 
-      // Hardware OK — update session timing
-      const now = new Date();
-      const endsAt = new Date(now.getTime() + session.total_seconds * 1000);
+      // Hardware OK — timing is updated by station-control Edge Function (service role bypasses RLS)
+      // Use returned timestamps if available, otherwise fallback to local calculation
+      const startedAt = hwData.started_at as string | undefined;
+      const endsAt = hwData.ends_at as string | undefined;
+      const fallbackEndsAt = new Date(Date.now() + session.total_seconds * 1000).toISOString();
 
-      await updateSessionTiming(
-        session.id,
-        now.toISOString(),
-        endsAt.toISOString(),
-        isShowerStation ? 'timer' : 'rules',
-      );
+      const resolvedEndsAt = endsAt ?? fallbackEndsAt;
+      const resolvedStartedAt = startedAt ?? new Date().toISOString();
 
       toast.success("🚿 Stazione attivata! L'acqua è in erogazione.");
-      const updatedSession = { ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() };
+      const updatedSession = { ...session, started_at: resolvedStartedAt, ends_at: resolvedEndsAt };
       setSession(updatedSession);
+
+      // If session was NOT updated by edge function (e.g. no session_id), update manually
+      if (!hwData.session_updated) {
+        updateSessionTiming(
+          session.id,
+          resolvedStartedAt,
+          resolvedEndsAt,
+          isShowerStation ? 'timer' : 'rules',
+        ).catch((e) => console.warn('[SESSION] timing update fallback failed:', e));
+      }
 
       // Fire-and-forget: generate fiscal receipt in background (edge function resolves partner autonomously)
       console.log('[RECEIPT] Triggering generate-receipt for session:', session.id);

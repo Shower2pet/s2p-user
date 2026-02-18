@@ -147,14 +147,57 @@ serve(async (req) => {
         });
       }
 
-      // NOTE: waitUntil does NOT survive for multi-minute delays in serverless.
-      // The frontend is responsible for sending the OFF command when the timer expires.
-      // The scheduleOff here is a best-effort safety net only.
+      // Update session timing in DB using service role (bypasses RLS — works for both guest and auth sessions)
+      const startedAt = new Date().toISOString();
+      const endsAt = new Date(Date.now() + duration_minutes * 60 * 1000).toISOString();
+      const step = (() => {
+        // We'll default to 'timer' — if needed the frontend can override for TUB (rules step)
+        // The frontend still receives started_at/ends_at to sync the UI
+        return 'timer';
+      })();
 
-      logStep("START_TIMED_WASH success, relay ON sent", { duration_minutes });
+      let sessionUpdated = false;
+      if (session_id) {
+        try {
+          const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.57.2");
+          const supabaseAdmin = createClient(
+            Deno.env.get("SUPABASE_URL") ?? "",
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+          );
+
+          // Fetch station type to determine correct step (SHOWER=timer, TUB=rules)
+          const { data: stationRow } = await supabaseAdmin
+            .from('stations')
+            .select('type')
+            .eq('id', station_id)
+            .maybeSingle();
+
+          const isShower = stationRow?.type?.toUpperCase() === 'BRACCO';
+          const sessionStep = isShower ? 'timer' : 'rules';
+
+          const { error: updateError } = await supabaseAdmin
+            .from('wash_sessions')
+            .update({ started_at: startedAt, ends_at: endsAt, step: sessionStep })
+            .eq('id', session_id);
+
+          if (updateError) {
+            logStep("Session timing update failed", { error: String(updateError) });
+          } else {
+            sessionUpdated = true;
+            logStep("Session timing updated", { session_id, startedAt, endsAt, step: sessionStep });
+          }
+        } catch (e) {
+          logStep("Session timing update exception", { error: String(e) });
+        }
+      }
+
+      logStep("START_TIMED_WASH success, relay ON sent", { duration_minutes, sessionUpdated });
       return new Response(JSON.stringify({
         success: true,
         message: "Lavaggio avviato",
+        started_at: startedAt,
+        ends_at: endsAt,
+        session_updated: sessionUpdated,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
