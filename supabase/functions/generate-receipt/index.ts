@@ -157,7 +157,7 @@ serve(async (req) => {
       if (error) console.error("Error updating receipt row:", error);
     };
 
-    // --- Fetch partner fiskaly_system_id ---
+    // --- Fetch partner fiskaly_system_id + credenziali proprie ---
     const { data: profile } = await supabase
       .from("profiles")
       .select("fiskaly_system_id")
@@ -173,17 +173,28 @@ serve(async (req) => {
       });
     }
 
-    // --- Determine environment ---
-    const fiskalyEnv = (Deno.env.get("FISKALY_ENV") || "test").toLowerCase();
+    // --- Fetch partner-specific Fiskaly credentials from partners_fiscal_data ---
+    const { data: fiscalData } = await supabase
+      .from("partners_fiscal_data")
+      .select("fiscal_api_credentials")
+      .eq("profile_id", partner_id)
+      .maybeSingle();
+
+    const partnerCreds = fiscalData?.fiscal_api_credentials as { api_key?: string; api_secret?: string; env?: string } | null;
+
+    // Partner credentials take priority; fall back to global env secrets
+    const apiKey = partnerCreds?.api_key || Deno.env.get("FISKALY_API_KEY");
+    const apiSecret = partnerCreds?.api_secret || Deno.env.get("FISKALY_API_SECRET");
+    const fiskalyEnvRaw = partnerCreds?.env || Deno.env.get("FISKALY_ENV") || "test";
+    const fiskalyEnv = fiskalyEnvRaw.toLowerCase();
     const baseUrl = fiskalyEnv === "live"
       ? "https://live.api.fiskaly.com"
       : "https://test.api.fiskaly.com";
 
-    const apiKey = Deno.env.get("FISKALY_API_KEY");
-    const apiSecret = Deno.env.get("FISKALY_API_SECRET");
+    console.log("Fiskaly creds source:", partnerCreds?.api_key ? "partner_fiscal_data" : "global_env", { env: fiskalyEnv, systemId });
 
     if (!apiKey || !apiSecret) {
-      await updateReceipt({ status: "ERROR", error_details: "Fiskaly credentials missing" });
+      await updateReceipt({ status: "ERROR", error_details: "Fiskaly credentials missing (né nel profilo partner né in env)" });
       return new Response(JSON.stringify({ error: "Fiskaly credentials missing" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
