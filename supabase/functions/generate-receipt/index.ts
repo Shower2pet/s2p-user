@@ -9,19 +9,16 @@ const corsHeaders = {
 /**
  * Fiskaly SIGN IT – generate-receipt
  *
- * Accetta solo { session_id } — ricava partner_id e amount autonomamente dal DB.
+ * Accetta { session_id } per lavaggi con Stripe
+ * oppure { stripe_session_id, product_type, amount, description } per credit_pack / subscription.
  *
- * Flow:
- *  1. Fetch session → join station → join structure → owner = partner_id
- *  2. Fetch transaction amount for this session
- *  3. Insert PENDING row in transaction_receipts
- *  4. Authenticate with Fiskaly (POST /tokens)
- *  5. Create INTENTION::TRANSACTION record
- *  6. Create TRANSACTION::RECEIPT record
- *  7. Update row to SENT or ERROR
+ * Solo per pagamenti Stripe — i crediti non generano scontrino fiscale.
  */
 
 const API_VERSION = "2025-08-12";
+
+const log = (msg: string, details?: unknown) =>
+  console.log(`[RECEIPT] ${msg}${details ? " - " + JSON.stringify(details) : ""}`);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -36,11 +33,18 @@ serve(async (req) => {
       });
     }
 
-    const { session_id } = body as { session_id: string };
-    console.log("generate-receipt called:", { session_id });
+    const { session_id, stripe_session_id, product_type, amount: bodyAmount, description: bodyDescription } = body as {
+      session_id?: string;
+      stripe_session_id?: string;
+      product_type?: string;
+      amount?: number;
+      description?: string;
+    };
 
-    if (!session_id) {
-      return new Response(JSON.stringify({ error: "session_id is required" }), {
+    log("generate-receipt called", { session_id, stripe_session_id, product_type });
+
+    if (!session_id && !stripe_session_id) {
+      return new Response(JSON.stringify({ error: "session_id or stripe_session_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -50,114 +54,185 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // --- STEP 1: Fetch session + station + structure → owner = partner_id ---
-    const { data: session, error: sessionErr } = await supabase
-      .from("wash_sessions")
-      .select("id, station_id, total_seconds, option_name")
-      .eq("id", session_id)
-      .maybeSingle();
+    // ── Variabili da risolvere ────────────────────────────────────────────
+    let partner_id: string | null = null;
+    let amountFloat: number = 0;
+    let receiptDescription = bodyDescription || "Servizio Shower2Pet";
+    let resolvedSessionId: string | null = session_id || null;
+    let idempotencyKey: string;
 
-    if (sessionErr || !session) {
-      console.error("Session not found:", sessionErr);
-      return new Response(JSON.stringify({ error: "Session not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // ── CASO A: wash_session (pagamento Stripe per lavaggio) ─────────────
+    if (session_id) {
+      idempotencyKey = `wash-${session_id}`;
 
-    // Get station → structure_id
-    const { data: station, error: stationErr } = await supabase
-      .from("stations")
-      .select("structure_id")
-      .eq("id", session.station_id)
-      .maybeSingle();
+      const { data: session, error: sessionErr } = await supabase
+        .from("wash_sessions")
+        .select("id, station_id, total_seconds, option_name")
+        .eq("id", session_id)
+        .maybeSingle();
 
-    if (stationErr || !station?.structure_id) {
-      console.error("Station/structure not found:", stationErr);
-      return new Response(JSON.stringify({ error: "Station structure not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Get structure → owner_id = partner_id
-    const { data: structure, error: structErr } = await supabase
-      .from("structures")
-      .select("owner_id")
-      .eq("id", station.structure_id)
-      .maybeSingle();
-
-    if (structErr || !structure?.owner_id) {
-      console.error("Structure owner not found:", structErr);
-      return new Response(JSON.stringify({ error: "Structure owner not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const partner_id = structure.owner_id;
-    console.log("Resolved partner_id:", partner_id, "for station:", session.station_id);
-
-    // --- STEP 2: Fetch transaction amount ---
-    const { data: transaction } = await supabase
-      .from("transactions")
-      .select("total_value")
-      .eq("station_id", session.station_id)
-      .in("status", ["COMPLETED", "completed", "PAID", "paid"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    // Fallback: derive amount from washing option duration (minutes * price not available here, use total_seconds / 60 as proxy)
-    // Better: use total_value from transaction if available
-    const amountFloat = transaction?.total_value
-      ? Number(parseFloat(String(transaction.total_value)).toFixed(2))
-      : Number((session.total_seconds / 60).toFixed(2)); // fallback
-
-    console.log("Amount resolved:", amountFloat, "from transaction:", !!transaction);
-
-    // Check if receipt already exists for this session
-    const { data: existingReceipt } = await supabase
-      .from("transaction_receipts")
-      .select("id, status")
-      .eq("session_id", session_id)
-      .maybeSingle();
-
-    if (existingReceipt && existingReceipt.status === "SENT") {
-      console.log("Receipt already sent for session:", session_id);
-      return new Response(JSON.stringify({ success: true, message: "Receipt already sent" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // --- STEP 3: Insert or reuse PENDING row ---
-    let receiptRowId: string;
-    if (existingReceipt) {
-      receiptRowId = existingReceipt.id;
-    } else {
-      const { data: insertedData, error: insertError } = await supabase
-        .from("transaction_receipts")
-        .insert({ session_id, partner_id, amount: amountFloat, status: "PENDING" })
-        .select()
-        .single();
-
-      if (insertError || !insertedData) {
-        console.error("DB insert error:", insertError);
-        return new Response(JSON.stringify({ error: "DB insert failed", details: insertError }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (sessionErr || !session) {
+        log("Session not found", { sessionErr });
+        return new Response(JSON.stringify({ error: "Session not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      receiptRowId = insertedData.id;
+
+      const { data: station } = await supabase
+        .from("stations")
+        .select("structure_id")
+        .eq("id", session.station_id)
+        .maybeSingle();
+
+      if (!station?.structure_id) {
+        log("Station structure not found");
+        return new Response(JSON.stringify({ error: "Station structure not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: structure } = await supabase
+        .from("structures")
+        .select("owner_id")
+        .eq("id", station.structure_id)
+        .maybeSingle();
+
+      if (!structure?.owner_id) {
+        log("Structure owner not found");
+        return new Response(JSON.stringify({ error: "Structure owner not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      partner_id = structure.owner_id;
+      log("Resolved partner_id from wash_session", { partner_id, station: session.station_id });
+
+      // Fetch amount from transaction (match by stripe_session_id or latest for station)
+      const { data: tx } = await supabase
+        .from("transactions")
+        .select("total_value")
+        .eq("station_id", session.station_id)
+        .in("status", ["COMPLETED", "completed", "PAID", "paid"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      amountFloat = tx?.total_value
+        ? Number(parseFloat(String(tx.total_value)).toFixed(2))
+        : Number((session.total_seconds / 60).toFixed(2));
+
+      receiptDescription = `Lavaggio pet: ${session.option_name || "Servizio"}`;
+      log("Amount from transaction", { amountFloat, fromTx: !!tx });
     }
 
-    console.log("Receipt row ID:", receiptRowId);
+    // ── CASO B: credit_pack o subscription via stripe_session_id ─────────
+    if (!session_id && stripe_session_id) {
+      idempotencyKey = `stripe-${stripe_session_id}`;
+
+      // Trova la transazione associata alla stripe_session
+      const { data: tx } = await supabase
+        .from("transactions")
+        .select("total_value, structure_id, user_id, transaction_type")
+        .eq("stripe_payment_id", stripe_session_id)
+        .maybeSingle();
+
+      if (!tx) {
+        log("Transaction not found for stripe_session_id", { stripe_session_id });
+        return new Response(JSON.stringify({ error: "Transaction not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      amountFloat = bodyAmount ?? Number(parseFloat(String(tx.total_value)).toFixed(2));
+
+      // Trova il partner tramite structure_id
+      if (tx.structure_id) {
+        const { data: structure } = await supabase
+          .from("structures")
+          .select("owner_id")
+          .eq("id", tx.structure_id)
+          .maybeSingle();
+
+        partner_id = structure?.owner_id ?? null;
+      }
+
+      if (!partner_id) {
+        log("Partner not found for stripe transaction", { stripe_session_id });
+        return new Response(JSON.stringify({ error: "Partner not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (product_type === "credit_pack") {
+        receiptDescription = "Ricarica crediti Shower2Pet";
+      } else if (product_type === "subscription") {
+        receiptDescription = "Abbonamento Shower2Pet";
+      }
+
+      log("Resolved from stripe_session_id", { partner_id, amountFloat, product_type });
+    }
+
+    // ── Guardia: amount e partner devono essere risolti ───────────────────
+    if (!partner_id || amountFloat <= 0) {
+      log("Cannot resolve partner or amount", { partner_id, amountFloat });
+      return new Response(JSON.stringify({ error: "Cannot resolve partner_id or amount" }), {
+        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Deduplicazione: scontrino già inviato? ────────────────────────────
+    const dedupeFilter = resolvedSessionId
+      ? { column: "session_id", value: resolvedSessionId }
+      : null;
+
+    if (dedupeFilter) {
+      const { data: existingReceipt } = await supabase
+        .from("transaction_receipts")
+        .select("id, status")
+        .eq(dedupeFilter.column, dedupeFilter.value)
+        .maybeSingle();
+
+      if (existingReceipt?.status === "SENT") {
+        log("Receipt already sent", { session_id: resolvedSessionId });
+        return new Response(JSON.stringify({ success: true, message: "Receipt already sent" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ── Insert PENDING row ────────────────────────────────────────────────
+    const insertPayload: Record<string, unknown> = {
+      partner_id,
+      amount: amountFloat,
+      status: "PENDING",
+    };
+    if (resolvedSessionId) insertPayload.session_id = resolvedSessionId;
+
+    const { data: insertedData, error: insertError } = await supabase
+      .from("transaction_receipts")
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (insertError || !insertedData) {
+      log("DB insert error", { insertError });
+      return new Response(JSON.stringify({ error: "DB insert failed" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const receiptRowId = insertedData.id;
+    log("Receipt row created", { receiptRowId });
 
     const updateReceipt = async (updates: Record<string, unknown>) => {
       const { error } = await supabase
         .from("transaction_receipts")
         .update(updates)
         .eq("id", receiptRowId);
-      if (error) console.error("Error updating receipt row:", error);
+      if (error) log("Error updating receipt row", { error });
     };
 
-    // --- Fetch partner fiskaly_system_id + credenziali proprie ---
+    // ── Fetch partner fiskaly_system_id + credenziali ─────────────────────
     const { data: profile } = await supabase
       .from("profiles")
       .select("fiskaly_system_id")
@@ -166,14 +241,13 @@ serve(async (req) => {
 
     const systemId = profile?.fiskaly_system_id;
     if (!systemId) {
-      console.error("No fiskaly_system_id for partner:", partner_id);
+      log("fiskaly_system_id mancante per il partner", { partner_id });
       await updateReceipt({ status: "ERROR", error_details: "fiskaly_system_id mancante per il partner" });
       return new Response(JSON.stringify({ error: "fiskaly_system_id mancante" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // --- Fetch partner-specific Fiskaly credentials from partners_fiscal_data ---
     const { data: fiscalData } = await supabase
       .from("partners_fiscal_data")
       .select("fiscal_api_credentials")
@@ -182,26 +256,22 @@ serve(async (req) => {
 
     const partnerCreds = fiscalData?.fiscal_api_credentials as { api_key?: string; api_secret?: string; env?: string } | null;
 
-    // Partner credentials take priority; fall back to global env secrets
     const apiKey = partnerCreds?.api_key || Deno.env.get("FISKALY_API_KEY");
     const apiSecret = partnerCreds?.api_secret || Deno.env.get("FISKALY_API_SECRET");
-    const fiskalyEnvRaw = partnerCreds?.env || Deno.env.get("FISKALY_ENV") || "test";
-    const fiskalyEnv = fiskalyEnvRaw.toLowerCase();
-    const baseUrl = fiskalyEnv === "live"
-      ? "https://live.api.fiskaly.com"
-      : "https://test.api.fiskaly.com";
+    const fiskalyEnv = (partnerCreds?.env || Deno.env.get("FISKALY_ENV") || "test").toLowerCase();
+    const baseUrl = fiskalyEnv === "live" ? "https://live.api.fiskaly.com" : "https://test.api.fiskaly.com";
 
-    console.log("Fiskaly creds source:", partnerCreds?.api_key ? "partner_fiscal_data" : "global_env", { env: fiskalyEnv, systemId });
+    log("Fiskaly creds source", { source: partnerCreds?.api_key ? "partner_fiscal_data" : "global_env", env: fiskalyEnv, systemId });
 
     if (!apiKey || !apiSecret) {
-      await updateReceipt({ status: "ERROR", error_details: "Fiskaly credentials missing (né nel profilo partner né in env)" });
+      await updateReceipt({ status: "ERROR", error_details: "Fiskaly credentials missing" });
       return new Response(JSON.stringify({ error: "Fiskaly credentials missing" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // --- STEP 4: Authenticate with Fiskaly ---
-    console.log("Authenticating with Fiskaly...", baseUrl);
+    // ── Autenticazione Fiskaly ─────────────────────────────────────────────
+    log("Authenticating with Fiskaly...", { baseUrl });
     const tokenRes = await fetch(`${baseUrl}/tokens`, {
       method: "POST",
       headers: {
@@ -209,15 +279,13 @@ serve(async (req) => {
         "X-Api-Version": API_VERSION,
         "X-Idempotency-Key": crypto.randomUUID(),
       },
-      body: JSON.stringify({
-        content: { type: "API_KEY", key: apiKey, secret: apiSecret },
-      }),
+      body: JSON.stringify({ content: { type: "API_KEY", key: apiKey, secret: apiSecret } }),
     });
 
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
-      console.error("Fiskaly auth failed:", tokenRes.status, errText);
-      await updateReceipt({ status: "ERROR", error_details: `Fiskaly auth failed: ${tokenRes.status} ${errText.slice(0, 300)}` });
+      log("Fiskaly auth failed", { status: tokenRes.status, err: errText.slice(0, 200) });
+      await updateReceipt({ status: "ERROR", error_details: `Fiskaly auth failed: ${tokenRes.status}` });
       return new Response(JSON.stringify({ error: "Fiskaly auth failed" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -226,13 +294,12 @@ serve(async (req) => {
     const tokenData = await tokenRes.json();
     const bearer = tokenData?.content?.authentication?.bearer;
     if (!bearer) {
-      console.error("Fiskaly token response missing bearer:", JSON.stringify(tokenData).slice(0, 300));
       await updateReceipt({ status: "ERROR", error_details: "Fiskaly bearer token missing" });
       return new Response(JSON.stringify({ error: "Fiskaly bearer missing" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    console.log("Fiskaly auth OK.");
+    log("Fiskaly auth OK");
 
     const authHeaders = {
       "Content-Type": "application/json",
@@ -240,45 +307,45 @@ serve(async (req) => {
       "X-Api-Version": API_VERSION,
     };
 
-    // --- STEP 5: Create INTENTION::TRANSACTION ---
-    console.log("Creating INTENTION record...");
+    // ── INTENTION ─────────────────────────────────────────────────────────
+    log("Creating INTENTION record...");
     const intentionRes = await fetch(`${baseUrl}/records`, {
       method: "POST",
-      headers: { ...authHeaders, "X-Idempotency-Key": crypto.randomUUID() },
+      headers: { ...authHeaders, "X-Idempotency-Key": idempotencyKey! + "-intent" },
       body: JSON.stringify({
         content: {
           type: "INTENTION",
           system: { id: systemId },
           operation: { type: "TRANSACTION" },
         },
-        metadata: { session_id, source: "shower2pet" },
+        metadata: { source: "shower2pet", ...(resolvedSessionId ? { session_id: resolvedSessionId } : { stripe_session_id }) },
       }),
     });
 
     if (!intentionRes.ok) {
       const errText = await intentionRes.text();
-      console.error("Fiskaly INTENTION failed:", intentionRes.status, errText);
+      log("Fiskaly INTENTION failed", { status: intentionRes.status, err: errText.slice(0, 300) });
       await updateReceipt({ status: "ERROR", error_details: `Fiskaly INTENTION ${intentionRes.status}: ${errText.slice(0, 500)}` });
-      return new Response(JSON.stringify({ error: "Fiskaly INTENTION failed", details: errText }), {
+      return new Response(JSON.stringify({ error: "Fiskaly INTENTION failed" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const intentionData = await intentionRes.json();
     const intentionId = intentionData?.content?.id;
-    console.log("INTENTION created:", intentionId);
+    log("INTENTION created", { intentionId });
 
-    // --- STEP 6: Create TRANSACTION::RECEIPT ---
+    // ── RECEIPT ───────────────────────────────────────────────────────────
     const vatRate = 22;
     const grossAmount = amountFloat;
     const netAmount = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
     const transactionDate = new Date().toISOString().split("T")[0];
 
-    console.log("Creating TRANSACTION::RECEIPT...", { grossAmount, netAmount });
+    log("Creating TRANSACTION::RECEIPT", { grossAmount, netAmount });
 
     const receiptRes = await fetch(`${baseUrl}/records`, {
       method: "POST",
-      headers: { ...authHeaders, "X-Idempotency-Key": crypto.randomUUID() },
+      headers: { ...authHeaders, "X-Idempotency-Key": idempotencyKey! + "-receipt" },
       body: JSON.stringify({
         content: {
           type: "TRANSACTION",
@@ -299,7 +366,7 @@ serve(async (req) => {
               {
                 number: 1,
                 type: "SALE",
-                description: `Lavaggio pet: ${session.option_name || "Servizio"}`,
+                description: receiptDescription,
                 commodity: "SERVICE",
                 quantity: "1.000",
                 amounts: {
@@ -312,29 +379,27 @@ serve(async (req) => {
             payments: [{ type: "ELECTRONIC", amount: grossAmount.toFixed(2) }],
           },
         },
-        metadata: { session_id, source: "shower2pet" },
+        metadata: { source: "shower2pet", ...(resolvedSessionId ? { session_id: resolvedSessionId } : { stripe_session_id }) },
       }),
     });
 
     if (!receiptRes.ok) {
       let errorDetails: string;
       try {
-        const errorJson = await receiptRes.json();
-        errorDetails = JSON.stringify(errorJson);
-        console.error("Fiskaly RECEIPT Error:", errorJson);
+        errorDetails = JSON.stringify(await receiptRes.json());
       } catch {
         errorDetails = await receiptRes.text();
-        console.error("Fiskaly RECEIPT Error Text:", errorDetails);
       }
+      log("Fiskaly RECEIPT Error", { status: receiptRes.status, errorDetails: errorDetails.slice(0, 300) });
       await updateReceipt({ status: "ERROR", error_details: `Fiskaly RECEIPT ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
-      return new Response(JSON.stringify({ success: false, error: "Fiskaly RECEIPT Error", details: errorDetails }), {
+      return new Response(JSON.stringify({ success: false, error: "Fiskaly RECEIPT Error" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const receiptData = await receiptRes.json();
     const fiskalyRecordId = receiptData?.content?.id || "SUCCESS_NO_ID";
-    console.log("Fiskaly receipt success:", fiskalyRecordId);
+    log("Fiskaly receipt success", { fiskalyRecordId });
 
     await updateReceipt({ status: "SENT", fiskaly_record_id: fiskalyRecordId });
 
@@ -343,7 +408,7 @@ serve(async (req) => {
     });
 
   } catch (err) {
-    console.error("generate-receipt unhandled error:", err);
+    log("Unhandled error", { error: (err as Error).message });
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
