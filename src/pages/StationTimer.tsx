@@ -13,7 +13,7 @@ import logo from '@/assets/shower2pet-logo.png';
 import { WashSession } from '@/types/database';
 import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession } from '@/services/sessionService';
 import { sendStationCommand } from '@/services/stationService';
-import { generateReceipt } from '@/services/paymentService';
+import { sendFiskalyReceipt } from '@/services/receiptService';
 
 type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
 
@@ -169,8 +169,7 @@ const StationTimer = () => {
 
       // Fire-and-forget: generate fiscal receipt in background (edge function resolves partner autonomously)
       console.log('[RECEIPT] Triggering generate-receipt for session:', session.id);
-      generateReceipt(session.id)
-        .catch((err) => console.error("Errore generazione scontrino:", err));
+      sendFiskalyReceipt(session.id);
       setSecondsLeft(session.total_seconds);
 
       autoStopFiredRef.current = false;
