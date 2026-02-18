@@ -153,7 +153,7 @@ serve(async (req) => {
     const now = new Date();
     const endsAt = new Date(now.getTime() + optionDuration * 1000);
 
-    const { error: wsErr } = await supabaseClient
+    const { data: wsData, error: wsErr } = await supabaseClient
       .from('wash_sessions')
       .insert({
         station_id,
@@ -165,10 +165,31 @@ serve(async (req) => {
         ends_at: endsAt.toISOString(),
         step: 'ready',
         status: 'ACTIVE',
-      });
+      })
+      .select('id')
+      .single();
 
     if (wsErr) logStep("Error creating wash session", { error: wsErr.message });
-    else logStep("Wash session created");
+    else {
+      logStep("Wash session created", { sessionId: wsData?.id });
+
+      // Fire-and-forget: emit Fiskaly fiscal receipt
+      if (wsData?.id) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (supabaseUrl && serviceKey) {
+          fetch(`${supabaseUrl}/functions/v1/generate-receipt`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ session_id: wsData.id }),
+          }).catch((e) => logStep("generate-receipt fire-and-forget error", { error: String(e) }));
+          logStep("generate-receipt triggered", { sessionId: wsData.id });
+        }
+      }
+    }
 
     const newBalance = walletId ? oldBalance - price : undefined;
 
