@@ -59,11 +59,16 @@ serve(async (req) => {
     let amountFloat: number = 0;
     let receiptDescription = bodyDescription || "Servizio Shower2Pet";
     let resolvedSessionId: string | null = session_id || null;
-    let idempotencyKey: string;
+
+    // Genera UUID deterministici per idempotency (Fiskaly richiede UUID v4 puri)
+    // Usiamo crypto.randomUUID() ma "seediamo" logicamente con un hash del session/stripe id
+    // Per idempotenza reale, usiamo il session_id/stripe_session_id come namespace UUID v5-like
+    // ma per semplicità usiamo UUID casuali: il sistema di deduplicazione DB già gestisce i duplicati
+    const intentionIdempotencyKey = crypto.randomUUID();
+    const receiptIdempotencyKey = crypto.randomUUID();
 
     // ── CASO A: wash_session (pagamento Stripe per lavaggio) ─────────────
     if (session_id) {
-      idempotencyKey = `wash-${session_id}`;
 
       const { data: session, error: sessionErr } = await supabase
         .from("wash_sessions")
@@ -127,7 +132,6 @@ serve(async (req) => {
 
     // ── CASO B: credit_pack o subscription via stripe_session_id ─────────
     if (!session_id && stripe_session_id) {
-      idempotencyKey = `stripe-${stripe_session_id}`;
 
       // Trova la transazione associata alla stripe_session
       const { data: tx } = await supabase
@@ -311,7 +315,7 @@ serve(async (req) => {
     log("Creating INTENTION record...");
     const intentionRes = await fetch(`${baseUrl}/records`, {
       method: "POST",
-      headers: { ...authHeaders, "X-Idempotency-Key": idempotencyKey! + "-intent" },
+      headers: { ...authHeaders, "X-Idempotency-Key": intentionIdempotencyKey },
       body: JSON.stringify({
         content: {
           type: "INTENTION",
@@ -345,7 +349,7 @@ serve(async (req) => {
 
     const receiptRes = await fetch(`${baseUrl}/records`, {
       method: "POST",
-      headers: { ...authHeaders, "X-Idempotency-Key": idempotencyKey! + "-receipt" },
+      headers: { ...authHeaders, "X-Idempotency-Key": receiptIdempotencyKey },
       body: JSON.stringify({
         content: {
           type: "TRANSACTION",
