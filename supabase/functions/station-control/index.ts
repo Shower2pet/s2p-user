@@ -121,9 +121,6 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Authorization required");
-
     const { station_id, command, duration_minutes, session_id } = await req.json();
 
     if (!station_id || !command) {
