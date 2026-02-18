@@ -167,19 +167,10 @@ const StationTimer = () => {
       const updatedSession = { ...session, started_at: now.toISOString(), ends_at: endsAt.toISOString() };
       setSession(updatedSession);
 
-      // Fire-and-forget: generate fiscal receipt in background
-      const receiptPartnerId = station?.structure_owner_id;
-      const selectedOption = station?.washing_options?.find(o => o.id === session.option_id);
-      const receiptAmount = selectedOption?.price ?? (session.total_seconds / 60);
-
-      console.log('[RECEIPT] partner:', receiptPartnerId, 'amount:', receiptAmount, 'station:', station?.id, 'session:', session.id);
-
-      if (receiptPartnerId) {
-        generateReceipt(session.id, receiptPartnerId, receiptAmount)
-          .catch((err) => console.error("Errore generazione scontrino:", err));
-      } else {
-        console.warn('[RECEIPT] Skipped: no structure_owner_id found for station', station?.id);
-      }
+      // Fire-and-forget: generate fiscal receipt in background (edge function resolves partner autonomously)
+      console.log('[RECEIPT] Triggering generate-receipt for session:', session.id);
+      generateReceipt(session.id)
+        .catch((err) => console.error("Errore generazione scontrino:", err));
       setSecondsLeft(session.total_seconds);
 
       autoStopFiredRef.current = false;

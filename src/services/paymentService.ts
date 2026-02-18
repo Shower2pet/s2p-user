@@ -55,9 +55,9 @@ export const verifySession = async (body: Record<string, unknown>) => {
 };
 
 /* ── Generate receipt (fire-and-forget) ──────────────────── */
-export const generateReceipt = async (sessionId: string, partnerId: string, amount: number) => {
+export const generateReceipt = async (sessionId: string) => {
   const { data, error } = await supabase.functions.invoke('generate-receipt', {
-    body: { session_id: sessionId, partner_id: partnerId, amount },
+    body: { session_id: sessionId },
   });
   if (error) throw error;
   return data;
