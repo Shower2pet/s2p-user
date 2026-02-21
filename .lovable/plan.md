@@ -1,110 +1,101 @@
 
 
-# Uniformare Stati, Visibilita e Accesso Protetto delle Stazioni
+# Rilevamento Offline Rapido tramite LWT
 
-## Riepilogo del modello
+## Situazione Attuale
 
-Il sistema delle stazioni si basa su tre concetti indipendenti:
+La Edge Function `check-heartbeat` si connette al broker MQTT ogni 3 minuti, ascolta per 50 secondi, e poi aggiorna il DB. Quando riceve un messaggio LWT "offline", lo logga ma **non lo usa** per marcare la stazione offline. Risultato: una stazione scollegata viene rilevata come offline solo dopo 3 minuti (soglia heartbeat).
+
+## Soluzione: Sfruttare LWT + Messaggi Retained
+
+Dalla configurazione della scheda ETH484-B:
+- **Power Up message** su `shower2pet/BR_001/status` (pubblica un messaggio all'accensione)
+- **LWT** su `shower2pet/BR_001/status` con payload `offline` (il broker lo pubblica automaticamente quando la scheda si disconnette)
+- **Heartbeat** sullo stesso topic
+
+### Strategia in 3 punti:
+
+1. **Reagire attivamente al messaggio LWT**: quando la funzione riceve payload "offline", marcare immediatamente la stazione come OFFLINE nel DB (attualmente viene ignorato)
+
+2. **Ridurre il tempo di attesa da 50s a 10s**: se i messaggi heartbeat e LWT sono configurati con **retain=true** sul broker, arrivano istantaneamente alla sottoscrizione. 10 secondi sono sufficienti per catturare anche messaggi non retained.
+
+3. **Aumentare la frequenza del cron a ogni minuto**: con un runtime di ~15 secondi (connessione + 10s attesa + DB update), possiamo eseguire ogni minuto senza sovrapposizioni.
+
+### Risultato: rilevamento offline in ~1 minuto invece di ~3 minuti.
+
+## Configurazione Hardware Consigliata
+
+Sulla scheda ETH484-B, se possibile, abilitare il **retain flag** sia per il Power Up message che per l'heartbeat. Questo fa si che il broker mantenga sempre l'ultimo stato noto, e la Edge Function lo riceve istantaneamente alla sottoscrizione senza dover aspettare il prossimo ciclo.
+
+## Dettaglio Tecnico delle Modifiche
+
+### 1. Edge Function `check-heartbeat/index.ts`
+
+Modifiche principali:
+- Aggiungere un set `offlineStations` per tracciare le stazioni con LWT "offline"
+- Quando si riceve payload "offline", aggiungere la stazione a `offlineStations`
+- Dopo la fase di ascolto, marcare le stazioni offline nel DB con un UPDATE diretto
+- Ridurre il timeout di attesa da 50.000ms a 10.000ms
 
 ```text
-+--------------------+   +------------------------+   +------------------+
-|    VISIBILITA      |   |   STATO FUNZIONAMENTO  |   |  ACCESSO FISICO  |
-+--------------------+   +------------------------+   +------------------+
-| PUBLIC (default)   |   | AVAILABLE (default)    |   | has_access_gate  |
-| RESTRICTED         |   | BUSY (calcolato)       |   | (true/false)     |
-| HIDDEN             |   | OFFLINE                |   |                  |
-+--------------------+   | MAINTENANCE            |   |                  |
-                          +------------------------+                      
+Flusso aggiornato:
+
+  Connetti MQTT
+       |
+  Sottoscrivi shower2pet/+/status
+       |
+  Attendi 10 secondi
+       |
+  +-- Messaggi ricevuti:
+  |     payload != "offline" --> aliveStations.add(id)
+  |     payload == "offline" --> offlineStations.add(id)
+       |
+  Disconnetti
+       |
+  Per ogni aliveStation --> handle_station_heartbeat(id)
+  Per ogni offlineStation --> UPDATE stations SET status='OFFLINE' WHERE id=...
+       |
+  auto_offline_expired_heartbeats()  (soglia ridotta a 2 min)
 ```
 
-- **Visibilita**: gia presente nel DB (`visibility_type` enum). Nessuna modifica necessaria.
-- **Stato di funzionamento**: gia presente (`station_status` enum). Serve aggiungere un flag `manual_offline` per impedire il ripristino automatico.
-- **Accesso protetto**: gia presente (`has_access_gate` boolean). Nessuna modifica necessaria.
+### 2. Migrazione Database
 
-## Problema chiave: Offline manuale vs automatico
+- **Soglia offline ridotta a 2 minuti** in `auto_offline_expired_heartbeats()` (da 3 min). Con il cron ogni minuto, 2 minuti significano che una stazione deve mancare 2 cicli consecutivi.
+- **Soglia in `get_public_stations()`** aggiornata a 2 minuti per coerenza.
+- **Cron reschedulato a ogni minuto** (`* * * * *`).
 
-Attualmente non c'e modo di distinguere tra:
-- Stazione messa offline **manualmente** da admin/partner/gestore (non deve tornare online da sola)
-- Stazione andata offline **per heartbeat scaduto** (deve tornare online quando riceve un nuovo heartbeat)
+### 3. Nuova funzione DB `mark_station_offline`
 
-### Soluzione: colonna `manual_offline`
-
-Aggiungere una colonna `manual_offline BOOLEAN DEFAULT false` alla tabella `stations`. Quando un admin/partner imposta manualmente lo stato a OFFLINE, questo flag viene settato a `true`. Il meccanismo di heartbeat ripristinera la stazione solo se `manual_offline = false`.
-
-## Dettaglio tecnico delle modifiche
-
-### 1. Migrazione Database
+Creare una funzione RPC che:
+- Imposta `status = 'OFFLINE'` solo se `manual_offline = false`
+- Non tocca le stazioni in MAINTENANCE
+- Usata dalla Edge Function quando riceve LWT
 
 ```sql
-ALTER TABLE stations ADD COLUMN manual_offline boolean NOT NULL DEFAULT false;
+CREATE OR REPLACE FUNCTION mark_station_offline(p_station_id text)
+RETURNS void AS $$
+BEGIN
+  UPDATE stations
+  SET status = 'OFFLINE'::station_status
+  WHERE id = p_station_id
+    AND manual_offline = false
+    AND status NOT IN ('MAINTENANCE');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-### 2. Logica heartbeat (da implementare lato server o trigger)
+## Riepilogo Modifiche
 
-Creare una funzione DB `handle_heartbeat(station_id)` che:
-- Aggiorna `last_heartbeat_at = now()`
-- Se `status = 'OFFLINE'` e `manual_offline = false`, imposta `status = 'AVAILABLE'`
-- Se `manual_offline = true`, non cambia lo stato
+| Componente | Prima | Dopo |
+|---|---|---|
+| Tempo attesa MQTT | 50 secondi | 10 secondi |
+| Frequenza cron | ogni 3 minuti | ogni 1 minuto |
+| Soglia auto-offline | 3 minuti | 2 minuti |
+| Reazione a LWT "offline" | Solo log | Marca OFFLINE nel DB |
+| Tempo rilevamento offline | ~3-6 minuti | ~1-2 minuti |
+| Runtime Edge Function | ~55 secondi | ~15 secondi |
 
-Creare un cron job (pg_cron) che ogni minuto:
-- Cerca stazioni con `status = 'AVAILABLE'` e `last_heartbeat_at < now() - interval '2 minutes'`
-- Le imposta su `status = 'OFFLINE'` (ma `manual_offline` resta `false`, cosi torneranno online al prossimo heartbeat)
+## Impatto su App Console
 
-### 3. Aggiornare `get_public_stations()` RPC
-
-Aggiungere la logica heartbeat nella funzione:
-- Se `status = 'AVAILABLE'` ma `last_heartbeat_at < now() - 2 min`, restituire `'OFFLINE'` come stato
-- Lo stato BUSY resta calcolato dinamicamente dalle sessioni attive (gia presente)
-- MAINTENANCE viene restituito cosi com'e (gia gestito come offline lato UI)
-
-### 4. Frontend - Hook `useStations.tsx`
-
-Aggiornare `isStationOnline()` per considerare anche il nuovo campo:
-- `AVAILABLE` = online e pronta
-- `BUSY` = occupata (mostrata con colore diverso)
-- `OFFLINE` e `MAINTENANCE` = non disponibile
-
-### 5. Frontend - Badge di stato (`StationStatusBadge.tsx`)
-
-Aggiungere lo stato `maintenance` come variante separata del badge, con icona e colore dedicati (attualmente viene mostrato come "offline").
-
-### 6. Frontend - Pagina Index (mappa)
-
-Il colore dei marker sulla mappa gia distingue tra online e offline. Aggiungere:
-- Colore arancione/giallo per stazioni RESTRICTED (attualmente usano il colore standard)
-- Le stazioni HIDDEN sono gia escluse (`visibility !== 'HIDDEN'`)
-
-### 7. Frontend - StationDetail.tsx
-
-La logica attuale e gia corretta:
-- Stazioni RESTRICTED richiedono verifica QR/codice (gia implementato)
-- Stazioni con `has_access_gate` mostrano il pulsante "Apri Porta" (gia implementato)
-- Stazioni offline/maintenance mostrano il banner di indisponibilita (gia implementato)
-
-### 8. Aggiornare `src/types/database.ts`
-
-Nessuna modifica agli enum esistenti. Aggiungere solo la documentazione del campo `manual_offline` se necessario.
-
-### 9. Impatto su App Console
-
-La Console dovra:
-- Mostrare il toggle `manual_offline` quando un admin/partner mette una stazione offline manualmente
-- Quando si imposta `status = 'OFFLINE'` dalla Console, settare anche `manual_offline = true`
-- Quando si imposta `status = 'AVAILABLE'`, resettare `manual_offline = false`
-
-Forniro le istruzioni esatte per aggiornare la Console dopo l'implementazione.
-
-## Riepilogo modifiche
-
-| Componente | Modifica |
-|---|---|
-| DB: `stations` | Aggiungere colonna `manual_offline` |
-| DB: funzione RPC | Aggiornare `get_public_stations()` con logica heartbeat |
-| DB: cron job | Nuovo job per auto-offline su heartbeat scaduto |
-| DB: funzione | Nuova `handle_station_heartbeat()` |
-| Frontend: `useStations.tsx` | Aggiornare mapping stati |
-| Frontend: `StationStatusBadge.tsx` | Aggiungere variante `maintenance` |
-| Frontend: `Index.tsx` | Colore marker per RESTRICTED |
-| Frontend: `StationDetail.tsx` | Minori aggiustamenti messaggi |
-| App Console | Istruzioni per gestire `manual_offline` |
+Nessun impatto. Le modifiche sono tutte lato backend (Edge Function + RPC). La Console continua a leggere `status` dalla tabella `stations` come prima.
 
