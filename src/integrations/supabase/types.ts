@@ -892,6 +892,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_manager_of: { Args: { struct_id: string }; Returns: boolean }
+      mark_station_offline: {
+        Args: { p_station_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       payment_method_type: "STRIPE" | "CREDITS" | "HYBRID"
