@@ -41,12 +41,34 @@ serve(async (req) => {
     // Get station and resolve option
     const { data: station, error: stationErr } = await supabaseClient
       .from('stations')
-      .select('structure_id, washing_options, type')
+      .select('structure_id, washing_options, type, status, last_heartbeat_at')
       .eq('id', station_id)
       .maybeSingle();
 
     if (stationErr || !station) throw new Error("Station not found");
     if (!station.structure_id) throw new Error("Station has no structure");
+
+    // ─── PRE-PAYMENT FRESHNESS CHECK ────────────────────────
+    if (station.status !== 'AVAILABLE') {
+      return new Response(JSON.stringify({ error: "Stazione non disponibile" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
+    const heartbeatAge = station.last_heartbeat_at
+      ? Date.now() - new Date(station.last_heartbeat_at).getTime()
+      : Infinity;
+    const FRESHNESS_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
+
+    if (heartbeatAge > FRESHNESS_THRESHOLD_MS) {
+      logStep("Station heartbeat stale", { heartbeatAge, threshold: FRESHNESS_THRESHOLD_MS });
+      return new Response(JSON.stringify({ error: "Stazione non raggiungibile. Riprova tra qualche minuto." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    logStep("Station freshness OK", { heartbeatAgeMs: heartbeatAge });
 
     const options = (station.washing_options as any[]) || [];
     const option = options.find((o: any) => o.id === option_id);
