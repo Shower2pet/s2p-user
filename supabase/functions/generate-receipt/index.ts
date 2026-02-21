@@ -437,6 +437,32 @@ serve(async (req) => {
 
     await updateReceipt({ status: "SENT", fiskaly_record_id: fiskalyRecordId });
 
+    // ── Salva fiscal_doc_url sulla transazione per accesso utente ──────
+    if (fiskalyRecordId && fiskalyRecordId !== "SUCCESS_NO_ID") {
+      const fiscalDocRef = `fiskaly:${fiskalyRecordId}`;
+      if (resolvedSessionId) {
+        // Trova la transazione dalla wash_session (match by station_id)
+        const { data: ws } = await supabase
+          .from("wash_sessions")
+          .select("station_id, stripe_session_id")
+          .eq("id", resolvedSessionId)
+          .maybeSingle();
+        if (ws?.stripe_session_id) {
+          await supabase
+            .from("transactions")
+            .update({ fiscal_doc_url: fiscalDocRef, fiscal_status: "SENT" })
+            .eq("stripe_payment_id", ws.stripe_session_id);
+          log("fiscal_doc_url saved on transaction via stripe_session_id");
+        }
+      } else if (stripe_session_id) {
+        await supabase
+          .from("transactions")
+          .update({ fiscal_doc_url: fiscalDocRef, fiscal_status: "SENT" })
+          .eq("stripe_payment_id", stripe_session_id as string);
+        log("fiscal_doc_url saved on transaction via stripe_session_id");
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, data: receiptData }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

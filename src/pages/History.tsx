@@ -3,18 +3,20 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { Calendar, Clock, MapPin, CreditCard, Loader2, Coins } from 'lucide-react';
+import { Calendar, Clock, MapPin, CreditCard, Loader2, Coins, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Transaction } from '@/types/database';
-import { fetchTransactions } from '@/services/transactionService';
+import { fetchTransactions, downloadReceiptPdf } from '@/services/transactionService';
 
 const History = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -37,6 +39,39 @@ const History = () => {
     load();
   }, [user]);
 
+  const handleDownloadReceipt = async (tx: Transaction) => {
+    setDownloadingId(tx.id);
+    try {
+      const result = await downloadReceiptPdf(tx.id);
+      if (result.pdf_base64) {
+        // Decode base64 and trigger download
+        const byteCharacters = atob(result.pdf_base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scontrino_${format(new Date(tx.created_at || ''), 'yyyyMMdd_HHmm')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('Scontrino scaricato');
+      } else {
+        toast.info(result.message || 'Scontrino non ancora disponibile da Fiskaly');
+      }
+    } catch (err) {
+      console.error('Download receipt error:', err);
+      toast.error('Errore nel download dello scontrino');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const getStatusColor = (status: string | null) => {
     switch (status?.toUpperCase()) {
       case 'COMPLETED': return 'bg-success text-foreground';
@@ -58,8 +93,14 @@ const History = () => {
     return type === 'CREDIT_TOPUP' ? Coins : CreditCard;
   };
 
+  const hasReceipt = (tx: Transaction) => {
+    return tx.fiscal_doc_url && tx.fiscal_doc_url.startsWith('fiskaly:');
+  };
+
   const renderTransaction = (tx: Transaction) => {
     const TypeIcon = getTypeIcon(tx.transaction_type);
+    const isDownloading = downloadingId === tx.id;
+
     return (
       <Card key={tx.id} className="p-4 hover:shadow-md transition-shadow">
         <div className="flex items-start justify-between gap-4">
@@ -85,6 +126,22 @@ const History = () => {
             <div className="text-lg font-bold text-foreground">€{tx.total_value.toFixed(2)}</div>
             {tx.status && (
               <Badge className={getStatusColor(tx.status)}>{tx.status}</Badge>
+            )}
+            {hasReceipt(tx) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs gap-1 text-primary"
+                onClick={() => handleDownloadReceipt(tx)}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <FileDown className="w-3.5 h-3.5" />
+                )}
+                Scontrino
+              </Button>
             )}
           </div>
         </div>
