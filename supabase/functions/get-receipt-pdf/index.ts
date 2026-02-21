@@ -145,7 +145,7 @@ serve(async (req) => {
     }
 
     // Fetch the record to get compliance artifact (PDF)
-    const recordRes = await fetch(`${baseUrl}/records/${fiskalyRecordId}`, {
+    const recordRes = await fetch(`${baseUrl}/records/${fiskalyRecordId}?compliance-artifact`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${bearer}`,
@@ -162,17 +162,22 @@ serve(async (req) => {
     }
 
     const recordData = await recordRes.json();
-    log("Record fetched successfully");
+    log("Record fetched successfully", {
+      hasCompliance: !!recordData?.content?.compliance,
+      complianceKeys: recordData?.content?.compliance ? Object.keys(recordData.content.compliance) : [],
+      hasArtifact: !!recordData?.content?.compliance?.artifact,
+      artifactType: typeof recordData?.content?.compliance?.artifact,
+      contentKeys: recordData?.content ? Object.keys(recordData.content) : [],
+    });
 
-    // Check for compliance artifact (PDF)
-    const artifact = recordData?.content?.compliance?.artifact;
+    // Check for compliance artifact (PDF) - available at compliance.artifact.data
+    const artifactData = recordData?.content?.compliance?.artifact?.data;
 
-    if (artifact) {
-      // If artifact is a base64-encoded PDF, return it
+    if (artifactData) {
       log("Compliance artifact found, returning PDF");
       return new Response(JSON.stringify({
         success: true,
-        pdf_base64: artifact,
+        pdf_base64: artifactData,
         record_id: fiskalyRecordId,
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -180,7 +185,9 @@ serve(async (req) => {
     }
 
     // Fallback: return the full record data for the client to render
-    log("No compliance artifact, returning record data");
+    log("No compliance artifact, returning record data", {
+      complianceKeys: recordData?.content?.compliance ? Object.keys(recordData.content.compliance) : [],
+    });
     return new Response(JSON.stringify({
       success: true,
       record: recordData,
