@@ -51,6 +51,14 @@ export const isStationOnline = (station: Station): boolean => {
   return station.status === 'AVAILABLE';
 };
 
+export const isStationBusy = (station: Station): boolean => {
+  return station.status === 'BUSY';
+};
+
+export const isStationMaintenance = (station: Station): boolean => {
+  return station.status === 'MAINTENANCE';
+};
+
 const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station => {
   const options = Array.isArray(row.washing_options) ? row.washing_options : [];
   const struct = row.structure_id ? structuresMap.get(row.structure_id) : null;
