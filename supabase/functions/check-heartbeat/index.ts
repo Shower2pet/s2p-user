@@ -54,47 +54,38 @@ serve(async (req) => {
     });
 
     const aliveStations = new Set<string>();
-    let selfTestReceived = false;
-    let messageCount = 0;
     const decoder = new TextDecoder();
 
-    // Register handler using .on() — this library uses CustomEvent internally
     client.on('publish', (event: any) => {
-      messageCount++;
       try {
-        // Try both event.detail (CustomEvent) and direct access
         const packet = event?.detail ?? event;
         const topic = packet?.topic?.toString?.() ?? packet?.topic ?? '';
         let payload = '';
         if (packet?.payload) {
           try {
-            payload = typeof packet.payload === 'string' 
-              ? packet.payload 
+            payload = typeof packet.payload === 'string'
+              ? packet.payload
               : decoder.decode(packet.payload);
           } catch { payload = String(packet.payload); }
         }
 
-        logStep("MSG", { topic, payload, msgNum: messageCount, eventKeys: Object.keys(event || {}), detailKeys: event?.detail ? Object.keys(event.detail) : 'none' });
-
-        if (topic === 'shower2pet/_selftest/status') {
-          selfTestReceived = true;
-          return;
-        }
-
+        // Topic format: shower2pet/{stationId}/status
         const parts = topic.split('/');
         if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
           const stationId = parts[1];
+          if (stationId === '_selftest') return; // ignore self-test
+
           if (payload.toLowerCase() !== 'offline') {
             aliveStations.add(stationId);
             logStep("ALIVE", { stationId, payload });
+          } else {
+            logStep("LWT offline", { stationId });
           }
         }
       } catch (e) {
-        logStep("Parse error", { error: String(e), eventType: typeof event });
+        logStep("Parse error", { error: String(e) });
       }
     });
-
-    logStep("Handler registered, available events: " + (typeof client.on));
 
     await client.connect();
     logStep("Connected");
@@ -102,21 +93,16 @@ serve(async (req) => {
     await client.subscribe('shower2pet/+/status', Mqtt.QoS.AT_MOST_ONCE);
     logStep("Subscribed");
 
-    // Self-test
-    const encoder = new TextEncoder();
-    await client.publish('shower2pet/_selftest/status', encoder.encode('ping'), {
-      qos: Mqtt.QoS.AT_MOST_ONCE,
-    });
-    logStep("Self-test published");
+    // Wait ~50 seconds to capture heartbeats from devices
+    // (ETH484-B heartbeat interval may be 30-60 seconds)
+    // Retained messages arrive immediately after subscribe
+    await new Promise(resolve => setTimeout(resolve, 50000));
 
-    // Wait for messages
-    await new Promise(resolve => setTimeout(resolve, 10000));
-
-    logStep("Wait done", { selfTestReceived, messageCount, aliveCount: aliveStations.size, alive: [...aliveStations] });
+    logStep("Wait done", { aliveCount: aliveStations.size, alive: [...aliveStations] });
 
     try { await client.disconnect(); } catch (_) { /* ignore */ }
 
-    // Update DB
+    // Update DB for alive stations
     let updatedCount = 0;
     for (const stationId of aliveStations) {
       const { error } = await supabaseAdmin.rpc('handle_station_heartbeat', { p_station_id: stationId });
@@ -124,13 +110,14 @@ serve(async (req) => {
       else logStep("DB error", { stationId, error: error.message });
     }
 
+    // Auto-offline expired
     const { error: offlineError } = await supabaseAdmin.rpc('auto_offline_expired_heartbeats');
     if (offlineError) logStep("Auto-offline error", { error: offlineError.message });
 
+    logStep("Done", { aliveCount: aliveStations.size, updated: updatedCount });
+
     return new Response(JSON.stringify({
       success: true,
-      self_test_ok: selfTestReceived,
-      messages_received: messageCount,
       alive_stations: [...aliveStations],
       updated: updatedCount,
     }), {
