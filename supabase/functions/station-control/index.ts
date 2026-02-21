@@ -1,119 +1,199 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import mqtt from "npm:mqtt@5.10.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[STATION-CONTROL] ${step}${detailsStr}`);
 };
 
+/* ── Minimal MQTT v3.1.1 over native WebSocket ───────────── */
+
+function encodeMqttString(str: string): Uint8Array {
+  const encoded = new TextEncoder().encode(str);
+  const buf = new Uint8Array(2 + encoded.length);
+  buf[0] = (encoded.length >> 8) & 0xff;
+  buf[1] = encoded.length & 0xff;
+  buf.set(encoded, 2);
+  return buf;
+}
+
+function encodeRemainingLength(len: number): Uint8Array {
+  const bytes: number[] = [];
+  do {
+    let encodedByte = len % 128;
+    len = Math.floor(len / 128);
+    if (len > 0) encodedByte |= 0x80;
+    bytes.push(encodedByte);
+  } while (len > 0);
+  return new Uint8Array(bytes);
+}
+
+function buildConnectPacket(clientId: string, username: string, password: string): Uint8Array {
+  const protocolName = encodeMqttString("MQTT");
+  const protocolLevel = 4; // MQTT 3.1.1
+  const connectFlags = 0xc2; // username + password + clean session
+  const keepAlive = 60;
+  const clientIdBytes = encodeMqttString(clientId);
+  const usernameBytes = encodeMqttString(username);
+  const passwordBytes = encodeMqttString(password);
+
+  const remainingLength =
+    protocolName.length + 1 + 1 + 2 +
+    clientIdBytes.length + usernameBytes.length + passwordBytes.length;
+
+  const rl = encodeRemainingLength(remainingLength);
+  const packet = new Uint8Array(1 + rl.length + remainingLength);
+  let offset = 0;
+
+  packet[offset++] = 0x10; // CONNECT
+  packet.set(rl, offset); offset += rl.length;
+  packet.set(protocolName, offset); offset += protocolName.length;
+  packet[offset++] = protocolLevel;
+  packet[offset++] = connectFlags;
+  packet[offset++] = (keepAlive >> 8) & 0xff;
+  packet[offset++] = keepAlive & 0xff;
+  packet.set(clientIdBytes, offset); offset += clientIdBytes.length;
+  packet.set(usernameBytes, offset); offset += usernameBytes.length;
+  packet.set(passwordBytes, offset);
+
+  return packet;
+}
+
+function buildPublishPacket(topic: string, payload: string, retain: boolean): Uint8Array {
+  const topicBytes = encodeMqttString(topic);
+  const payloadBytes = new TextEncoder().encode(payload);
+  // QoS 1 → need packet identifier (2 bytes)
+  const packetId = Math.floor(Math.random() * 65535) + 1;
+  const remainingLength = topicBytes.length + 2 + payloadBytes.length;
+  const rl = encodeRemainingLength(remainingLength);
+
+  const firstByte = 0x30 | (retain ? 0x01 : 0x00) | 0x02; // PUBLISH + QoS 1 + retain
+  const packet = new Uint8Array(1 + rl.length + remainingLength);
+  let offset = 0;
+
+  packet[offset++] = firstByte;
+  packet.set(rl, offset); offset += rl.length;
+  packet.set(topicBytes, offset); offset += topicBytes.length;
+  packet[offset++] = (packetId >> 8) & 0xff;
+  packet[offset++] = packetId & 0xff;
+  packet.set(payloadBytes, offset);
+
+  return packet;
+}
+
+function buildDisconnectPacket(): Uint8Array {
+  return new Uint8Array([0xe0, 0x00]);
+}
+
 function getMqttConfig() {
   let mqttHost = Deno.env.get("MQTT_HOST") || "";
-  const mqttUser = Deno.env.get("MQTT_USER");
-  const mqttPassword = Deno.env.get("MQTT_PASSWORD");
+  const mqttUser = Deno.env.get("MQTT_USER") || "";
+  const mqttPassword = Deno.env.get("MQTT_PASSWORD") || "";
 
   if (!mqttHost || !mqttUser || !mqttPassword) {
     throw new Error("MQTT configuration missing");
   }
 
-  // Normalize: strip any protocol prefix the user may have added
   mqttHost = mqttHost.replace(/^wss?:\/\//, "").replace(/\/.*$/, "").replace(/:.*$/, "");
-
   const brokerUrl = Deno.env.get("MQTT_WS_URL") || `wss://${mqttHost}:8884/mqtt`;
   logStep("MQTT config resolved", { brokerUrl, host: mqttHost });
   return { brokerUrl, mqttUser, mqttPassword };
 }
 
 /**
- * Publishes an MQTT command with retain flag.
+ * Publishes an MQTT command with retain flag using native Deno WebSocket.
  * Creates a fresh connection each invocation for serverless safety.
- * Rejects if broker doesn't respond within 5 seconds.
  */
-function publishMqttRetain(
-  stationId: string,
-  payload: string,
-): Promise<boolean> {
+function publishMqttRetain(stationId: string, payload: string): Promise<boolean> {
   const { brokerUrl, mqttUser, mqttPassword } = getMqttConfig();
   const topic = `shower2pet/${stationId}/relay1/command`;
+  const clientId = `s2p-edge-${Date.now()}`;
 
   logStep("MQTT publish", { brokerUrl, topic, payload, retain: true });
 
   return new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
-      logStep("MQTT timeout (5s)");
-      try { client.end(true); } catch (_) { /* ignore */ }
+      logStep("MQTT timeout (8s)");
+      try { ws.close(); } catch (_) { /* ignore */ }
       resolve(false);
-    }, 5000);
+    }, 8000);
 
-    const client = mqtt.connect(brokerUrl, {
-      username: mqttUser,
-      password: mqttPassword,
-      clientId: `s2p-edge-${Date.now()}`,
-      connectTimeout: 4000,
-      protocolVersion: 4,
-      clean: true,
-    });
-
-    client.on('connect', () => {
-      logStep("MQTT connected, publishing");
-      client.publish(topic, payload, { qos: 1, retain: true }, (err) => {
-        clearTimeout(timeout);
-        if (err) {
-          logStep("Publish error", { error: String(err) });
-          client.end(true);
-          resolve(false);
-        } else {
-          logStep("Published OK", { topic, payload });
-          client.end(true);
-          resolve(true);
-        }
-      });
-    });
-
-    client.on('error', (err) => {
-      logStep("MQTT error", { error: String(err) });
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(brokerUrl, ["mqtt"]);
+      ws.binaryType = "arraybuffer";
+    } catch (e) {
+      logStep("WebSocket creation error", { error: String(e) });
       clearTimeout(timeout);
-      client.end(true);
       resolve(false);
-    });
+      return;
+    }
+
+    ws.onopen = () => {
+      logStep("WebSocket connected, sending CONNECT");
+      const connectPacket = buildConnectPacket(clientId, mqttUser, mqttPassword);
+      ws.send(connectPacket);
+    };
+
+    ws.onmessage = (event) => {
+      const data = new Uint8Array(event.data as ArrayBuffer);
+      const packetType = (data[0] >> 4) & 0x0f;
+
+      // CONNACK = 2
+      if (packetType === 2) {
+        const returnCode = data[3];
+        if (returnCode !== 0) {
+          logStep("CONNACK error", { returnCode });
+          clearTimeout(timeout);
+          ws.close();
+          resolve(false);
+          return;
+        }
+        logStep("CONNACK OK, publishing");
+        const publishPacket = buildPublishPacket(topic, payload, true);
+        ws.send(publishPacket);
+      }
+
+      // PUBACK = 4 (QoS 1 acknowledgment)
+      if (packetType === 4) {
+        logStep("PUBACK received, published OK", { topic, payload });
+        clearTimeout(timeout);
+        try {
+          ws.send(buildDisconnectPacket());
+          ws.close();
+        } catch (_) { /* ignore */ }
+        resolve(true);
+      }
+    };
+
+    ws.onerror = (event) => {
+      logStep("WebSocket error", { error: String(event) });
+      clearTimeout(timeout);
+      try { ws.close(); } catch (_) { /* ignore */ }
+      resolve(false);
+    };
+
+    ws.onclose = () => {
+      // If we haven't resolved yet, it means connection was lost
+    };
   });
 }
 
-/**
- * Background task: waits delayMs then sends OFF and marks session completed.
- */
-async function scheduleOff(stationId: string, delayMs: number, sessionId?: string) {
-  logStep("Background timer scheduled", { stationId, delayMs, sessionId });
+/* ── Supabase admin helper ────────────────────────────────── */
 
-  await new Promise((r) => setTimeout(r, delayMs));
-
-  logStep("Timer expired, sending OFF", { stationId });
-  const ok = await publishMqttRetain(stationId, "0");
-  logStep("OFF command result", { success: ok });
-
-  // Mark session as completed if we have a session ID
-  if (sessionId) {
-    try {
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.57.2");
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      );
-      await supabase
-        .from('wash_sessions')
-        .update({ status: 'COMPLETED', step: 'rating' })
-        .eq('id', sessionId)
-        .eq('status', 'ACTIVE');
-      logStep("Session marked completed", { sessionId });
-    } catch (e) {
-      logStep("Error updating session", { error: String(e) });
-    }
-  }
+async function getSupabaseAdmin() {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.57.2");
+  return createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
 }
+
+/* ── Main handler ─────────────────────────────────────────── */
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -129,13 +209,12 @@ serve(async (req) => {
 
     logStep("Request", { station_id, command, duration_minutes, session_id });
 
-    // ── START_TIMED_WASH: ON + background OFF timer ──
+    // ── START_TIMED_WASH ──
     if (command === 'START_TIMED_WASH') {
       if (!duration_minutes || duration_minutes <= 0) {
         throw new Error("duration_minutes is required for START_TIMED_WASH");
       }
 
-      // Send ON with retain
       const onOk = await publishMqttRetain(station_id, "1");
       if (!onOk) {
         return new Response(JSON.stringify({
@@ -147,25 +226,14 @@ serve(async (req) => {
         });
       }
 
-      // Update session timing in DB using service role (bypasses RLS — works for both guest and auth sessions)
       const startedAt = new Date().toISOString();
       const endsAt = new Date(Date.now() + duration_minutes * 60 * 1000).toISOString();
-      const step = (() => {
-        // We'll default to 'timer' — if needed the frontend can override for TUB (rules step)
-        // The frontend still receives started_at/ends_at to sync the UI
-        return 'timer';
-      })();
 
       let sessionUpdated = false;
       if (session_id) {
         try {
-          const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.57.2");
-          const supabaseAdmin = createClient(
-            Deno.env.get("SUPABASE_URL") ?? "",
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-          );
+          const supabaseAdmin = await getSupabaseAdmin();
 
-          // Fetch station type to determine correct step (SHOWER=timer, TUB=rules)
           const { data: stationRow } = await supabaseAdmin
             .from('stations')
             .select('type')
@@ -191,7 +259,7 @@ serve(async (req) => {
         }
       }
 
-      logStep("START_TIMED_WASH success, relay ON sent", { duration_minutes, sessionUpdated });
+      logStep("START_TIMED_WASH success", { duration_minutes, sessionUpdated });
       return new Response(JSON.stringify({
         success: true,
         message: "Lavaggio avviato",
