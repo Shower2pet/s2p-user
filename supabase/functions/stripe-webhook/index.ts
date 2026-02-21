@@ -72,16 +72,24 @@ serve(async (req) => {
         const session = event.data.object as Stripe.Checkout.Session;
         logStep("Checkout session completed", { sessionId: session.id, mode: session.mode });
 
-        // Update transaction status
+        // Extract guest email from Stripe customer_details (for non-authenticated users)
+        const guestEmailFromStripe = session.customer_details?.email || null;
+
+        // Update transaction status + save guest email if available
+        const updatePayload: Record<string, unknown> = { status: 'COMPLETED' };
+        if (guestEmailFromStripe) {
+          updatePayload.guest_email = guestEmailFromStripe;
+        }
+
         const { error } = await supabaseClient
           .from('transactions')
-          .update({ status: 'COMPLETED' })
+          .update(updatePayload)
           .eq('stripe_payment_id', session.id);
 
         if (error) {
           logStep("Error updating transaction", { error: error.message });
         } else {
-          logStep("Transaction updated to completed");
+          logStep("Transaction updated to completed", { guestEmail: guestEmailFromStripe });
         }
 
         const userId = session.metadata?.user_id;
