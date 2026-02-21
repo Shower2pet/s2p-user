@@ -59,7 +59,7 @@ serve(async (req) => {
     const heartbeatAge = station.last_heartbeat_at
       ? Date.now() - new Date(station.last_heartbeat_at).getTime()
       : Infinity;
-    const FRESHNESS_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
+    const FRESHNESS_THRESHOLD_MS = 90 * 1000; // 90 seconds
 
     if (heartbeatAge > FRESHNESS_THRESHOLD_MS) {
       logStep("Station heartbeat stale", { heartbeatAge, threshold: FRESHNESS_THRESHOLD_MS });

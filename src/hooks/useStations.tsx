@@ -45,7 +45,7 @@ export const getStationDisplayName = (station: Station): string => {
   return station.structure_name ? `${typeName} – ${station.structure_name}` : typeName;
 };
 
-const HEARTBEAT_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+const HEARTBEAT_TIMEOUT_MS = 90 * 1000; // 90 seconds
 
 export const isStationOnline = (station: Station): boolean => {
   if (station.status !== 'AVAILABLE') return false;

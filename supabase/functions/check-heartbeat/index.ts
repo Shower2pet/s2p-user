@@ -97,9 +97,9 @@ serve(async (req) => {
     await client.subscribe('shower2pet/+/status', Mqtt.QoS.AT_MOST_ONCE);
     logStep("Subscribed");
 
-    // Wait 50 seconds to reliably capture at least one heartbeat cycle
-    // Device heartbeat interval is ~35s; 50s guarantees catching at least one
-    await new Promise(resolve => setTimeout(resolve, 50000));
+    // Wait 40 seconds to reliably capture at least one heartbeat cycle
+    // Device heartbeat interval is ~35s; 40s guarantees catching at least one
+    await new Promise(resolve => setTimeout(resolve, 40000));
 
     logStep("Wait done", {
       aliveCount: aliveStations.size,
