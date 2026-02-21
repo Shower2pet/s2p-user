@@ -72,7 +72,7 @@ serve(async (req) => {
           const heartbeatAge = stationData.last_heartbeat_at
             ? Date.now() - new Date(stationData.last_heartbeat_at).getTime()
             : Infinity;
-          const FRESHNESS_THRESHOLD_MS = 3 * 60 * 1000;
+          const FRESHNESS_THRESHOLD_MS = 90 * 1000; // 90 seconds
           if (heartbeatAge > FRESHNESS_THRESHOLD_MS) {
             logStep("Station heartbeat stale", { heartbeatAge });
             return new Response(JSON.stringify({ error: "Stazione non raggiungibile. Riprova tra qualche minuto." }), {
