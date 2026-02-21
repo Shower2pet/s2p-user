@@ -166,7 +166,12 @@ const Index = () => {
       const lng = station.geo_lng;
       if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
       const online = isStationOnline(station);
-      const markerColor = !online ? '#9ca3af' : station.category === 'SHOWER' ? '#10b981' : '#005596';
+      const isRestricted = station.visibility === 'RESTRICTED';
+      const markerColor = !online
+        ? '#9ca3af'
+        : isRestricted
+          ? '#f59e0b'
+          : station.category === 'SHOWER' ? '#10b981' : '#005596';
       const marker = new mapboxgl.Marker({ color: markerColor })
         .setLngLat([lng, lat])
         .setPopup(
@@ -203,6 +208,7 @@ const Index = () => {
     const online = isStationOnline(station);
     if (online) return { color: 'bg-success text-success-foreground', text: t('available') };
     if (station.status === 'BUSY') return { color: 'bg-warning text-warning-foreground', text: t('busy') };
+    if (station.status === 'MAINTENANCE') return { color: 'bg-destructive/15 text-destructive', text: 'Manutenzione' };
     return { color: 'bg-muted text-muted-foreground', text: t('offline') };
   };
 

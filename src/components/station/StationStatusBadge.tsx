@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-type StationStatus = 'available' | 'busy' | 'offline';
+type StationStatus = 'available' | 'busy' | 'offline' | 'maintenance';
 
 interface StationStatusBadgeProps {
   status: StationStatus;
@@ -11,16 +11,20 @@ interface StationStatusBadgeProps {
 export const StationStatusBadge = ({ status, className }: StationStatusBadgeProps) => {
   const statusConfig = {
     available: {
-      label: 'Available',
+      label: 'Disponibile',
       className: 'bg-success text-success-foreground hover:bg-success/90',
     },
     busy: {
-      label: 'Busy',
+      label: 'Occupata',
       className: 'bg-warning text-warning-foreground hover:bg-warning/90',
     },
     offline: {
       label: 'Offline',
       className: 'bg-muted text-muted-foreground',
+    },
+    maintenance: {
+      label: 'In Manutenzione',
+      className: 'bg-destructive/15 text-destructive hover:bg-destructive/20',
     },
   };
 

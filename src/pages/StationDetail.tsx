@@ -160,7 +160,7 @@ const StationDetail = () => {
   }
 
   const online = isStationOnline(station);
-  const displayStatus = online ? 'available' : station.status === 'MAINTENANCE' ? 'offline' : station.status === 'BUSY' ? 'busy' : 'offline';
+  const displayStatus = online ? 'available' : station.status === 'MAINTENANCE' ? 'maintenance' : station.status === 'BUSY' ? 'busy' : 'offline';
   const washOptions = station.washing_options || [];
   const chosen = washOptions.find(o => o.id === selectedOption);
   const walletBalance = wallet?.balance || 0;
