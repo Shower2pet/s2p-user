@@ -88,6 +88,7 @@ const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station
 export const useStations = () => {
   return useQuery({
     queryKey: ['stations'],
+    refetchInterval: 30_000, // Poll every 30s for status changes
     queryFn: async () => {
       // Use RPC function to get public station data (bypasses RLS safely)
       const { data: stationsData, error } = await supabase.rpc('get_public_stations');
@@ -114,6 +115,7 @@ export const useStations = () => {
 export const useStation = (stationId: string | undefined) => {
   return useQuery({
     queryKey: ['station', stationId],
+    refetchInterval: 30_000, // Poll every 30s for status changes
     queryFn: async () => {
       if (!stationId) return null;
 
