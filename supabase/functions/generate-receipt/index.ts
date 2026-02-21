@@ -339,11 +339,19 @@ serve(async (req) => {
     const intentionId = intentionData?.content?.id;
     log("INTENTION created", { intentionId });
 
-    // ── RECEIPT ─────────────────────────────────────────────────────────
-    const vatRate = 22;
-    const grossAmount = amountFloat;
+    // ── RECEIPT (Fiskaly SIGN IT 2025-08-12 schema) ──────────────────
+    const vatPercentage = 22;
+    const grossAmount = amountFloat; // IVA inclusa
+    const netAmount = grossAmount / (1 + vatPercentage / 100);
+    const vatAmount = grossAmount - netAmount;
 
-    log("Creating TRANSACTION::RECEIPT", { grossAmount });
+    // Formato Decimal12p8 richiesto da Fiskaly
+    const fmt = (n: number) => n.toFixed(8);
+
+    // Numero documento incrementale (usiamo timestamp-based per unicità)
+    const docNumber = String(Date.now()).slice(-10);
+
+    log("Creating TRANSACTION::RECEIPT", { grossAmount, netAmount: fmt(netAmount), vatAmount: fmt(vatAmount) });
 
     const receiptPayload = {
       content: {
@@ -351,15 +359,49 @@ serve(async (req) => {
         record: { id: intentionId },
         operation: {
           type: "RECEIPT",
+          document: {
+            number: docNumber,
+            total_vat: {
+              amount: fmt(vatAmount),
+              exclusive: fmt(netAmount),
+              inclusive: fmt(grossAmount),
+            },
+          },
           entries: [
             {
-              number: 1,
               type: "SALE",
-              description: receiptDescription,
-              commodity: "SERVICE",
-              quantity: "1.000",
-              amount: grossAmount.toFixed(2),
-              vat_rate: String(vatRate),
+              data: {
+                type: "ITEM",
+                text: receiptDescription,
+                unit: {
+                  quantity: fmt(1),
+                  price: fmt(grossAmount),
+                },
+                value: {
+                  base: fmt(netAmount),
+                },
+                vat: {
+                  type: "VAT_RATE",
+                  code: "STANDARD",
+                  percentage: "22.00",
+                  amount: fmt(vatAmount),
+                  exclusive: fmt(netAmount),
+                  inclusive: fmt(grossAmount),
+                },
+              },
+              details: {
+                concept: "SERVICE",
+                description: receiptDescription,
+              },
+            },
+          ],
+          payments: [
+            {
+              type: "ONLINE",
+              details: {
+                amount: fmt(grossAmount),
+              },
+              name: "Stripe",
             },
           ],
         },
@@ -382,9 +424,9 @@ serve(async (req) => {
       } catch {
         errorDetails = await receiptRes.text();
       }
-      log("Fiskaly RECEIPT Error", { status: receiptRes.status, errorDetails: errorDetails.slice(0, 300) });
+      log("Fiskaly RECEIPT Error", { status: receiptRes.status, errorDetails: errorDetails.slice(0, 500) });
       await updateReceipt({ status: "ERROR", error_details: `Fiskaly RECEIPT ${receiptRes.status}: ${errorDetails.slice(0, 500)}` });
-      return new Response(JSON.stringify({ success: false, error: "Fiskaly RECEIPT Error" }), {
+      return new Response(JSON.stringify({ success: false, error: "Fiskaly RECEIPT Error", details: errorDetails.slice(0, 300) }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
