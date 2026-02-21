@@ -165,28 +165,27 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create(sessionParams);
     logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
-    // Create transaction record if user is authenticated
-    if (userId) {
-      const { error: txError } = await supabaseClient
-        .from('transactions')
-        .insert({
-          user_id: userId,
-          stripe_payment_id: session.id,
-          total_value: amount / 100,
-          amount_paid_stripe: amount / 100,
-          transaction_type: productType === 'credit_pack' ? 'CREDIT_TOPUP' : 'WASH_SERVICE',
-          station_id: station_id || null,
-          structure_id: body.structure_id || null,
-          credits_purchased: credits || 0,
-          status: 'PENDING',
-          payment_method: 'STRIPE',
-        });
+    // Create transaction record for both authenticated users and guests
+    const { error: txError } = await supabaseClient
+      .from('transactions')
+      .insert({
+        user_id: userId || null,
+        guest_email: !userId ? (body.guest_email || null) : null,
+        stripe_payment_id: session.id,
+        total_value: amount / 100,
+        amount_paid_stripe: amount / 100,
+        transaction_type: userId ? (productType === 'credit_pack' ? 'CREDIT_TOPUP' : 'WASH_SERVICE') : 'GUEST_WASH',
+        station_id: station_id || null,
+        structure_id: body.structure_id || null,
+        credits_purchased: credits || 0,
+        status: 'PENDING',
+        payment_method: 'STRIPE',
+      });
 
-      if (txError) {
-        logStep("Error creating transaction record", { error: txError.message });
-      } else {
-        logStep("Transaction record created");
-      }
+    if (txError) {
+      logStep("Error creating transaction record", { error: txError.message });
+    } else {
+      logStep("Transaction record created", { isGuest: !userId });
     }
 
     // Create wash session record for station payments

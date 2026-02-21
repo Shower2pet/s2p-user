@@ -528,7 +528,12 @@ const StationDetail = () => {
                     <label className="text-sm font-medium text-foreground">Email *</label>
                     <Input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)}
                       placeholder="email@esempio.com" required />
-                    <p className="text-xs text-muted-foreground">Necessaria per la ricevuta</p>
+                    <p className="text-xs text-muted-foreground">
+                      Necessaria per ricevere lo scontrino fiscale via email
+                    </p>
+                    {guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail) && (
+                      <p className="text-xs text-destructive">Inserisci un indirizzo email valido</p>
+                    )}
                   </div>
                 )}
 
@@ -583,7 +588,7 @@ const StationDetail = () => {
           <DialogFooter>
             <Button
               onClick={handlePay}
-              disabled={isProcessing || (!user && !guestEmail && !hasActiveSub) || displayStatus !== 'available'}
+              disabled={isProcessing || (!user && (!guestEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) && !hasActiveSub) || displayStatus !== 'available'}
               className="w-full"
               size="lg"
             >
