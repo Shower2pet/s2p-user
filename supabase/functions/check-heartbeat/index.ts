@@ -54,6 +54,7 @@ serve(async (req) => {
     });
 
     const aliveStations = new Set<string>();
+    const offlineStations = new Set<string>();
     const decoder = new TextDecoder();
 
     client.on('publish', (event: any) => {
@@ -73,13 +74,16 @@ serve(async (req) => {
         const parts = topic.split('/');
         if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
           const stationId = parts[1];
-          if (stationId === '_selftest') return; // ignore self-test
+          if (stationId === '_selftest') return;
 
-          if (payload.toLowerCase() !== 'offline') {
-            aliveStations.add(stationId);
-            logStep("ALIVE", { stationId, payload });
-          } else {
+          if (payload.toLowerCase() === 'offline') {
+            offlineStations.add(stationId);
+            aliveStations.delete(stationId); // LWT overrides any prior alive
             logStep("LWT offline", { stationId });
+          } else {
+            aliveStations.add(stationId);
+            offlineStations.delete(stationId); // alive overrides prior LWT
+            logStep("ALIVE", { stationId, payload });
           }
         }
       } catch (e) {
@@ -93,12 +97,15 @@ serve(async (req) => {
     await client.subscribe('shower2pet/+/status', Mqtt.QoS.AT_MOST_ONCE);
     logStep("Subscribed");
 
-    // Wait ~50 seconds to capture heartbeats from devices
-    // (ETH484-B heartbeat interval may be 30-60 seconds)
-    // Retained messages arrive immediately after subscribe
-    await new Promise(resolve => setTimeout(resolve, 50000));
+    // Wait 10 seconds (retained messages arrive instantly, 10s covers non-retained)
+    await new Promise(resolve => setTimeout(resolve, 10000));
 
-    logStep("Wait done", { aliveCount: aliveStations.size, alive: [...aliveStations] });
+    logStep("Wait done", {
+      aliveCount: aliveStations.size,
+      offlineCount: offlineStations.size,
+      alive: [...aliveStations],
+      offline: [...offlineStations],
+    });
 
     try { await client.disconnect(); } catch (_) { /* ignore */ }
 
@@ -110,16 +117,26 @@ serve(async (req) => {
       else logStep("DB error", { stationId, error: error.message });
     }
 
-    // Auto-offline expired
+    // Mark offline stations via LWT
+    let offlineCount = 0;
+    for (const stationId of offlineStations) {
+      const { error } = await supabaseAdmin.rpc('mark_station_offline', { p_station_id: stationId });
+      if (!error) offlineCount++;
+      else logStep("DB offline error", { stationId, error: error.message });
+    }
+
+    // Auto-offline expired heartbeats (2 min threshold)
     const { error: offlineError } = await supabaseAdmin.rpc('auto_offline_expired_heartbeats');
     if (offlineError) logStep("Auto-offline error", { error: offlineError.message });
 
-    logStep("Done", { aliveCount: aliveStations.size, updated: updatedCount });
+    logStep("Done", { aliveCount: aliveStations.size, updated: updatedCount, markedOffline: offlineCount });
 
     return new Response(JSON.stringify({
       success: true,
       alive_stations: [...aliveStations],
+      offline_stations: [...offlineStations],
       updated: updatedCount,
+      marked_offline: offlineCount,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
