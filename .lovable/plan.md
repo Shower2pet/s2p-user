@@ -1,101 +1,123 @@
 
 
-# Rilevamento Offline Rapido tramite LWT
+# Protezione Pagamenti Senza Retain: Strategia Basata su DB
 
-## Situazione Attuale
+## Vincolo Chiave
 
-La Edge Function `check-heartbeat` si connette al broker MQTT ogni 3 minuti, ascolta per 50 secondi, e poi aggiorna il DB. Quando riceve un messaggio LWT "offline", lo logga ma **non lo usa** per marcare la stazione offline. Risultato: una stazione scollegata viene rilevata come offline solo dopo 3 minuti (soglia heartbeat).
+Senza il retain flag, una verifica MQTT in tempo reale richiederebbe fino a 35 secondi (un ciclo di heartbeat) prima di ricevere risposta. Questo e' inaccettabile per l'esperienza utente durante il pagamento.
 
-## Soluzione: Sfruttare LWT + Messaggi Retained
+## Strategia: 3 Livelli di Protezione Basati sul DB
 
-Dalla configurazione della scheda ETH484-B:
-- **Power Up message** su `shower2pet/BR_001/status` (pubblica un messaggio all'accensione)
-- **LWT** su `shower2pet/BR_001/status` con payload `offline` (il broker lo pubblica automaticamente quando la scheda si disconnette)
-- **Heartbeat** sullo stesso topic
-
-### Strategia in 3 punti:
-
-1. **Reagire attivamente al messaggio LWT**: quando la funzione riceve payload "offline", marcare immediatamente la stazione come OFFLINE nel DB (attualmente viene ignorato)
-
-2. **Ridurre il tempo di attesa da 50s a 10s**: se i messaggi heartbeat e LWT sono configurati con **retain=true** sul broker, arrivano istantaneamente alla sottoscrizione. 10 secondi sono sufficienti per catturare anche messaggi non retained.
-
-3. **Aumentare la frequenza del cron a ogni minuto**: con un runtime di ~15 secondi (connessione + 10s attesa + DB update), possiamo eseguire ogni minuto senza sovrapposizioni.
-
-### Risultato: rilevamento offline in ~1 minuto invece di ~3 minuti.
-
-## Configurazione Hardware Consigliata
-
-Sulla scheda ETH484-B, se possibile, abilitare il **retain flag** sia per il Power Up message che per l'heartbeat. Questo fa si che il broker mantenga sempre l'ultimo stato noto, e la Edge Function lo riceve istantaneamente alla sottoscrizione senza dover aspettare il prossimo ciclo.
-
-## Dettaglio Tecnico delle Modifiche
-
-### 1. Edge Function `check-heartbeat/index.ts`
-
-Modifiche principali:
-- Aggiungere un set `offlineStations` per tracciare le stazioni con LWT "offline"
-- Quando si riceve payload "offline", aggiungere la stazione a `offlineStations`
-- Dopo la fase di ascolto, marcare le stazioni offline nel DB con un UPDATE diretto
-- Ridurre il timeout di attesa da 50.000ms a 10.000ms
+Invece di verificare MQTT in tempo reale prima del pagamento, sfruttiamo il campo `last_heartbeat_at` gia' aggiornato dal cron ogni 2 minuti come gate di sicurezza.
 
 ```text
-Flusso aggiornato:
+Livello 1: UI (Frontend)
+  Station status = OFFLINE --> opzioni lavaggio disabilitate (gia' implementato)
+  Polling ogni 30s per aggiornamenti (gia' implementato)
 
-  Connetti MQTT
-       |
-  Sottoscrivi shower2pet/+/status
-       |
-  Attendi 10 secondi
-       |
-  +-- Messaggi ricevuti:
-  |     payload != "offline" --> aliveStations.add(id)
-  |     payload == "offline" --> offlineStations.add(id)
-       |
-  Disconnetti
-       |
-  Per ogni aliveStation --> handle_station_heartbeat(id)
-  Per ogni offlineStation --> UPDATE stations SET status='OFFLINE' WHERE id=...
-       |
-  auto_offline_expired_heartbeats()  (soglia ridotta a 2 min)
+Livello 2: Edge Functions Pre-Pagamento (NUOVO)
+  pay-with-credits: controlla last_heartbeat_at < 3 min --> blocca pagamento
+  create-checkout: controlla last_heartbeat_at < 3 min --> blocca pagamento
+
+Livello 3: station-control (GIA' ESISTENTE)
+  MQTT publish con timeout 5s --> se broker non risponde, ritorna 503
+  Il frontend gestisce il rollback (rimborso crediti + ticket manutenzione)
 ```
 
-### 2. Migrazione Database
+## Dettaglio Modifiche
 
-- **Soglia offline ridotta a 2 minuti** in `auto_offline_expired_heartbeats()` (da 3 min). Con il cron ogni minuto, 2 minuti significano che una stazione deve mancare 2 cicli consecutivi.
-- **Soglia in `get_public_stations()`** aggiornata a 2 minuti per coerenza.
-- **Cron reschedulato a ogni minuto** (`* * * * *`).
+### 1. Ridurre soglia offline da 5 a 3 minuti
 
-### 3. Nuova funzione DB `mark_station_offline`
+Con il cron ogni 2 minuti e 50s di ascolto, una stazione attiva viene rilevata ad ogni ciclo. Se manca un ciclo intero, a 3 minuti viene marcata offline. Questo bilancia reattivita' e stabilita'.
 
-Creare una funzione RPC che:
-- Imposta `status = 'OFFLINE'` solo se `manual_offline = false`
-- Non tocca le stazioni in MAINTENANCE
-- Usata dalla Edge Function quando riceve LWT
+Funzioni DB da aggiornare:
+- `auto_offline_expired_heartbeats()`: soglia da 5 a 3 minuti
+- `get_public_stations()`: soglia da 5 a 3 minuti
 
-```sql
-CREATE OR REPLACE FUNCTION mark_station_offline(p_station_id text)
-RETURNS void AS $$
-BEGIN
-  UPDATE stations
-  SET status = 'OFFLINE'::station_status
-  WHERE id = p_station_id
-    AND manual_offline = false
-    AND status NOT IN ('MAINTENANCE');
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+### 2. Check freshness in `pay-with-credits`
+
+Prima di detrarre crediti o contare un lavaggio abbonamento, la funzione verifica:
+
+```text
+1. Leggi station.status e last_heartbeat_at dal DB
+2. Se status != 'AVAILABLE' --> errore "Stazione non disponibile"
+3. Se last_heartbeat_at < now() - 3 minuti --> errore "Stazione non raggiungibile"
+4. Altrimenti --> procedi con il pagamento
 ```
 
-## Riepilogo Modifiche
+Questo aggiunge ~50ms al flusso (una singola query DB), nessun impatto UX.
 
-| Componente | Prima | Dopo |
+### 3. Check freshness in `create-checkout`
+
+Prima di creare la sessione Stripe:
+
+```text
+1. Leggi station.status e last_heartbeat_at dal DB (gia' legge la stazione per washing_options)
+2. Se status non e' AVAILABLE --> errore 503 "Stazione non disponibile"
+3. Se last_heartbeat_at < now() - 3 minuti --> errore 503 "Stazione non raggiungibile"
+4. Altrimenti --> crea sessione Stripe normalmente
+```
+
+L'utente NON viene reindirizzato a Stripe se la stazione e' offline.
+
+### 4. Frontend: gestione errore pre-pagamento
+
+In `StationDetail.tsx`, i catch di `handlePay` gestiscono gia' gli errori. Aggiungiamo un messaggio specifico quando l'errore indica stazione non raggiungibile, con refresh automatico dello status.
+
+### 5. Frontend: `isStationOnline` con check heartbeat lato client
+
+Aggiungere un controllo aggiuntivo in `isStationOnline()`: se `last_heartbeat_at` e' piu' vecchio di 3 minuti, la stazione viene mostrata come offline anche se il DB dice AVAILABLE (per coprire il gap tra un ciclo cron e l'altro).
+
+## File da Modificare
+
+| File | Modifica |
+|---|---|
+| `supabase/functions/pay-with-credits/index.ts` | Aggiunta check `last_heartbeat_at` prima del pagamento |
+| `supabase/functions/create-checkout/index.ts` | Aggiunta check `last_heartbeat_at` prima di creare sessione Stripe |
+| `src/hooks/useStations.tsx` | `isStationOnline` verifica anche freshness heartbeat |
+| `src/pages/StationDetail.tsx` | Toast specifico + invalidazione query su errore "stazione non raggiungibile" |
+| Migrazione SQL | Soglie ridotte da 5 a 3 minuti |
+
+## Flusso Completo di Protezione
+
+```text
+Utente vede stazione AVAILABLE (heartbeat < 3 min)
+         |
+  Seleziona opzione lavaggio
+         |
+  [Frontend] isStationOnline() = true (status + heartbeat fresh)
+         |
+  Click "Paga"
+         |
+  [Edge Function] SELECT status, last_heartbeat_at FROM stations
+         |
+  heartbeat > 3 min? --SI--> Errore "Stazione non raggiungibile"
+         |                     (nessun addebito, toast + refresh UI)
+        NO
+         |
+  Pagamento processato (crediti/Stripe)
+         |
+  StationTimer --> "Avvia Servizio"
+         |
+  [station-control] publishMqtt con timeout 5s
+         |
+  Broker non risponde? --SI--> 503, rollback crediti + ticket
+         |
+        NO
+         |
+  Acqua erogata
+```
+
+## Tempi di Rilevamento
+
+| Scenario | Tempo rilevamento | Protezione |
 |---|---|---|
-| Tempo attesa MQTT | 50 secondi | 10 secondi |
-| Frequenza cron | ogni 3 minuti | ogni 1 minuto |
-| Soglia auto-offline | 3 minuti | 2 minuti |
-| Reazione a LWT "offline" | Solo log | Marca OFFLINE nel DB |
-| Tempo rilevamento offline | ~3-6 minuti | ~1-2 minuti |
-| Runtime Edge Function | ~55 secondi | ~15 secondi |
+| Stazione si spegne | ~3 minuti (1 ciclo mancato) | Cron marca OFFLINE |
+| Utente paga durante gap | Istantaneo | Edge function check DB |
+| Broker MQTT down | 5 secondi | station-control timeout |
+| LWT ricevuto | Istantaneo | check-heartbeat marca OFFLINE |
 
 ## Impatto su App Console
 
-Nessun impatto. Le modifiche sono tutte lato backend (Edge Function + RPC). La Console continua a leggere `status` dalla tabella `stations` come prima.
+Nessun impatto. Le modifiche sono nei check pre-pagamento (solo App User) e nelle soglie DB (la Console legge `status` che viene aggiornato con la stessa logica).
 
