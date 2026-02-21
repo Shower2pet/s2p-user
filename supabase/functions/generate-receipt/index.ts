@@ -339,52 +339,40 @@ serve(async (req) => {
     const intentionId = intentionData?.content?.id;
     log("INTENTION created", { intentionId });
 
-    // ── RECEIPT ───────────────────────────────────────────────────────────
+    // ── RECEIPT ─────────────────────────────────────────────────────────
     const vatRate = 22;
     const grossAmount = amountFloat;
-    const netAmount = Number((grossAmount / (1 + vatRate / 100)).toFixed(2));
-    const transactionDate = new Date().toISOString().split("T")[0];
 
-    log("Creating TRANSACTION::RECEIPT", { grossAmount, netAmount });
+    log("Creating TRANSACTION::RECEIPT", { grossAmount });
+
+    const receiptPayload = {
+      content: {
+        type: "TRANSACTION",
+        record: { id: intentionId },
+        operation: {
+          type: "RECEIPT",
+          entries: [
+            {
+              number: 1,
+              type: "SALE",
+              description: receiptDescription,
+              commodity: "SERVICE",
+              quantity: "1.000",
+              amount: grossAmount.toFixed(2),
+              vat_rate: String(vatRate),
+            },
+          ],
+        },
+      },
+      metadata: { source: "shower2pet", ...(resolvedSessionId ? { session_id: resolvedSessionId } : { stripe_session_id }) },
+    };
+
+    log("RECEIPT payload", receiptPayload);
 
     const receiptRes = await fetch(`${baseUrl}/records`, {
       method: "POST",
       headers: { ...authHeaders, "X-Idempotency-Key": receiptIdempotencyKey },
-      body: JSON.stringify({
-        content: {
-          type: "TRANSACTION",
-          record: { id: intentionId },
-          operation: {
-            type: "RECEIPT",
-            document: {
-              date: transactionDate,
-              number: 0,
-              amounts: {
-                total: {
-                  including_vat: grossAmount.toFixed(2),
-                  excluding_vat: netAmount.toFixed(2),
-                },
-              },
-            },
-            entries: [
-              {
-                number: 1,
-                type: "SALE",
-                description: receiptDescription,
-                commodity: "SERVICE",
-                quantity: "1.000",
-                amounts: {
-                  unit: { including_vat: grossAmount.toFixed(2) },
-                  total: { including_vat: grossAmount.toFixed(2) },
-                },
-                vat_rate: { code: "STANDARD", percentage: String(vatRate) },
-              },
-            ],
-            payments: [{ type: "ELECTRONIC", amount: grossAmount.toFixed(2) }],
-          },
-        },
-        metadata: { source: "shower2pet", ...(resolvedSessionId ? { session_id: resolvedSessionId } : { stripe_session_id }) },
-      }),
+      body: JSON.stringify(receiptPayload),
     });
 
     if (!receiptRes.ok) {
