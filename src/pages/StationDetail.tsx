@@ -260,7 +260,14 @@ const StationDetail = () => {
         navigate(`/s/${station.id}/timer`);
       } catch (err: any) {
         console.error('Payment error:', err);
-        toast.error(err.message || t('paymentError'));
+        const msg = err.message || t('paymentError');
+        if (msg.includes('non raggiungibile') || msg.includes('non disponibile')) {
+          toast.error(msg, { icon: <WifiOff className="w-4 h-4" /> });
+          queryClient.invalidateQueries({ queryKey: ['station', id] });
+          queryClient.invalidateQueries({ queryKey: ['stations'] });
+        } else {
+          toast.error(msg);
+        }
       } finally {
         setIsProcessing(false);
       }
@@ -284,7 +291,14 @@ const StationDetail = () => {
         if (data?.url) window.location.href = data.url;
       } catch (err: any) {
         console.error('Payment error:', err);
-        toast.error(t('paymentError'));
+        const msg = err.message || t('paymentError');
+        if (msg.includes('non raggiungibile') || msg.includes('non disponibile')) {
+          toast.error(msg, { icon: <WifiOff className="w-4 h-4" /> });
+          queryClient.invalidateQueries({ queryKey: ['station', id] });
+          queryClient.invalidateQueries({ queryKey: ['stations'] });
+        } else {
+          toast.error(msg);
+        }
       } finally {
         setIsProcessing(false);
       }

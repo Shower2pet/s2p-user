@@ -49,7 +49,7 @@ serve(async (req) => {
     if (station_id) {
       const { data: stationData, error: stationError } = await supabaseClient
         .from('stations')
-        .select('type, washing_options')
+        .select('type, washing_options, status, last_heartbeat_at')
         .eq('id', station_id)
         .maybeSingle();
       
@@ -60,6 +60,28 @@ serve(async (req) => {
         station_type = stationData.type;
         station_category = stationData.type === 'BRACCO' ? 'SHOWER' : 'TUB';
         logStep("Station metadata", { station_type, station_category });
+
+        // ─── PRE-PAYMENT FRESHNESS CHECK (session purchases only) ───
+        if (productType === 'session') {
+          if (stationData.status !== 'AVAILABLE') {
+            return new Response(JSON.stringify({ error: "Stazione non disponibile" }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 503,
+            });
+          }
+          const heartbeatAge = stationData.last_heartbeat_at
+            ? Date.now() - new Date(stationData.last_heartbeat_at).getTime()
+            : Infinity;
+          const FRESHNESS_THRESHOLD_MS = 3 * 60 * 1000;
+          if (heartbeatAge > FRESHNESS_THRESHOLD_MS) {
+            logStep("Station heartbeat stale", { heartbeatAge });
+            return new Response(JSON.stringify({ error: "Stazione non raggiungibile. Riprova tra qualche minuto." }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 503,
+            });
+          }
+          logStep("Station freshness OK", { heartbeatAgeMs: heartbeatAge });
+        }
 
         // Resolve price from washing_options if option_id provided
         if (stationData.washing_options && option_id) {
