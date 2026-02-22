@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Mqtt, WebSocketMqttClient } from "jsr:@ymjacky/mqtt5";
+import mqtt from "npm:mqtt@5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,59 +11,53 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[STATION-CONTROL] ${step}${detailsStr}`);
 };
 
-/* ── MQTT helper using @ymjacky/mqtt5 library ─────────────── */
+/* ── MQTT helper using mqtt.js ─────────────────────────────── */
 
-function getMqttConfig() {
+function getMqttHost(): string {
   let mqttHost = Deno.env.get("MQTT_HOST") || "";
-  const mqttUser = Deno.env.get("MQTT_USER") || "";
-  const mqttPassword = Deno.env.get("MQTT_PASSWORD") || "";
-
-  if (!mqttHost || !mqttUser || !mqttPassword) {
-    throw new Error("MQTT configuration missing");
-  }
-
-  // Normalize host: strip protocol/port/path
+  if (!mqttHost) throw new Error("MQTT_HOST missing");
   mqttHost = mqttHost.replace(/^wss?:\/\//, "").replace(/^mqtts?:\/\//, "").replace(/\/.*$/, "").replace(/:.*$/, "");
-  const brokerUrl = `wss://${mqttHost}:8884/mqtt`;
-  logStep("MQTT config", { brokerUrl, host: mqttHost });
-  return { brokerUrl, mqttUser, mqttPassword };
+  return mqttHost;
+}
+
+function connectMqtt(): Promise<mqtt.MqttClient> {
+  const host = getMqttHost();
+  const brokerUrl = `wss://${host}:8884/mqtt`;
+  const clientId = `s2p-edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+  logStep("MQTT connecting", { brokerUrl, clientId });
+
+  const client = mqtt.connect(brokerUrl, {
+    clientId,
+    username: Deno.env.get("MQTT_USER") || "",
+    password: Deno.env.get("MQTT_PASSWORD") || "",
+    clean: true,
+    connectTimeout: 6000,
+    protocolVersion: 4,
+  });
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      client.end(true);
+      reject(new Error("MQTT connect timeout"));
+    }, 8000);
+    client.on('connect', () => { clearTimeout(timeout); logStep("MQTT connected"); resolve(client); });
+    client.on('error', (err: Error) => { clearTimeout(timeout); reject(err); });
+  });
 }
 
 async function publishMqtt(stationId: string, payload: string): Promise<boolean> {
-  const { brokerUrl, mqttUser, mqttPassword } = getMqttConfig();
   const topic = `shower2pet/${stationId}/relay1/command`;
-  const clientId = `s2p-edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-  logStep("MQTT publish start", { brokerUrl, topic, payload, retain: true, clientId });
-
-  const client = new WebSocketMqttClient({
-    url: new URL(brokerUrl),
-    clientId,
-    username: mqttUser,
-    password: mqttPassword,
-    clean: true,
-    keepAlive: 30,
-    connectTimeoutMs: 6000,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
-  });
+  logStep("MQTT publish start", { topic, payload, retain: true });
 
   try {
-    await client.connect();
-    logStep("MQTT connected");
-
-    const encoder = new TextEncoder();
-    await client.publish(topic, encoder.encode(payload), {
-      qos: Mqtt.QoS.AT_LEAST_ONCE,
-      retain: true,
-    });
+    const client = await connectMqtt();
+    await client.publishAsync(topic, payload, { qos: 1, retain: true });
     logStep("MQTT published OK", { topic, payload });
-
-    await client.disconnect();
-    logStep("MQTT disconnected");
+    client.end();
     return true;
   } catch (e) {
     logStep("MQTT error", { error: String(e) });
-    try { await client.disconnect(); } catch (_) { /* ignore */ }
     return false;
   }
 }
