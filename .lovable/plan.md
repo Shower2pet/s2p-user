@@ -1,123 +1,105 @@
 
 
-# Protezione Pagamenti Senza Retain: Strategia Basata su DB
+# Migrazione libreria MQTT: da @ymjacky/mqtt5 a mqtt.js
 
-## Vincolo Chiave
+## Problema attuale
 
-Senza il retain flag, una verifica MQTT in tempo reale richiederebbe fino a 35 secondi (un ciclo di heartbeat) prima di ricevere risposta. Questo e' inaccettabile per l'esperienza utente durante il pagamento.
+La libreria `jsr:@ymjacky/mqtt5` ha causato crash silenziosi nelle Edge Functions di Supabase, richiedendo workaround come import dinamici. E' una libreria di nicchia (JSR score 82%, pochi utenti) con supporto limitato per ambienti serverless.
 
-## Strategia: 3 Livelli di Protezione Basati sul DB
+## Libreria proposta: mqtt.js (via esm.sh)
 
-Invece di verificare MQTT in tempo reale prima del pagamento, sfruttiamo il campo `last_heartbeat_at` gia' aggiornato dal cron ogni 2 minuti come gate di sicurezza.
+**mqtt.js** (npm: `mqtt`, v5.14+) e' il client MQTT standard de-facto per JavaScript:
+- 8000+ stelle su GitHub, mantenuto attivamente
+- Supporto nativo WebSocket (browser e Deno via esm.sh)
+- API basata su eventi ben documentata e testata in produzione
+- Funziona in Deno tramite `import mqtt from "https://esm.sh/mqtt@5"`
 
-```text
-Livello 1: UI (Frontend)
-  Station status = OFFLINE --> opzioni lavaggio disabilitate (gia' implementato)
-  Polling ogni 30s per aggiornamenti (gia' implementato)
+## File coinvolti
 
-Livello 2: Edge Functions Pre-Pagamento (NUOVO)
-  pay-with-credits: controlla last_heartbeat_at < 3 min --> blocca pagamento
-  create-checkout: controlla last_heartbeat_at < 3 min --> blocca pagamento
+Tre Edge Functions usano MQTT:
 
-Livello 3: station-control (GIA' ESISTENTE)
-  MQTT publish con timeout 5s --> se broker non risponde, ritorna 503
-  Il frontend gestisce il rollback (rimborso crediti + ticket manutenzione)
+1. **`supabase/functions/station-control/index.ts`** -- publish comandi relay (ON/OFF)
+2. **`supabase/functions/check-heartbeat/index.ts`** -- subscribe heartbeat + publish self-test
+3. **`supabase/functions/check-expired-sessions/index.ts`** -- publish OFF quando sessione scade
+
+## Dettagli tecnici
+
+### Nuova API di connessione (mqtt.js)
+
+```typescript
+import mqtt from "https://esm.sh/mqtt@5";
+
+function connectMqtt(): Promise<mqtt.MqttClient> {
+  const host = getMqttConfig(); // stesso helper gia' esistente
+  const client = mqtt.connect(`wss://${host}:8884/mqtt`, {
+    clientId: `s2p-edge-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+    username: Deno.env.get("MQTT_USER"),
+    password: Deno.env.get("MQTT_PASSWORD"),
+    clean: true,
+    connectTimeout: 6000,
+    protocolVersion: 4, // MQTT 3.1.1
+  });
+  return new Promise((resolve, reject) => {
+    client.on('connect', () => resolve(client));
+    client.on('error', (err) => reject(err));
+    setTimeout(() => reject(new Error('MQTT connect timeout')), 8000);
+  });
+}
 ```
 
-## Dettaglio Modifiche
+### Publish (station-control, check-expired-sessions)
 
-### 1. Ridurre soglia offline da 5 a 3 minuti
-
-Con il cron ogni 2 minuti e 50s di ascolto, una stazione attiva viene rilevata ad ogni ciclo. Se manca un ciclo intero, a 3 minuti viene marcata offline. Questo bilancia reattivita' e stabilita'.
-
-Funzioni DB da aggiornare:
-- `auto_offline_expired_heartbeats()`: soglia da 5 a 3 minuti
-- `get_public_stations()`: soglia da 5 a 3 minuti
-
-### 2. Check freshness in `pay-with-credits`
-
-Prima di detrarre crediti o contare un lavaggio abbonamento, la funzione verifica:
-
-```text
-1. Leggi station.status e last_heartbeat_at dal DB
-2. Se status != 'AVAILABLE' --> errore "Stazione non disponibile"
-3. Se last_heartbeat_at < now() - 3 minuti --> errore "Stazione non raggiungibile"
-4. Altrimenti --> procedi con il pagamento
+```typescript
+async function publishMqtt(stationId: string, payload: string): Promise<boolean> {
+  try {
+    const client = await connectMqtt();
+    await client.publishAsync(topic, payload, { qos: 1, retain: true });
+    client.end();
+    return true;
+  } catch (e) {
+    logStep("MQTT error", { error: String(e) });
+    return false;
+  }
+}
 ```
 
-Questo aggiunge ~50ms al flusso (una singola query DB), nessun impatto UX.
+### Subscribe (check-heartbeat)
 
-### 3. Check freshness in `create-checkout`
-
-Prima di creare la sessione Stripe:
-
-```text
-1. Leggi station.status e last_heartbeat_at dal DB (gia' legge la stazione per washing_options)
-2. Se status non e' AVAILABLE --> errore 503 "Stazione non disponibile"
-3. Se last_heartbeat_at < now() - 3 minuti --> errore 503 "Stazione non raggiungibile"
-4. Altrimenti --> crea sessione Stripe normalmente
+```typescript
+const client = await connectMqtt();
+client.subscribe('shower2pet/+/status');
+client.on('message', (topic: string, message: Buffer) => {
+  const payload = message.toString();
+  // stessa logica di parsing gia' esistente
+});
+// attesa 40 secondi, poi client.end()
 ```
 
-L'utente NON viene reindirizzato a Stripe se la stazione e' offline.
+### Modifiche per ogni file
 
-### 4. Frontend: gestione errore pre-pagamento
+**station-control/index.ts:**
+- Sostituire import `jsr:@ymjacky/mqtt5` con `esm.sh/mqtt@5`
+- Riscrivere `publishMqtt()` con la nuova API (connect/publishAsync/end)
+- Rimuovere riferimenti a `Mqtt.QoS`, `Mqtt.ProtocolVersion`, `WebSocketMqttClient`
 
-In `StationDetail.tsx`, i catch di `handlePay` gestiscono gia' gli errori. Aggiungiamo un messaggio specifico quando l'errore indica stazione non raggiungibile, con refresh automatico dello status.
+**check-heartbeat/index.ts:**
+- Rimuovere il dynamic import workaround (non piu' necessario con mqtt.js)
+- Usare import statico di `mqtt` da esm.sh
+- Sostituire `client.on('publish', ...)` con `client.on('message', ...)`
+- Il self-test resta invariato nella logica
 
-### 5. Frontend: `isStationOnline` con check heartbeat lato client
+**check-expired-sessions/index.ts:**
+- Stesso refactor di station-control: nuovo import e nuova `publishMqttOff()`
 
-Aggiungere un controllo aggiuntivo in `isStationOnline()`: se `last_heartbeat_at` e' piu' vecchio di 3 minuti, la stazione viene mostrata come offline anche se il DB dice AVAILABLE (per coprire il gap tra un ciclo cron e l'altro).
+### Vantaggi
 
-## File da Modificare
+- Nessun crash silenzioso al boot: mqtt.js e' battle-tested
+- Import statico in tutte le funzioni (niente piu' dynamic import workaround)
+- API piu' pulita: `publishAsync()` nativa, eventi standard Node.js
+- Compatibilita' retrocompatibile: nessuna modifica a database, topic, o payload
 
-| File | Modifica |
-|---|---|
-| `supabase/functions/pay-with-credits/index.ts` | Aggiunta check `last_heartbeat_at` prima del pagamento |
-| `supabase/functions/create-checkout/index.ts` | Aggiunta check `last_heartbeat_at` prima di creare sessione Stripe |
-| `src/hooks/useStations.tsx` | `isStationOnline` verifica anche freshness heartbeat |
-| `src/pages/StationDetail.tsx` | Toast specifico + invalidazione query su errore "stazione non raggiungibile" |
-| Migrazione SQL | Soglie ridotte da 5 a 3 minuti |
+### Rischi e mitigazioni
 
-## Flusso Completo di Protezione
-
-```text
-Utente vede stazione AVAILABLE (heartbeat < 3 min)
-         |
-  Seleziona opzione lavaggio
-         |
-  [Frontend] isStationOnline() = true (status + heartbeat fresh)
-         |
-  Click "Paga"
-         |
-  [Edge Function] SELECT status, last_heartbeat_at FROM stations
-         |
-  heartbeat > 3 min? --SI--> Errore "Stazione non raggiungibile"
-         |                     (nessun addebito, toast + refresh UI)
-        NO
-         |
-  Pagamento processato (crediti/Stripe)
-         |
-  StationTimer --> "Avvia Servizio"
-         |
-  [station-control] publishMqtt con timeout 5s
-         |
-  Broker non risponde? --SI--> 503, rollback crediti + ticket
-         |
-        NO
-         |
-  Acqua erogata
-```
-
-## Tempi di Rilevamento
-
-| Scenario | Tempo rilevamento | Protezione |
-|---|---|---|
-| Stazione si spegne | ~3 minuti (1 ciclo mancato) | Cron marca OFFLINE |
-| Utente paga durante gap | Istantaneo | Edge function check DB |
-| Broker MQTT down | 5 secondi | station-control timeout |
-| LWT ricevuto | Istantaneo | check-heartbeat marca OFFLINE |
-
-## Impatto su App Console
-
-Nessun impatto. Le modifiche sono nei check pre-pagamento (solo App User) e nelle soglie DB (la Console legge `status` che viene aggiornato con la stessa logica).
+- **Compatibilita' esm.sh/Deno**: mqtt.js v5 supporta ESM nativo e funziona via esm.sh. Se ci fossero problemi di bundling, si puo' fissare la versione esatta (es. `esm.sh/mqtt@5.14.1`)
+- **App Console**: nessun impatto -- le funzioni mantengono gli stessi input/output/topic MQTT
 
