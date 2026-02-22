@@ -82,16 +82,19 @@ serve(async (req) => {
         totalEventsReceived++;
         const payload = message.toString();
 
-        logStep("MSG", { topic, payload: payload.substring(0, 50) });
+        logStep("MSG", { topic, payload: payload.substring(0, 80) });
 
         const parts = topic.split('/');
-        if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
-          const stationId = parts[1];
-          if (stationId === '_selftest') {
-            selfTestReceived = true;
-            return;
-          }
+        if (parts.length < 2 || parts[0] !== 'shower2pet') return;
+        
+        const stationId = parts[1];
+        if (stationId === '_selftest') {
+          selfTestReceived = true;
+          return;
+        }
 
+        // Match shower2pet/{stationId}/status (heartbeat topic)
+        if (parts.length === 3 && parts[2] === 'status') {
           if (payload.toLowerCase() === 'offline') {
             offlineStations.add(stationId);
             aliveStations.delete(stationId);
@@ -99,16 +102,25 @@ serve(async (req) => {
           } else {
             aliveStations.add(stationId);
             offlineStations.delete(stationId);
-            logStep("ALIVE", { stationId, payload });
+            logStep("ALIVE via status", { stationId, payload });
           }
+          return;
+        }
+
+        // Also treat relay state messages as proof of life
+        // e.g. shower2pet/BR_001/relay1/state
+        if (parts.length >= 3 && !aliveStations.has(stationId) && !offlineStations.has(stationId)) {
+          aliveStations.add(stationId);
+          logStep("ALIVE via activity", { stationId, topic });
         }
       } catch (e) {
         logStep("Parse error", { error: String(e) });
       }
     });
 
-    await client.subscribeAsync('shower2pet/+/status', { qos: 0 });
-    logStep("Subscribed");
+    // Subscribe to all station topics to maximize heartbeat detection
+    await client.subscribeAsync('shower2pet/#', { qos: 0 });
+    logStep("Subscribed to shower2pet/#");
 
     // Self-test
     try {
@@ -118,8 +130,9 @@ serve(async (req) => {
       logStep("Self-test publish error", { error: String(e) });
     }
 
-    // Wait 40 seconds to capture heartbeats
-    await new Promise(resolve => setTimeout(resolve, 40000));
+    // Wait 50 seconds to maximize heartbeat capture window
+    // (station publishes ~every 60s, so 50s window catches most heartbeats)
+    await new Promise(resolve => setTimeout(resolve, 50000));
 
     logStep("Wait done", {
       totalEventsReceived,
