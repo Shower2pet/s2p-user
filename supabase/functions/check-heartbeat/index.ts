@@ -56,9 +56,12 @@ serve(async (req) => {
     const aliveStations = new Set<string>();
     const offlineStations = new Set<string>();
     const decoder = new TextDecoder();
+    let totalEventsReceived = 0;
+    let selfTestReceived = false;
 
-    client.on('publish', (event: any) => {
+    const handleMessage = (event: any) => {
       try {
+        totalEventsReceived++;
         const packet = event?.detail ?? event;
         const topic = packet?.topic?.toString?.() ?? packet?.topic ?? '';
         let payload = '';
@@ -70,26 +73,34 @@ serve(async (req) => {
           } catch { payload = String(packet.payload); }
         }
 
+        logStep("MSG", { topic, payload: payload.substring(0, 50) });
+
         // Topic format: shower2pet/{stationId}/status
         const parts = topic.split('/');
         if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
           const stationId = parts[1];
-          if (stationId === '_selftest') return;
+          if (stationId === '_selftest') {
+            selfTestReceived = true;
+            return;
+          }
 
           if (payload.toLowerCase() === 'offline') {
             offlineStations.add(stationId);
-            aliveStations.delete(stationId); // LWT overrides any prior alive
+            aliveStations.delete(stationId);
             logStep("LWT offline", { stationId });
           } else {
             aliveStations.add(stationId);
-            offlineStations.delete(stationId); // alive overrides prior LWT
+            offlineStations.delete(stationId);
             logStep("ALIVE", { stationId, payload });
           }
         }
       } catch (e) {
         logStep("Parse error", { error: String(e) });
       }
-    });
+    };
+
+    // Try both event binding methods
+    client.on('publish', handleMessage);
 
     await client.connect();
     logStep("Connected");
@@ -97,11 +108,24 @@ serve(async (req) => {
     await client.subscribe('shower2pet/+/status', Mqtt.QoS.AT_MOST_ONCE);
     logStep("Subscribed");
 
+    // Self-test: publish a message to verify subscription works
+    try {
+      await client.publish(
+        'shower2pet/_selftest/status',
+        new TextEncoder().encode('ping'),
+        { qos: Mqtt.QoS.AT_MOST_ONCE },
+      );
+      logStep("Self-test published");
+    } catch (e) {
+      logStep("Self-test publish error", { error: String(e) });
+    }
+
     // Wait 40 seconds to reliably capture at least one heartbeat cycle
-    // Device heartbeat interval is ~35s; 40s guarantees catching at least one
     await new Promise(resolve => setTimeout(resolve, 40000));
 
     logStep("Wait done", {
+      totalEventsReceived,
+      selfTestReceived,
       aliveCount: aliveStations.size,
       offlineCount: offlineStations.size,
       alive: [...aliveStations],
