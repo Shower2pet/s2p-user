@@ -10,7 +10,7 @@ export const InstallBanner = () => {
   if (!isInstallable) return null;
 
   return (
-    <div className="fixed bottom-20 left-3 right-3 z-[60] sm:bottom-auto sm:top-3 sm:left-auto sm:right-3 sm:max-w-sm animate-in slide-in-from-bottom-4 sm:slide-in-from-top-4 fade-in duration-300">
+    <div className="fixed top-3 left-3 right-3 z-[60] sm:left-auto sm:max-w-sm animate-in slide-in-from-top-4 fade-in duration-300">
       <div className="bg-primary text-primary-foreground px-3 py-2 rounded-2xl shadow-floating">
         <div className="flex items-center gap-2">
           <Smartphone className="w-4 h-4 flex-shrink-0" />
