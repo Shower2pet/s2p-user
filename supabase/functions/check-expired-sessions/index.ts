@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { Mqtt, WebSocketMqttClient } from "jsr:@ymjacky/mqtt5";
+import mqtt from "npm:mqtt@5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,52 +11,53 @@ const log = (msg: string, details?: unknown) => {
   console.log(`[CHECK-EXPIRED] ${msg}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
-/* ── MQTT helper using @ymjacky/mqtt5 library ─────────────── */
+/* ── MQTT helper using mqtt.js ─────────────────────────────── */
 
-async function publishMqttOff(stationId: string): Promise<boolean> {
+function getMqttHost(): string {
   let mqttHost = Deno.env.get("MQTT_HOST") || "";
-  const mqttUser = Deno.env.get("MQTT_USER") || "";
-  const mqttPassword = Deno.env.get("MQTT_PASSWORD") || "";
-
-  if (!mqttHost || !mqttUser || !mqttPassword) {
-    log("MQTT config missing");
-    return false;
-  }
-
+  if (!mqttHost) throw new Error("MQTT_HOST missing");
   mqttHost = mqttHost.replace(/^wss?:\/\//, "").replace(/^mqtts?:\/\//, "").replace(/\/.*$/, "").replace(/:.*$/, "");
-  const brokerUrl = `wss://${mqttHost}:8884/mqtt`;
-  const topic = `shower2pet/${stationId}/relay1/command`;
+  return mqttHost;
+}
+
+function connectMqtt(): Promise<mqtt.MqttClient> {
+  const host = getMqttHost();
+  const brokerUrl = `wss://${host}:8884/mqtt`;
   const clientId = `s2p-cron-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-  log("MQTT OFF publish", { brokerUrl, topic, stationId, clientId });
+  log("MQTT connecting", { brokerUrl, clientId });
 
-  const client = new WebSocketMqttClient({
-    url: new URL(brokerUrl),
+  const client = mqtt.connect(brokerUrl, {
     clientId,
-    username: mqttUser,
-    password: mqttPassword,
+    username: Deno.env.get("MQTT_USER") || "",
+    password: Deno.env.get("MQTT_PASSWORD") || "",
     clean: true,
-    keepAlive: 30,
-    connectTimeoutMs: 5000,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+    connectTimeout: 5000,
+    protocolVersion: 4,
   });
 
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      client.end(true);
+      reject(new Error("MQTT connect timeout"));
+    }, 8000);
+    client.on('connect', () => { clearTimeout(timeout); log("MQTT connected"); resolve(client); });
+    client.on('error', (err: Error) => { clearTimeout(timeout); reject(err); });
+  });
+}
+
+async function publishMqttOff(stationId: string): Promise<boolean> {
+  const topic = `shower2pet/${stationId}/relay1/command`;
+  log("MQTT OFF publish", { topic, stationId });
+
   try {
-    await client.connect();
-    log("MQTT connected");
-
-    const encoder = new TextEncoder();
-    await client.publish(topic, encoder.encode("0"), {
-      qos: Mqtt.QoS.AT_LEAST_ONCE,
-      retain: true,
-    });
+    const client = await connectMqtt();
+    await client.publishAsync(topic, "0", { qos: 1, retain: true });
     log("MQTT published OFF OK", { stationId });
-
-    await client.disconnect();
+    client.end();
     return true;
   } catch (e) {
     log("MQTT error", { error: String(e) });
-    try { await client.disconnect(); } catch (_) { /* ignore */ }
     return false;
   }
 }

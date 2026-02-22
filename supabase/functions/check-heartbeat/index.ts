@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import mqtt from "npm:mqtt@5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,18 +12,37 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[CHECK-HEARTBEAT] ${step}${detailsStr}`);
 };
 
-function getMqttConfig() {
+function getMqttHost(): string {
   let mqttHost = Deno.env.get("MQTT_HOST") || "";
-  const mqttUser = Deno.env.get("MQTT_USER") || "";
-  const mqttPassword = Deno.env.get("MQTT_PASSWORD") || "";
-
-  if (!mqttHost || !mqttUser || !mqttPassword) {
-    throw new Error("MQTT configuration missing");
-  }
-
+  if (!mqttHost) throw new Error("MQTT_HOST missing");
   mqttHost = mqttHost.replace(/^wss?:\/\//, "").replace(/^mqtts?:\/\//, "").replace(/\/.*$/, "").replace(/:.*$/, "");
-  const brokerUrl = `wss://${mqttHost}:8884/mqtt`;
-  return { brokerUrl, mqttUser, mqttPassword };
+  return mqttHost;
+}
+
+function connectMqtt(): Promise<mqtt.MqttClient> {
+  const host = getMqttHost();
+  const brokerUrl = `wss://${host}:8884/mqtt`;
+  const clientId = `s2p-hb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+  logStep("Connecting", { brokerUrl, clientId });
+
+  const client = mqtt.connect(brokerUrl, {
+    clientId,
+    username: Deno.env.get("MQTT_USER") || "",
+    password: Deno.env.get("MQTT_PASSWORD") || "",
+    clean: true,
+    connectTimeout: 8000,
+    protocolVersion: 4,
+  });
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      client.end(true);
+      reject(new Error("MQTT connect timeout"));
+    }, 10000);
+    client.on('connect', () => { clearTimeout(timeout); logStep("Connected"); resolve(client); });
+    client.on('error', (err: Error) => { clearTimeout(timeout); reject(err); });
+  });
 }
 
 serve(async (req) => {
@@ -33,65 +53,34 @@ serve(async (req) => {
   try {
     logStep("START");
 
-    // Dynamic import to avoid silent crash on module load failure
-    let Mqtt: any;
-    let WebSocketMqttClient: any;
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    const aliveStations = new Set<string>();
+    const offlineStations = new Set<string>();
+    let totalEventsReceived = 0;
+    let selfTestReceived = false;
+
+    let client: mqtt.MqttClient;
     try {
-      const mqttModule = await import("jsr:@ymjacky/mqtt5");
-      Mqtt = mqttModule.Mqtt;
-      WebSocketMqttClient = mqttModule.WebSocketMqttClient;
-      logStep("MQTT module loaded");
-    } catch (importErr) {
-      logStep("MQTT module import FAILED", { error: String(importErr) });
+      client = await connectMqtt();
+    } catch (connectErr) {
+      logStep("MQTT connect FAILED", { error: String(connectErr) });
       return new Response(JSON.stringify({
         success: false,
-        error: "MQTT module import failed: " + String(importErr),
+        error: "MQTT connect failed: " + String(connectErr),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
-
-    const { brokerUrl, mqttUser, mqttPassword } = getMqttConfig();
-    const clientId = `s2p-hb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-    logStep("Connecting", { brokerUrl, clientId });
-
-    const client = new WebSocketMqttClient({
-      url: new URL(brokerUrl),
-      clientId,
-      username: mqttUser,
-      password: mqttPassword,
-      clean: true,
-      keepAlive: 30,
-      connectTimeoutMs: 8000,
-      protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
-    });
-
-    const aliveStations = new Set<string>();
-    const offlineStations = new Set<string>();
-    const decoder = new TextDecoder();
-    let totalEventsReceived = 0;
-    let selfTestReceived = false;
-
-    const handleMessage = (event: any) => {
+    client.on('message', (topic: string, message: Buffer) => {
       try {
         totalEventsReceived++;
-        const packet = event?.detail ?? event;
-        const topic = packet?.topic?.toString?.() ?? packet?.topic ?? '';
-        let payload = '';
-        if (packet?.payload) {
-          try {
-            payload = typeof packet.payload === 'string'
-              ? packet.payload
-              : decoder.decode(packet.payload);
-          } catch { payload = String(packet.payload); }
-        }
+        const payload = message.toString();
 
         logStep("MSG", { topic, payload: payload.substring(0, 50) });
 
@@ -116,34 +105,14 @@ serve(async (req) => {
       } catch (e) {
         logStep("Parse error", { error: String(e) });
       }
-    };
+    });
 
-    client.on('publish', handleMessage);
-
-    try {
-      await client.connect();
-      logStep("Connected");
-    } catch (connectErr) {
-      logStep("MQTT connect FAILED", { error: String(connectErr) });
-      return new Response(JSON.stringify({
-        success: false,
-        error: "MQTT connect failed: " + String(connectErr),
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    }
-
-    await client.subscribe('shower2pet/+/status', Mqtt.QoS.AT_MOST_ONCE);
+    await client.subscribeAsync('shower2pet/+/status', { qos: 0 });
     logStep("Subscribed");
 
     // Self-test
     try {
-      await client.publish(
-        'shower2pet/_selftest/status',
-        new TextEncoder().encode('ping'),
-        { qos: Mqtt.QoS.AT_MOST_ONCE },
-      );
+      await client.publishAsync('shower2pet/_selftest/status', 'ping', { qos: 0 });
       logStep("Self-test published");
     } catch (e) {
       logStep("Self-test publish error", { error: String(e) });
@@ -161,7 +130,7 @@ serve(async (req) => {
       offline: [...offlineStations],
     });
 
-    try { await client.disconnect(); } catch (_) { /* ignore */ }
+    try { client.end(); } catch (_) { /* ignore */ }
 
     // Update DB for alive stations
     let updatedCount = 0;
