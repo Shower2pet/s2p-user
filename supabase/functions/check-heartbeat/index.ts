@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { Mqtt, WebSocketMqttClient } from "jsr:@ymjacky/mqtt5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +31,27 @@ serve(async (req) => {
   }
 
   try {
+    logStep("START");
+
+    // Dynamic import to avoid silent crash on module load failure
+    let Mqtt: any;
+    let WebSocketMqttClient: any;
+    try {
+      const mqttModule = await import("jsr:@ymjacky/mqtt5");
+      Mqtt = mqttModule.Mqtt;
+      WebSocketMqttClient = mqttModule.WebSocketMqttClient;
+      logStep("MQTT module loaded");
+    } catch (importErr) {
+      logStep("MQTT module import FAILED", { error: String(importErr) });
+      return new Response(JSON.stringify({
+        success: false,
+        error: "MQTT module import failed: " + String(importErr),
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -75,7 +95,6 @@ serve(async (req) => {
 
         logStep("MSG", { topic, payload: payload.substring(0, 50) });
 
-        // Topic format: shower2pet/{stationId}/status
         const parts = topic.split('/');
         if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
           const stationId = parts[1];
@@ -99,16 +118,26 @@ serve(async (req) => {
       }
     };
 
-    // Try both event binding methods
     client.on('publish', handleMessage);
 
-    await client.connect();
-    logStep("Connected");
+    try {
+      await client.connect();
+      logStep("Connected");
+    } catch (connectErr) {
+      logStep("MQTT connect FAILED", { error: String(connectErr) });
+      return new Response(JSON.stringify({
+        success: false,
+        error: "MQTT connect failed: " + String(connectErr),
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
 
     await client.subscribe('shower2pet/+/status', Mqtt.QoS.AT_MOST_ONCE);
     logStep("Subscribed");
 
-    // Self-test: publish a message to verify subscription works
+    // Self-test
     try {
       await client.publish(
         'shower2pet/_selftest/status',
@@ -120,7 +149,7 @@ serve(async (req) => {
       logStep("Self-test publish error", { error: String(e) });
     }
 
-    // Wait 40 seconds to reliably capture at least one heartbeat cycle
+    // Wait 40 seconds to capture heartbeats
     await new Promise(resolve => setTimeout(resolve, 40000));
 
     logStep("Wait done", {
@@ -150,7 +179,7 @@ serve(async (req) => {
       else logStep("DB offline error", { stationId, error: error.message });
     }
 
-    // Auto-offline expired heartbeats (2 min threshold)
+    // Auto-offline expired heartbeats
     const { error: offlineError } = await supabaseAdmin.rpc('auto_offline_expired_heartbeats');
     if (offlineError) logStep("Auto-offline error", { error: offlineError.message });
 
@@ -167,7 +196,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (err) {
-    logStep("ERROR", { error: String(err) });
+    logStep("ERROR", { error: String(err), stack: (err as Error)?.stack });
     return new Response(JSON.stringify({ success: false, error: String(err) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
