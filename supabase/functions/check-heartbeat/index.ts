@@ -104,14 +104,6 @@ serve(async (req) => {
             offlineStations.delete(stationId);
             logStep("ALIVE via status", { stationId, payload });
           }
-          return;
-        }
-
-        // Also treat relay state messages as proof of life
-        // e.g. shower2pet/BR_001/relay1/state
-        if (parts.length >= 3 && !aliveStations.has(stationId) && !offlineStations.has(stationId)) {
-          aliveStations.add(stationId);
-          logStep("ALIVE via activity", { stationId, topic });
         }
       } catch (e) {
         logStep("Parse error", { error: String(e) });
