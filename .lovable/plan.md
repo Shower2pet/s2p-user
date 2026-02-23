@@ -8,6 +8,7 @@
 1. **Creata `emqx-webhook` Edge Function** — riceve POST da EMQX per:
    - `client.connected` → chiama `handle_station_heartbeat` (stazione online, aggiorna `last_heartbeat_at`)
    - `client.disconnected` → chiama `mark_station_offline` (stazione offline)
+   - `message.publish` su `shower2pet/{id}/status` → aggiorna `last_heartbeat_at` (necessario finché il firmware invia heartbeat periodici)
 
 2. **Eliminata `check-heartbeat`** — non più necessaria, EMQX notifica in push
 
