@@ -898,7 +898,6 @@ export type Database = {
       }
     }
     Functions: {
-      auto_offline_expired_heartbeats: { Args: never; Returns: undefined }
       get_public_stations: {
         Args: never
         Returns: {
