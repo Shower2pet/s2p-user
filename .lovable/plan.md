@@ -1,14 +1,13 @@
 
 # Migrazione MQTT: da HiveMQ a EMQX con Webhook
 
-## Stato: ✅ Completata e verificata
+## Stato: ✅ Completata e ottimizzata
 
 ### Cosa è stato fatto
 
 1. **Creata `emqx-webhook` Edge Function** — riceve POST da EMQX per:
-   - `client.connected` → chiama `handle_station_heartbeat` (stazione online)
+   - `client.connected` → chiama `handle_station_heartbeat` (stazione online, aggiorna `last_heartbeat_at`)
    - `client.disconnected` → chiama `mark_station_offline` (stazione offline)
-   - `message.publish` su `shower2pet/{id}/status` → gestisce heartbeat e LWT
 
 2. **Eliminata `check-heartbeat`** — non più necessaria, EMQX notifica in push
 
@@ -18,19 +17,28 @@
 
 5. **Rimosso cron job `check-heartbeat-cron`** — non più necessario, eliminato dal DB
 
+6. **Semplificato heartbeat** — rimosso handler `message.publish` dal webhook e check client-side su `last_heartbeat_at`. Il campo `last_heartbeat_at` resta nel DB come safety net (usato da `get_public_stations()` per marcare OFFLINE stazioni con heartbeat stale).
+
 ### Configurazione EMQX attiva
 
 - **HTTP Server Connector** con TLS abilitato (TLS Verify OFF)
-- **3 regole** nel Rule Engine:
+- **2 regole** nel Rule Engine:
   - `SELECT * FROM "$events/client_connected"` → webhook
   - `SELECT * FROM "$events/client_disconnected"` → webhook
-  - `SELECT * FROM "shower2pet/+/status"` → webhook
+- ⚠️ La regola `shower2pet/+/status` può essere **rimossa** dal pannello EMQX (il firmware può smettere di inviare heartbeat periodici)
 
-### Test superati
-- ✅ Heartbeat via `message.publish` (BR_001)
-- ✅ Disconnessione (`client.disconnected`, reason: keepalive_timeout)
-- ✅ Riconnessione (`client.connected` → status torna AVAILABLE)
-- ✅ Cron job legacy rimosso
+### Architettura status stazione
+
+```
+Firmware si connette a EMQX
+  → EMQX invia client.connected → webhook → handle_station_heartbeat (AVAILABLE + last_heartbeat_at = now())
+
+Firmware si disconnette (o keepalive timeout)
+  → EMQX invia client.disconnected → webhook → mark_station_offline (OFFLINE)
+
+Safety net DB:
+  → get_public_stations() controlla last_heartbeat_at: se > 90s → sovrascrive status a OFFLINE
+```
 
 ### File ancora attivi con MQTT
 - `station-control/index.ts` — publish comandi relay (invariato, usa MQTT_HOST/USER/PASSWORD)
