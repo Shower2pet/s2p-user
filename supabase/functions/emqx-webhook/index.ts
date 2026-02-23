@@ -95,32 +95,9 @@ serve(async (req) => {
       });
     }
 
-    // ── message.publish (optional: heartbeat via status topic) ──
+    // ── message.publish — ignored, status managed via connect/disconnect events ──
     if (event === "message.publish") {
-      const topic = body.topic || "";
-      const parts = topic.split('/');
-
-      // Match shower2pet/{stationId}/status
-      if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
-        const stationId = parts[1];
-        const payload = body.payload || "";
-
-        if (payload.toLowerCase() === 'offline') {
-          log("LWT offline via publish", { stationId });
-          const { error } = await supabase.rpc('mark_station_offline', { p_station_id: stationId });
-          if (error) log("DB offline error", { stationId, error: error.message });
-        } else {
-          log("Heartbeat via publish", { stationId });
-          const { error } = await supabase.rpc('handle_station_heartbeat', { p_station_id: stationId });
-          if (error) log("DB heartbeat error", { stationId, error: error.message });
-        }
-
-        return new Response(JSON.stringify({ ok: true, action: "status_publish", station_id: stationId }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Ignore other message topics
+      log("Ignoring message.publish (heartbeat disabled)", { topic: body.topic });
       return new Response(JSON.stringify({ ok: true, action: "ignored" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

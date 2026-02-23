@@ -45,16 +45,10 @@ export const getStationDisplayName = (station: Station): string => {
   return station.structure_name ? `${typeName} – ${station.structure_name}` : typeName;
 };
 
-const HEARTBEAT_TIMEOUT_MS = 90 * 1000; // 90 seconds
-
 export const isStationOnline = (station: Station): boolean => {
-  if (station.status !== 'AVAILABLE') return false;
-  // Client-side freshness check: if heartbeat is stale, treat as offline
-  if (station.last_heartbeat_at) {
-    const age = Date.now() - new Date(station.last_heartbeat_at).getTime();
-    if (age > HEARTBEAT_TIMEOUT_MS) return false;
-  }
-  return true;
+  // Status is already resolved server-side by get_public_stations() 
+  // which checks last_heartbeat_at as a safety net
+  return station.status === 'AVAILABLE';
 };
 
 export const isStationBusy = (station: Station): boolean => {
