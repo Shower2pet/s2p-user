@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.get-receipt-pdf]
 verify_jwt = false
+
+[functions.emqx-webhook]
+verify_jwt = false

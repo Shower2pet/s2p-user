@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.auto_offline_expired_heartbeats();
