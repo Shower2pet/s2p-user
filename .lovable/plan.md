@@ -1,7 +1,7 @@
 
 # Migrazione MQTT: da HiveMQ a EMQX con Webhook
 
-## Stato: ✅ Completata
+## Stato: ✅ Completata e verificata
 
 ### Cosa è stato fatto
 
@@ -16,14 +16,22 @@
 
 4. **Autenticazione webhook** — Bearer token via secret `EMQX_WEBHOOK_SECRET`
 
-### Configurazione EMQX richiesta
+5. **Rimosso cron job `check-heartbeat-cron`** — non più necessario, eliminato dal DB
 
-Nel pannello EMQX, creare webhook con:
-- **URL**: `https://rbdzinajiyswzdeoenil.supabase.co/functions/v1/emqx-webhook`
-- **Headers**: `Authorization: Bearer <stesso-valore-del-secret>`
-- **Events**: `client.connected`, `client.disconnected`, `message.publish`
-- **Topic filter** (per message.publish): `shower2pet/+/status`
+### Configurazione EMQX attiva
+
+- **HTTP Server Connector** con TLS abilitato (TLS Verify OFF)
+- **3 regole** nel Rule Engine:
+  - `SELECT * FROM "$events/client_connected"` → webhook
+  - `SELECT * FROM "$events/client_disconnected"` → webhook
+  - `SELECT * FROM "shower2pet/+/status"` → webhook
+
+### Test superati
+- ✅ Heartbeat via `message.publish` (BR_001)
+- ✅ Disconnessione (`client.disconnected`, reason: keepalive_timeout)
+- ✅ Riconnessione (`client.connected` → status torna AVAILABLE)
+- ✅ Cron job legacy rimosso
 
 ### File ancora attivi con MQTT
-- `station-control/index.ts` — publish comandi relay (invariato)
+- `station-control/index.ts` — publish comandi relay (invariato, usa MQTT_HOST/USER/PASSWORD)
 - `check-expired-sessions/index.ts` — publish OFF a fine sessione (invariato)
