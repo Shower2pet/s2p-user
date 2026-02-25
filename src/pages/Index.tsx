@@ -258,7 +258,7 @@ const Index = () => {
               )}
             </div>
           </div>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 ${status.color}`}>
             {status.text}
           </span>
         </div>
