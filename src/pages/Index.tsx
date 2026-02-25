@@ -197,24 +197,17 @@ const Index = () => {
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Track used coordinates to offset overlapping markers
+    // Track used coordinates to apply pixel offsets for overlapping markers
     const usedCoords = new Map<string, number>();
 
     visibleStations.forEach((station) => {
-      let lat = station.geo_lat;
-      let lng = station.geo_lng;
+      const lat = station.geo_lat;
+      const lng = station.geo_lng;
       if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
 
-      // Offset overlapping markers
       const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
       const count = usedCoords.get(key) || 0;
       usedCoords.set(key, count + 1);
-      if (count > 0) {
-        const angle = (count * 60) * (Math.PI / 180);
-        const offset = 0.0003;
-        lat = lat + offset * Math.sin(angle);
-        lng = lng + offset * Math.cos(angle);
-      }
 
       const online = isStationOnline(station);
       const isRestricted = station.visibility === 'RESTRICTED';
@@ -223,7 +216,13 @@ const Index = () => {
         : isRestricted
           ? '#f59e0b'
           : station.category === 'SHOWER' ? '#10b981' : '#005596';
-      const marker = new mapboxgl.Marker({ color: markerColor })
+
+      // Pixel-based offset so markers are always visually separated regardless of zoom
+      const pixelOffset: [number, number] = count > 0
+        ? [Math.cos(count * 60 * Math.PI / 180) * 20, Math.sin(count * 60 * Math.PI / 180) * 20]
+        : [0, 0];
+
+      const marker = new mapboxgl.Marker({ color: markerColor, offset: pixelOffset })
         .setLngLat([lng, lat])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
