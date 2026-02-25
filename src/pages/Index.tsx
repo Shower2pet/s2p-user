@@ -194,10 +194,26 @@ const Index = () => {
     }
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
+
+    // Track used coordinates to offset overlapping markers
+    const usedCoords = new Map<string, number>();
+
     visibleStations.forEach((station) => {
-      const lat = station.geo_lat;
-      const lng = station.geo_lng;
+      let lat = station.geo_lat;
+      let lng = station.geo_lng;
       if (!lat || !lng || lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+
+      // Offset overlapping markers
+      const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+      const count = usedCoords.get(key) || 0;
+      usedCoords.set(key, count + 1);
+      if (count > 0) {
+        const angle = (count * 60) * (Math.PI / 180);
+        const offset = 0.0003;
+        lat = lat + offset * Math.sin(angle);
+        lng = lng + offset * Math.cos(angle);
+      }
+
       const online = isStationOnline(station);
       const isRestricted = station.visibility === 'RESTRICTED';
       const markerColor = !online
