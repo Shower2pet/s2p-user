@@ -4,12 +4,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useStations, Station, isStationOnline, StationCategory, getStationDisplayName } from '@/hooks/useStations';
 import { useGeolocation, getDistanceKm } from '@/hooks/useGeolocation';
 import { QrScanner } from '@/components/scanner/QrScanner';
-import { MapPin, Navigation, ScanLine, Unlock, X, Search, AlertTriangle, Lock, LogIn } from 'lucide-react';
+import { MapPin, Navigation, ScanLine, Unlock, X, Search, AlertTriangle, Lock, LogIn, UserPlus, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
@@ -40,6 +41,7 @@ const Index = () => {
   const [categoryFilter, setCategoryFilter] = useState<StationCategory | 'ALL'>('ALL');
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [showAllStations, setShowAllStations] = useState(false);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const { data: stations, isLoading } = useStations();
   const { position } = useGeolocation();
 
@@ -243,6 +245,14 @@ const Index = () => {
     };
   }, []);
 
+  // Show auth prompt after 3 seconds for unauthenticated users
+  useEffect(() => {
+    if (!user && !loading) {
+      const timer = setTimeout(() => setShowAuthPrompt(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, loading]);
+
   const handleActivateStation = (station: Station) => navigate(`/s/${station.id}`);
 
   const handleNavigate = (station: Station) => {
@@ -335,11 +345,6 @@ const Index = () => {
         {/* Hero */}
         <div className="text-center space-y-2 animate-fade-in">
           <h1 className="text-2xl font-bold text-primary leading-tight">{t('heroTitle')}</h1>
-          {!user && !loading && (
-            <Button onClick={() => navigate('/login')} variant="outline" size="sm" className="mt-2">
-              <LogIn className="w-4 h-4" /> {t('loginToActivate')}
-            </Button>
-          )}
         </div>
 
         {/* QR Scanner Button - prominent */}
@@ -479,6 +484,29 @@ const Index = () => {
 
       {/* QR Scanner Modal */}
       {showQrScanner && <QrScanner onClose={() => setShowQrScanner(false)} />}
+
+      {/* Auth Prompt Dialog */}
+      <Dialog open={showAuthPrompt && !user} onOpenChange={setShowAuthPrompt}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader className="text-center items-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="w-7 h-7 text-primary" />
+            </div>
+            <DialogTitle className="text-lg">Unisciti a Shower2Pet!</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Accedi o registrati per attivare le stazioni, accumulare crediti e gestire i tuoi lavaggi in un unico posto.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button onClick={() => { setShowAuthPrompt(false); navigate('/login'); }} className="w-full" size="lg">
+              <LogIn className="w-5 h-5" /> Accedi
+            </Button>
+            <Button onClick={() => { setShowAuthPrompt(false); navigate('/register'); }} variant="outline" className="w-full" size="lg">
+              <UserPlus className="w-5 h-5" /> Registrati gratis
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 };
