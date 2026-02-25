@@ -40,12 +40,13 @@ const Profile = () => {
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
   const displayName = fullName || profile?.email || user?.email || 'Utente';
 
-  // Deterministic random pet avatar based on user ID
+  // Deterministic pet avatar - uses adorable animal illustrations
   const petAvatarUrl = useMemo(() => {
-    const petKeywords = ['kitten', 'puppy', 'dog', 'cat', 'bunny', 'hamster'];
-    const seed = user?.id ? user.id.charCodeAt(0) + user.id.charCodeAt(1) : 0;
-    const keyword = petKeywords[seed % petKeywords.length];
-    return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${user?.id || 'default'}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+    const seed = user?.id || 'default';
+    // Using "adventurer" style with pet-like seeds for cute animal avatars
+    const petSeeds = ['Bella', 'Max', 'Luna', 'Charlie', 'Daisy', 'Buddy', 'Coco', 'Rocky', 'Milo', 'Lola'];
+    const idx = seed.charCodeAt(0) % petSeeds.length;
+    return `https://api.dicebear.com/9.x/thumbs/svg?seed=${petSeeds[idx]}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&shapeColor=0a5b83,1c799f,69d2e7,f1f4dc,f88c49`;
   }, [user?.id]);
 
   if (authLoading) {
