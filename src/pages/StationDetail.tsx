@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { QrVerifyScanner } from '@/components/scanner/QrVerifyScanner';
 import { sendGateCommand } from '@/services/stationService';
 import { createCheckout, payWithCredits, verifySession } from '@/services/paymentService';
+import { logErrorToDb, GENERIC_ERROR_MESSAGE } from '@/services/errorLogService';
 
 const StationDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -129,7 +130,14 @@ const StationDetail = () => {
       toast.success('Comando di apertura inviato!');
     } catch (err) {
       console.error('Gate open error:', err);
-      toast.error('Errore nell\'invio del comando');
+      toast.error(GENERIC_ERROR_MESSAGE);
+      logErrorToDb({
+        error_message: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        error_context: `Gate open command failed for station ${station.id}`,
+        component: 'StationDetail',
+        severity: 'error',
+      });
     } finally {
       setIsOpeningGate(false);
     }
@@ -201,7 +209,14 @@ const StationDetail = () => {
         if (data?.url) window.location.href = data.url;
       } catch (err: any) {
         console.error('Subscription error:', err);
-        toast.error('Errore nella creazione dell\'abbonamento');
+        toast.error(GENERIC_ERROR_MESSAGE);
+        logErrorToDb({
+          error_message: err instanceof Error ? err.message : String(err),
+          error_stack: err instanceof Error ? err.stack : undefined,
+          error_context: 'Subscription checkout creation failed',
+          component: 'StationDetail',
+          severity: 'error',
+        });
       } finally {
         setIsProcessing(false);
       }
@@ -230,7 +245,14 @@ const StationDetail = () => {
       if (data?.url) window.location.href = data.url;
     } catch (err) {
       console.error('Purchase error:', err);
-      toast.error('Errore durante l\'acquisto');
+      toast.error(GENERIC_ERROR_MESSAGE);
+      logErrorToDb({
+        error_message: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        error_context: `Credit purchase failed for structure ${station.structure_id}`,
+        component: 'StationDetail',
+        severity: 'error',
+      });
     } finally {
       setPurchasingId(null);
     }
@@ -260,13 +282,20 @@ const StationDetail = () => {
         navigate(`/s/${station.id}/timer`);
       } catch (err: any) {
         console.error('Payment error:', err);
-        const msg = err.message || t('paymentError');
+        logErrorToDb({
+          error_message: err instanceof Error ? err.message : String(err),
+          error_stack: err instanceof Error ? err.stack : undefined,
+          error_context: `Credit/subscription payment failed for station ${station.id}`,
+          component: 'StationDetail',
+          severity: 'error',
+        });
+        const msg = err.message || '';
         if (msg.includes('non raggiungibile') || msg.includes('non disponibile')) {
           toast.error(msg, { icon: <WifiOff className="w-4 h-4" /> });
           queryClient.invalidateQueries({ queryKey: ['station', id] });
           queryClient.invalidateQueries({ queryKey: ['stations'] });
         } else {
-          toast.error(msg);
+          toast.error(GENERIC_ERROR_MESSAGE);
         }
       } finally {
         setIsProcessing(false);
@@ -291,13 +320,20 @@ const StationDetail = () => {
         if (data?.url) window.location.href = data.url;
       } catch (err: any) {
         console.error('Payment error:', err);
-        const msg = err.message || t('paymentError');
+        logErrorToDb({
+          error_message: err instanceof Error ? err.message : String(err),
+          error_stack: err instanceof Error ? err.stack : undefined,
+          error_context: `Stripe checkout creation failed for station ${station.id}`,
+          component: 'StationDetail',
+          severity: 'error',
+        });
+        const msg = err.message || '';
         if (msg.includes('non raggiungibile') || msg.includes('non disponibile')) {
           toast.error(msg, { icon: <WifiOff className="w-4 h-4" /> });
           queryClient.invalidateQueries({ queryKey: ['station', id] });
           queryClient.invalidateQueries({ queryKey: ['stations'] });
         } else {
-          toast.error(msg);
+          toast.error(GENERIC_ERROR_MESSAGE);
         }
       } finally {
         setIsProcessing(false);
