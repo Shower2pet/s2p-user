@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Crown, Loader2 } from 'lucide-react';
 import { SubscriptionPlan } from '@/hooks/useSubscriptions';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface SubscriptionPlansListProps {
   plans: SubscriptionPlan[];
@@ -12,13 +13,16 @@ interface SubscriptionPlansListProps {
 }
 
 export const SubscriptionPlansList = ({ plans, activePlanId, onSubscribe, isProcessing }: SubscriptionPlansListProps) => {
+  const { t } = useLanguage();
   if (plans.length === 0) return null;
+
+  const intervalLabel = (interval: string) => interval === 'month' ? t('perMonth') : t('perYear');
 
   return (
     <div className="space-y-3">
       <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
         <Crown className="w-5 h-5 text-accent" />
-        Abbonamenti Disponibili
+        {t('availableSubscriptions')}
       </h2>
       {plans.map((plan) => {
         const isActive = activePlanId === plan.id;
@@ -33,7 +37,7 @@ export const SubscriptionPlansList = ({ plans, activePlanId, onSubscribe, isProc
                   <p className="font-bold text-foreground">{plan.name}</p>
                   {isActive && (
                     <Badge variant="outline" className="border-accent text-accent text-xs">
-                      Attivo
+                      {t('activeBadge')}
                     </Badge>
                   )}
                 </div>
@@ -42,14 +46,14 @@ export const SubscriptionPlansList = ({ plans, activePlanId, onSubscribe, isProc
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   {plan.max_washes_per_month
-                    ? `${plan.max_washes_per_month} lavaggi/${plan.interval === 'month' ? 'mese' : 'anno'}`
-                    : `Lavaggi illimitati/${plan.interval === 'month' ? 'mese' : 'anno'}`
+                    ? `${plan.max_washes_per_month} ${t('washesPerInterval')}/${intervalLabel(plan.interval)}`
+                    : `${t('unlimitedWashes')}/${intervalLabel(plan.interval)}`
                   }
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-xl font-bold text-accent">€{plan.price_eur.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">/{plan.interval === 'month' ? 'mese' : 'anno'}</p>
+                <p className="text-xs text-muted-foreground">/{intervalLabel(plan.interval)}</p>
               </div>
             </div>
             {!isActive && (
@@ -61,7 +65,7 @@ export const SubscriptionPlansList = ({ plans, activePlanId, onSubscribe, isProc
                 size="sm"
               >
                 {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                Abbonati
+                {t('subscribe')}
               </Button>
             )}
           </Card>
