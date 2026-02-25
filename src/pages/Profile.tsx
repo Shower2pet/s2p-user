@@ -37,7 +37,8 @@ const Profile = () => {
     return 'U';
   };
 
-  const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'User';
+  const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
+  const displayName = fullName || profile?.email || user?.email || 'Utente';
 
   if (authLoading) {
     return (
