@@ -71,7 +71,7 @@ const Credits = () => {
               <Card key={w.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <p className="font-bold text-foreground">{w.structure_name || 'Struttura'}</p>
-                  <span className="text-xl font-bold text-primary">€{w.balance.toFixed(2)}</span>
+                  <span className="text-xl font-bold text-primary">€ {w.balance.toFixed(2).replace('.', ',')}</span>
                 </div>
               </Card>
             ))
@@ -134,7 +134,7 @@ const Credits = () => {
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-accent">€{sub.plan?.price_eur?.toFixed(2) || '—'}</p>
+                      <p className="text-lg font-bold text-accent">€ {sub.plan?.price_eur?.toFixed(2).replace('.', ',') || '—'}</p>
                       <p className="text-xs text-muted-foreground">
                         /{sub.plan?.interval === 'month' ? 'mese' : 'anno'}
                       </p>
