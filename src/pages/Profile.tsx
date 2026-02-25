@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,14 @@ const Profile = () => {
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
   const displayName = fullName || profile?.email || user?.email || 'Utente';
 
+  // Deterministic random pet avatar based on user ID
+  const petAvatarUrl = useMemo(() => {
+    const petKeywords = ['kitten', 'puppy', 'dog', 'cat', 'bunny', 'hamster'];
+    const seed = user?.id ? user.id.charCodeAt(0) + user.id.charCodeAt(1) : 0;
+    const keyword = petKeywords[seed % petKeywords.length];
+    return `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${user?.id || 'default'}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
+  }, [user?.id]);
+
   if (authLoading) {
     return (
       <AppShell>
@@ -63,6 +71,7 @@ const Profile = () => {
           <Card className="p-6">
             <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
+                <AvatarImage src={petAvatarUrl} alt="Pet avatar" />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
                   {getInitials(profile?.first_name ?? null, profile?.last_name ?? null, profile?.email ?? null)}
                 </AvatarFallback>
