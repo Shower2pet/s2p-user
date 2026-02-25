@@ -13,6 +13,7 @@ import logo from '@/assets/shower2pet-logo.png';
 import { WashSession } from '@/types/database';
 import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession } from '@/services/sessionService';
 import { sendStationCommand } from '@/services/stationService';
+import { logErrorToDb, GENERIC_ERROR_MESSAGE } from '@/services/errorLogService';
 // receiptService rimosso: gli scontrini Fiskaly vengono triggerati solo dal stripe-webhook server-side
 
 type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
@@ -120,6 +121,13 @@ const StationTimer = () => {
       await sendStationCommand(sess.station_id, 'OFF');
     } catch (e) {
       console.error('[AUTO-STOP] OFF failed:', e);
+      logErrorToDb({
+        error_message: e instanceof Error ? e.message : String(e),
+        error_stack: e instanceof Error ? e.stack : undefined,
+        error_context: `AUTO-STOP OFF command failed for station ${sess.station_id}`,
+        component: 'StationTimer',
+        severity: 'critical',
+      });
     }
 
     setIsActive(false);
@@ -148,10 +156,16 @@ const StationTimer = () => {
 
       if (!hwData?.success) {
         const isOffline = hwData?.error === 'STATION_OFFLINE';
-        toast.error(isOffline
+        const errorMsg = isOffline
           ? '⚠️ La stazione risulta offline. Impossibile avviare il servizio.'
-          : 'La stazione non risponde. Riprova o contatta il supporto.'
-        );
+          : 'La stazione non risponde. Riprova o contatta il supporto.';
+        toast.error(errorMsg);
+        logErrorToDb({
+          error_message: `START_TIMED_WASH failed: ${hwData?.error || 'unknown'}`,
+          error_context: `Station ${session.station_id}, session ${session.id}`,
+          component: 'StationTimer',
+          severity: isOffline ? 'warning' : 'error',
+        });
         setStarting(false);
         return;
       }
@@ -192,7 +206,14 @@ const StationTimer = () => {
       }
     } catch (err) {
       console.error('Hardware activation error:', err);
-      toast.error('Errore di connessione alla stazione');
+      toast.error(GENERIC_ERROR_MESSAGE);
+      logErrorToDb({
+        error_message: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        error_context: `Hardware activation error for station ${session.station_id}`,
+        component: 'StationTimer',
+        severity: 'error',
+      });
     } finally {
       setStarting(false);
     }
@@ -286,8 +307,15 @@ const StationTimer = () => {
         return;
       }
       autoStopFiredRef.current = true;
-    } catch (_) {
-      toast.error('Errore di connessione');
+    } catch (err) {
+      toast.error(GENERIC_ERROR_MESSAGE);
+      logErrorToDb({
+        error_message: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        error_context: `Manual stop OFF command failed for station ${session.station_id}`,
+        component: 'StationTimer',
+        severity: 'error',
+      });
       setStopping(false);
       return;
     }
