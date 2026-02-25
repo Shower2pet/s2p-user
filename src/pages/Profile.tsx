@@ -4,18 +4,18 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
-import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Coins, Crown, LogIn, UserPlus } from 'lucide-react';
+import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Crown, LogIn, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useWallets } from '@/hooks/useWallet';
+
 
 const Profile = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { profile, signOut, user, loading: authLoading } = useAuth();
-  const { data: wallets } = useWallets();
+  
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -97,25 +97,6 @@ const Profile = () => {
           </Card>
         )}
 
-        {/* Wallets grouped by structure */}
-        {wallets && wallets.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold text-foreground px-1 flex items-center gap-2">
-              <Coins className="w-5 h-5" /> {t('yourCredits')}
-            </h2>
-            {wallets.map((w) => (
-              <Card key={w.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-foreground">{w.structure_name || 'Struttura'}</p>
-                    <p className="text-xs text-muted-foreground">Saldo disponibile</p>
-                  </div>
-                  <span className="text-2xl font-bold text-primary">€{w.balance.toFixed(2)}</span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
 
         {/* Notifications */}
         <div className="space-y-3">
