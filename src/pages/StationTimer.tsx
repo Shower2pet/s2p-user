@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2, Play, StopCircle } from 'lucide-react';
+import { Dog, Droplets, Wind, CheckCircle, Star, AlertTriangle, ShowerHead, Loader2, Play, StopCircle, PawPrint, Sparkles, Check, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -179,7 +179,7 @@ const StationTimer = () => {
       const resolvedEndsAt = endsAt ?? fallbackEndsAt;
       const resolvedStartedAt = startedAt ?? new Date().toISOString();
 
-      toast.success("🚿 Stazione attivata! L'acqua è in erogazione.");
+      toast.success("Stazione attivata! L'acqua è in erogazione.");
       const updatedSession = { ...session, started_at: resolvedStartedAt, ends_at: resolvedEndsAt };
       setSession(updatedSession);
 
@@ -397,7 +397,7 @@ const StationTimer = () => {
               {getStationDisplayName(station)}
             </p>
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-foreground/20 text-primary-foreground">
-              {station.type} — {isShowerStation ? '🚿 Doccia' : '🛁 Vasca'}
+              {station.type} — {isShowerStation ? 'Doccia' : 'Vasca'}
             </span>
           </div>
         )}
@@ -438,18 +438,18 @@ const StationTimer = () => {
           <Dialog open={step === 'rules'} onOpenChange={() => {}}>
             <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
               <DialogHeader>
-                <DialogTitle>📋 Regolamento</DialogTitle>
+                <DialogTitle>Regolamento</DialogTitle>
                 <DialogDescription>Leggi e accetta prima di iniziare</DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm text-muted-foreground">
-                <p>🐕 Tieni il cane al guinzaglio durante il lavaggio</p>
-                <p>🚿 Controlla la temperatura dell'acqua prima di iniziare</p>
-                <p>🧹 Lascia la vasca pulita dopo l'uso</p>
-                <p>⚠️ Supervisiona sempre il tuo animale</p>
+                <p className="flex items-center gap-2"><PawPrint className="w-4 h-4 shrink-0" /> Tieni il cane al guinzaglio durante il lavaggio</p>
+                <p className="flex items-center gap-2"><Droplets className="w-4 h-4 shrink-0" /> Controlla la temperatura dell'acqua prima di iniziare</p>
+                <p className="flex items-center gap-2"><Sparkles className="w-4 h-4 shrink-0" /> Lascia la vasca pulita dopo l'uso</p>
+                <p className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0" /> Supervisiona sempre il tuo animale</p>
               </div>
               <DialogFooter>
                 <Button onClick={handleAcceptRules} className="w-full" size="lg">
-                  ✅ Accetto e Avvia
+                  <Check className="w-4 h-4" /> Accetto e Avvia
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -547,15 +547,15 @@ const StationTimer = () => {
           <Dialog open={step === 'cleanup'} onOpenChange={() => {}}>
             <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
               <DialogHeader>
-                <DialogTitle>🧹 Pulizia vasca</DialogTitle>
+                <DialogTitle>Pulizia vasca</DialogTitle>
                 <DialogDescription>Hai lasciato la vasca pulita?</DialogDescription>
               </DialogHeader>
               <div className="flex gap-3">
                 <Button onClick={() => handleCleanupResponse(true)} className="flex-1" size="lg">
-                  ✅ Sì
+                  <Check className="w-4 h-4" /> Sì
                 </Button>
                 <Button onClick={() => handleCleanupResponse(false)} variant="outline" className="flex-1" size="lg">
-                  ❌ No
+                  <X className="w-4 h-4" /> No
                 </Button>
               </div>
             </DialogContent>

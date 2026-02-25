@@ -177,7 +177,7 @@ const Index = () => {
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<strong>${getStationDisplayName(station)}</strong><br/>${station.structure_address || ''}${
-              station.visibility === 'RESTRICTED' ? '<br/><em>🔒 Solo Clienti</em>' : ''
+              station.visibility === 'RESTRICTED' ? '<br/><em>Solo Clienti</em>' : ''
             }`
           )
         )
@@ -242,7 +242,7 @@ const Index = () => {
                 {distLabel && <span className="ml-1 text-primary font-medium">· {distLabel}</span>}
               </p>
               {station.visibility === 'RESTRICTED' && (
-                <p className="text-xs text-warning mt-0.5">🔒 Solo Clienti</p>
+                <p className="text-xs text-warning mt-0.5 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo Clienti</p>
               )}
             </div>
           </div>

@@ -12,7 +12,7 @@ export const LanguageSwitcher = () => {
         onClick={() => setLanguage('it')}
         className="rounded-full px-3 h-8 text-xs font-bold"
       >
-        🇮🇹 IT
+        IT
       </Button>
       <Button
         variant={language === 'en' ? 'default' : 'ghost'}
@@ -20,7 +20,7 @@ export const LanguageSwitcher = () => {
         onClick={() => setLanguage('en')}
         className="rounded-full px-3 h-8 text-xs font-bold"
       >
-        🇬🇧 EN
+        EN
       </Button>
     </div>
   );

@@ -79,7 +79,7 @@ const Payment = () => {
           <p className="text-xs text-center text-muted-foreground font-light">{t('redirectToPayment')}</p>
         </Card>
         <Card className="p-4 bg-mint/10 border-mint">
-          <p className="text-sm text-center text-muted-foreground font-light">💳 {t('acceptedCards')}</p>
+          <p className="text-sm text-center text-muted-foreground font-light flex items-center justify-center gap-1.5"><CreditCard className="w-4 h-4" /> {t('acceptedCards')}</p>
         </Card>
       </div>
     </AppShell>
