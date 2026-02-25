@@ -199,8 +199,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // RBAC: ON/OFF are admin/partner/manager only
-    if ((command === "ON" || command === "OFF") && userRole === "user") {
+    // RBAC: ON is admin/partner/manager only (OFF is allowed for users to stop their wash)
+    if (command === "ON" && userRole === "user") {
       return new Response(JSON.stringify({ error: "Forbidden", success: false }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
