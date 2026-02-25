@@ -340,11 +340,11 @@ const StationDetail = () => {
               </div>
               <Button
                 onClick={handleOpenGate}
-                disabled={isOpeningGate}
+                disabled={isOpeningGate || !online}
                 size="sm"
               >
-                {isOpeningGate ? <Loader2 className="w-4 h-4 animate-spin" /> : <DoorOpen className="w-4 h-4" />}
-                {isOpeningGate ? 'Invio...' : 'Apri Porta'}
+                {isOpeningGate ? <Loader2 className="w-4 h-4 animate-spin" /> : !online ? <WifiOff className="w-4 h-4" /> : <DoorOpen className="w-4 h-4" />}
+                {isOpeningGate ? 'Invio...' : !online ? 'Offline' : 'Apri Porta'}
               </Button>
             </div>
           </Card>
