@@ -305,9 +305,11 @@ Deno.serve(async (req) => {
       const ok = await publishMqtt(topic, durationMs.toString());
 
       if (ok && userId) {
-        await adminClient.from("gate_commands").insert({
-          station_id, command, user_id: userId, status: "sent",
-        }).catch(() => {});
+        try {
+          await adminClient.from("gate_commands").insert({
+            station_id, command, user_id: userId, status: "sent",
+          });
+        } catch { /* ignore logging failures */ }
       }
 
       return new Response(JSON.stringify({ success: ok, topic, payload: durationMs.toString() }), {
@@ -322,9 +324,11 @@ Deno.serve(async (req) => {
     const ok = await publishMqtt(topic, payload);
 
     if (ok && userId) {
-      await adminClient.from("gate_commands").insert({
-        station_id, command, user_id: userId, status: "sent",
-      }).catch(() => {});
+      try {
+        await adminClient.from("gate_commands").insert({
+          station_id, command, user_id: userId, status: "sent",
+        });
+      } catch { /* ignore logging failures */ }
     }
 
     return new Response(JSON.stringify({ success: ok }), {
