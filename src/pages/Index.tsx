@@ -342,6 +342,29 @@ const Index = () => {
           </div>
         </Card>
 
+        {/* Unlock station */}
+        {!showUnlockInput ? (
+          <Button onClick={() => setShowUnlockInput(true)} variant="outline" className="w-full" size="lg">
+            <Unlock className="w-5 h-5 mr-2" /> {t('unlockStation')}
+          </Button>
+        ) : (
+          <Card className="p-4 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-foreground">{t('enterStationCode')}</h3>
+              <button onClick={() => { setShowUnlockInput(false); setStationCode(''); }} className="p-1.5 hover:bg-muted rounded-full">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
+            <div className="flex gap-2">
+              <Input value={stationCode} onChange={(e) => setStationCode(e.target.value)}
+                placeholder={t('stationCodePlaceholder')} className="flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()} />
+              <Button onClick={handleUnlockStation}>{t('go')}</Button>
+            </div>
+          </Card>
+        )}
+
         {/* Search */}
         {MAPBOX_TOKEN && (
           <Card className="p-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -398,29 +421,6 @@ const Index = () => {
               <button onClick={() => setNoStationsMessage(null)} className="p-1 hover:bg-muted rounded-full">
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
-            </div>
-          </Card>
-        )}
-
-        {/* Unlock station */}
-        {!showUnlockInput ? (
-          <Button onClick={() => setShowUnlockInput(true)} variant="outline" className="w-full" size="lg">
-            <Unlock className="w-5 h-5 mr-2" /> {t('unlockStation')}
-          </Button>
-        ) : (
-          <Card className="p-4 space-y-3 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-foreground">{t('enterStationCode')}</h3>
-              <button onClick={() => { setShowUnlockInput(false); setStationCode(''); }} className="p-1.5 hover:bg-muted rounded-full">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground">{t('enterStationCodeDesc')}</p>
-            <div className="flex gap-2">
-              <Input value={stationCode} onChange={(e) => setStationCode(e.target.value)}
-                placeholder={t('stationCodePlaceholder')} className="flex-1"
-                onKeyDown={(e) => e.key === 'Enter' && handleUnlockStation()} />
-              <Button onClick={handleUnlockStation}>{t('go')}</Button>
             </div>
           </Card>
         )}
