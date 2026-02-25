@@ -99,7 +99,7 @@ const Index = () => {
 
   const checkStationsNearLocation = (lng: number, lat: number, locationName: string) => {
     if (visibleStations.length === 0) {
-      setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
+      setNoStationsMessage(t('noStationsAtLocation').replace('{location}', locationName));
       return;
     }
     const nearbyStations = visibleStations.filter(s => {
@@ -108,7 +108,7 @@ const Index = () => {
       return distance < 0.5;
     });
     if (nearbyStations.length === 0) {
-      setNoStationsMessage(`Non ci sono ancora stazioni disponibili a ${locationName}. Stiamo espandendo il servizio!`);
+      setNoStationsMessage(t('noStationsAtLocation').replace('{location}', locationName));
     } else {
       setNoStationsMessage(null);
     }
@@ -118,11 +118,11 @@ const Index = () => {
     const trimmed = locationSearch.trim();
     if (!trimmed || !map.current || !MAPBOX_TOKEN) return;
     if (trimmed.length > MAX_LOCATION_LENGTH) {
-      toast.error(`Località troppo lunga (max ${MAX_LOCATION_LENGTH} caratteri)`);
+      toast.error(t('locationTooLong').replace('{max}', String(MAX_LOCATION_LENGTH)));
       return;
     }
     if (!LOCATION_PATTERN.test(trimmed)) {
-      toast.error('La località contiene caratteri non validi');
+      toast.error(t('locationInvalidChars'));
       return;
     }
     setIsSearching(true);
@@ -135,20 +135,20 @@ const Index = () => {
         { signal: controller.signal }
       );
       clearTimeout(timeoutId);
-      if (!response.ok) throw new Error('Errore nella ricerca');
+      if (!response.ok) throw new Error('search error');
       const data = await response.json();
       if (data.features?.length > 0) {
         const [lng, lat] = data.features[0].center;
         map.current.flyTo({ center: [lng, lat], zoom: 13, essential: true });
         checkStationsNearLocation(lng, lat, data.features[0].place_name);
       } else {
-        toast.error('Località non trovata');
+        toast.error(t('locationNotFound'));
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        toast.error('Ricerca scaduta, riprova');
+        toast.error(t('searchTimeout'));
       } else {
-        toast.error('Errore nella ricerca');
+        toast.error(t('searchError'));
       }
     } finally {
       setIsSearching(false);
@@ -190,7 +190,7 @@ const Index = () => {
       el.className = 'user-location-marker';
       new mapboxgl.Marker({ element: el, color: '#ef4444', scale: 0.6 })
         .setLngLat([position.lng, position.lat])
-        .setPopup(new mapboxgl.Popup({ offset: 15 }).setText('La tua posizione'))
+        .setPopup(new mapboxgl.Popup({ offset: 15 }).setText('📍'))
         .addTo(map.current);
       map.current.flyTo({ center: [position.lng, position.lat], zoom: 13, essential: true });
     }
@@ -227,7 +227,7 @@ const Index = () => {
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<strong>${getStationDisplayName(station)}</strong><br/>${station.structure_address || ''}${
-              station.visibility === 'RESTRICTED' ? '<br/><em>Solo Clienti</em>' : ''
+              station.visibility === 'RESTRICTED' ? `<br/><em>${t('onlyClients')}</em>` : ''
             }`
           )
         )
@@ -266,7 +266,7 @@ const Index = () => {
     const online = isStationOnline(station);
     if (online) return { color: 'bg-success text-success-foreground', text: t('available') };
     if (station.status === 'BUSY') return { color: 'bg-warning text-warning-foreground', text: t('busy') };
-    if (station.status === 'MAINTENANCE') return { color: 'bg-destructive/15 text-destructive', text: 'Manutenzione' };
+    if (station.status === 'MAINTENANCE') return { color: 'bg-destructive/15 text-destructive', text: t('maintenance') };
     return { color: 'bg-muted text-muted-foreground', text: t('offline') };
   };
 
@@ -300,7 +300,7 @@ const Index = () => {
                 {distLabel && <span className="ml-1 text-primary font-medium">· {distLabel}</span>}
               </p>
               {station.visibility === 'RESTRICTED' && (
-                <p className="text-xs text-warning mt-0.5 flex items-center gap-1"><Lock className="w-3 h-3" /> Solo Clienti</p>
+                <p className="text-xs text-warning mt-0.5 flex items-center gap-1"><Lock className="w-3 h-3" /> {t('onlyClients')}</p>
               )}
             </div>
           </div>
@@ -313,7 +313,7 @@ const Index = () => {
             <Button variant="default" size="sm" className="flex-1"
               onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
             >
-              <MapPin className="w-4 h-4" /> Scopri di più
+              <MapPin className="w-4 h-4" /> {t('learnMore')}
             </Button>
             <Button variant="outline" size="sm" className="flex-1"
               onClick={(e) => { e.stopPropagation(); handleNavigate(station); }}
@@ -346,7 +346,7 @@ const Index = () => {
           <h1 className="text-2xl font-bold text-primary leading-tight">{t('heroTitle')}</h1>
         </div>
 
-        {/* QR Scanner Button - prominent */}
+        {/* QR Scanner Button */}
         <Card
           className="p-5 rounded-3xl shadow-floating bg-gradient-to-br from-primary to-primary/80 text-primary-foreground cursor-pointer hover:scale-[1.02] transition-all duration-300 animate-slide-up"
           onClick={() => setShowQrScanner(true)}
@@ -356,8 +356,8 @@ const Index = () => {
               <ScanLine className="w-7 h-7" />
             </div>
             <div className="flex-1">
-              <p className="text-lg font-bold">Scansiona QR Code</p>
-              <p className="text-sm opacity-80">Scansiona il codice sulla stazione per iniziare</p>
+              <p className="text-lg font-bold">{t('scanQrCode')}</p>
+              <p className="text-sm opacity-80">{t('scanQrCodeDesc')}</p>
             </div>
           </div>
         </Card>
@@ -394,14 +394,14 @@ const Index = () => {
                 <Input
                   value={locationSearch}
                   onChange={(e) => setLocationSearch(e.target.value)}
-                  placeholder="Cerca località (es. Milano, Roma...)"
+                  placeholder={t('searchLocation')}
                   className="pl-10"
                   maxLength={MAX_LOCATION_LENGTH}
                   onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
                 />
               </div>
               <Button onClick={handleLocationSearch} disabled={isSearching}>
-                {isSearching ? '...' : 'Cerca'}
+                {isSearching ? '...' : t('search')}
               </Button>
             </div>
           </Card>
@@ -410,7 +410,7 @@ const Index = () => {
         {/* Category filter */}
         <div className="flex gap-2 animate-slide-up" style={{ animationDelay: '0.15s' }}>
           <Button variant={categoryFilter === 'ALL' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => setCategoryFilter('ALL')}>
-            Tutte
+            {t('allCategories')}
           </Button>
           <Button
             variant={categoryFilter === 'TUB' ? 'default' : 'outline'} size="sm"
@@ -418,7 +418,7 @@ const Index = () => {
             onClick={() => setCategoryFilter('TUB')}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-primary inline-block mr-1.5" />
-            Vasche
+            {t('tubs')}
           </Button>
           <Button
             variant={categoryFilter === 'SHOWER' ? 'default' : 'outline'} size="sm"
@@ -426,7 +426,7 @@ const Index = () => {
             onClick={() => setCategoryFilter('SHOWER')}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block mr-1.5" />
-            Docce
+            {t('showers')}
           </Button>
         </div>
 
@@ -435,7 +435,7 @@ const Index = () => {
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-bold text-foreground text-sm">Nessuna stazione trovata</h3>
+                <h3 className="font-bold text-foreground text-sm">{t('noStationsFound')}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{noStationsMessage}</p>
               </div>
               <button onClick={() => setNoStationsMessage(null)} className="p-1 hover:bg-muted rounded-full">
@@ -458,7 +458,7 @@ const Index = () => {
           {nearbyStations.length > 0 ? (
             nearbyStations.map(renderStationCard)
           ) : (
-            <p className="text-sm text-muted-foreground">Nessuna stazione disponibile nelle vicinanze</p>
+            <p className="text-sm text-muted-foreground">{t('noStationsNearby')}</p>
           )}
 
           {otherStations.length > 0 && !showAllStations && (
@@ -468,13 +468,13 @@ const Index = () => {
               className="w-full"
               onClick={() => setShowAllStations(true)}
             >
-              Mostra altre {otherStations.length} stazioni
+              {t('showMoreStations').replace('{count}', String(otherStations.length))}
             </Button>
           )}
 
           {showAllStations && otherStations.length > 0 && (
             <>
-              <h2 className="text-sm font-bold text-foreground pt-2">Altre stazioni</h2>
+              <h2 className="text-sm font-bold text-foreground pt-2">{t('otherStations')}</h2>
               {otherStations.map(renderStationCard)}
             </>
           )}
@@ -491,17 +491,17 @@ const Index = () => {
             <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
               <Sparkles className="w-7 h-7 text-primary" />
             </div>
-            <DialogTitle className="text-lg">Unisciti a Shower2Pet!</DialogTitle>
+            <DialogTitle className="text-lg">{t('joinShower2Pet')}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Accedi o registrati per attivare le stazioni, accumulare crediti e gestire i tuoi lavaggi in un unico posto.
+              {t('loginOrRegisterPrompt')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 pt-2">
             <Button onClick={() => { setShowAuthPrompt(false); navigate('/login'); }} className="w-full" size="lg">
-              <LogIn className="w-5 h-5" /> Accedi
+              <LogIn className="w-5 h-5" /> {t('login')}
             </Button>
             <Button onClick={() => { setShowAuthPrompt(false); navigate('/register'); }} variant="outline" className="w-full" size="lg">
-              <UserPlus className="w-5 h-5" /> Registrati gratis
+              <UserPlus className="w-5 h-5" /> {t('registerFree')}
             </Button>
           </div>
         </DialogContent>

@@ -156,9 +156,7 @@ const StationTimer = () => {
 
       if (!hwData?.success) {
         const isOffline = hwData?.error === 'STATION_OFFLINE';
-        const errorMsg = isOffline
-          ? '⚠️ La stazione risulta offline. Impossibile avviare il servizio.'
-          : 'La stazione non risponde. Riprova o contatta il supporto.';
+          const errorMsg = isOffline ? t('stationOfflineCannotStart') : t('stationNotResponding');
         toast.error(errorMsg);
         logErrorToDb({
           error_message: `START_TIMED_WASH failed: ${hwData?.error || 'unknown'}`,
@@ -179,7 +177,7 @@ const StationTimer = () => {
       const resolvedEndsAt = endsAt ?? fallbackEndsAt;
       const resolvedStartedAt = startedAt ?? new Date().toISOString();
 
-      toast.success("Stazione attivata! L'acqua è in erogazione.");
+      toast.success(t('stationActivatedWaterRunning'));
       const updatedSession = { ...session, started_at: resolvedStartedAt, ends_at: resolvedEndsAt };
       setSession(updatedSession);
 
@@ -230,7 +228,7 @@ const StationTimer = () => {
       setSecondsLeft(remaining);
 
       if (!isShowerStation && remaining === 120 && !warningShown) {
-        toast.warning('⏰ Il tempo sta per scadere! Ricorda di sciacquare la vasca.', { duration: 8000 });
+        toast.warning(t('timeRunningOut'), { duration: 8000 });
         setWarningShown(true);
       }
 
@@ -302,7 +300,7 @@ const StationTimer = () => {
     try {
       const result = await sendStationCommand(session.station_id, 'OFF');
       if (!result?.success) {
-        toast.error('Errore nello spegnimento. Riprova.');
+        toast.error(t('stopError'));
         setStopping(false);
         return;
       }
@@ -332,7 +330,7 @@ const StationTimer = () => {
       setStep('cleanup');
       updateSessionStep(session.id, 'cleanup');
     }
-    toast.success('Lavaggio terminato.');
+    toast.success(t('washEnded'));
   };
 
   const handleCleanupResponse = async (clean: boolean) => {
@@ -368,13 +366,9 @@ const StationTimer = () => {
   if (!session) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-primary to-[hsl(206,100%,20%)] flex flex-col items-center justify-center gap-4 px-4">
-        <p className="text-primary-foreground text-lg font-bold text-center">Nessuna sessione attiva trovata</p>
-        <Button
-          variant="outline"
-          className="rounded-full bg-primary-foreground text-primary"
-          onClick={() => navigate('/')}
-        >
-          Torna alla Home
+        <p className="text-primary-foreground text-lg font-bold text-center">{t('noActiveSession')}</p>
+        <Button variant="outline" className="rounded-full bg-primary-foreground text-primary" onClick={() => navigate('/')}>
+          {t('backToHome')}
         </Button>
       </div>
     );
@@ -397,7 +391,7 @@ const StationTimer = () => {
               {getStationDisplayName(station)}
             </p>
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-foreground/20 text-primary-foreground">
-              {station.type} — {isShowerStation ? 'Doccia' : 'Vasca'}
+              {station.type} — {isShowerStation ? t('shower') : t('tub')}
             </span>
           </div>
         )}
@@ -409,7 +403,7 @@ const StationTimer = () => {
               <StationIcon className="h-12 w-12 text-primary-foreground" />
             </div>
             <div className="text-center space-y-2">
-              <p className="text-2xl font-bold text-primary-foreground">Pagamento confermato ✓</p>
+              <p className="text-2xl font-bold text-primary-foreground">{t('paymentConfirmedCheck')}</p>
               <p className="text-primary-foreground/80 text-base">
                 {session.option_name} — {Math.floor(session.total_seconds / 60)} minuti
               </p>
@@ -425,10 +419,10 @@ const StationTimer = () => {
               ) : (
                 <Play className="w-6 h-6" />
               )}
-              {starting ? 'Avvio in corso...' : 'Avvia Servizio'}
+              {starting ? t('startingService') : t('startService')}
             </Button>
             <p className="text-primary-foreground/60 text-xs text-center">
-              Il timer partirà quando premi il pulsante
+              {t('timerStartHint')}
             </p>
           </div>
         )}
@@ -438,18 +432,18 @@ const StationTimer = () => {
           <Dialog open={step === 'rules'} onOpenChange={() => {}}>
             <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
               <DialogHeader>
-                <DialogTitle>Regolamento</DialogTitle>
-                <DialogDescription>Leggi e accetta prima di iniziare</DialogDescription>
+                <DialogTitle>{t('rules')}</DialogTitle>
+                <DialogDescription>{t('readAndAccept')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm text-muted-foreground">
-                <p className="flex items-center gap-2"><PawPrint className="w-4 h-4 shrink-0" /> Tieni il cane al guinzaglio durante il lavaggio</p>
-                <p className="flex items-center gap-2"><Droplets className="w-4 h-4 shrink-0" /> Controlla la temperatura dell'acqua prima di iniziare</p>
-                <p className="flex items-center gap-2"><Sparkles className="w-4 h-4 shrink-0" /> Lascia la vasca pulita dopo l'uso</p>
-                <p className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0" /> Supervisiona sempre il tuo animale</p>
+                <p className="flex items-center gap-2"><PawPrint className="w-4 h-4 shrink-0" /> {t('keepDogLeashed')}</p>
+                <p className="flex items-center gap-2"><Droplets className="w-4 h-4 shrink-0" /> {t('checkWaterTemp')}</p>
+                <p className="flex items-center gap-2"><Sparkles className="w-4 h-4 shrink-0" /> {t('leaveTubClean')}</p>
+                <p className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {t('alwaysSupervise')}</p>
               </div>
               <DialogFooter>
                 <Button onClick={handleAcceptRules} className="w-full" size="lg">
-                  <Check className="w-4 h-4" /> Accetto e Avvia
+                  <Check className="w-4 h-4" /> {t('acceptAndStart')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -487,7 +481,7 @@ const StationTimer = () => {
                   }
                 </span>
                 <span className="text-primary-foreground/80 mt-1 text-sm">
-                  {step === 'courtesy' ? 'Risciacquo gratuito' : t('serviceActive')}
+                  {step === 'courtesy' ? t('freeRinse') : t('serviceActive')}
                 </span>
               </div>
             </div>
@@ -514,11 +508,11 @@ const StationTimer = () => {
             <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center animate-pulse">
               <Droplets className="h-10 w-10 text-primary-foreground" />
             </div>
-            <p className="text-xl font-bold text-primary-foreground">🧼 Sanificazione in corso...</p>
+            <p className="text-xl font-bold text-primary-foreground">{t('sanitizing')}</p>
             <p className="text-3xl font-bold text-primary-foreground tabular-nums">
               0:{sanitizeSeconds.toString().padStart(2, '0')}
             </p>
-            <p className="text-primary-foreground/70 text-sm">Attendere prego</p>
+            <p className="text-primary-foreground/70 text-sm">{t('pleaseWait')}</p>
           </div>
         )}
 
@@ -527,7 +521,7 @@ const StationTimer = () => {
           <div className="flex-1 flex flex-col items-center justify-center gap-6">
             <CheckCircle className="h-16 w-16 text-primary-foreground" />
             <p className="text-xl font-bold text-primary-foreground">{t('sessionFinished')}</p>
-            <p className="text-primary-foreground/70 text-sm">Come è andata?</p>
+            <p className="text-primary-foreground/70 text-sm">{t('howWasIt')}</p>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button key={star} onClick={() => setRating(star)}>
@@ -547,15 +541,15 @@ const StationTimer = () => {
           <Dialog open={step === 'cleanup'} onOpenChange={() => {}}>
             <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
               <DialogHeader>
-                <DialogTitle>Pulizia vasca</DialogTitle>
-                <DialogDescription>Hai lasciato la vasca pulita?</DialogDescription>
+                <DialogTitle>{t('tubCleaning')}</DialogTitle>
+                <DialogDescription>{t('didYouLeaveTubClean')}</DialogDescription>
               </DialogHeader>
               <div className="flex gap-3">
                 <Button onClick={() => handleCleanupResponse(true)} className="flex-1" size="lg">
-                  <Check className="w-4 h-4" /> Sì
+                  <Check className="w-4 h-4" /> {t('yes')}
                 </Button>
                 <Button onClick={() => handleCleanupResponse(false)} variant="outline" className="flex-1" size="lg">
-                  <X className="w-4 h-4" /> No
+                  <X className="w-4 h-4" /> {t('no')}
                 </Button>
               </div>
             </DialogContent>
@@ -573,24 +567,24 @@ const StationTimer = () => {
               disabled={stopping}
             >
               {stopping ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <StopCircle className="w-5 h-5 mr-2" />}
-              Termina Lavaggio
+              {t('endWash')}
             </Button>
 
             <AlertDialog open={showStopConfirm} onOpenChange={setShowStopConfirm}>
               <AlertDialogContent className="max-w-sm">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>⚠️ Terminare il lavaggio?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('endWashConfirm')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Il lavaggio verrà interrotto immediatamente. Non è previsto alcun rimborso per l'interruzione anticipata.
+                    {t('endWashDesc')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleStopManual}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Conferma e Termina
+                    {t('confirmAndEnd')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

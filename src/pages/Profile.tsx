@@ -10,12 +10,10 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
-
 const Profile = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { profile, signOut, user, loading: authLoading } = useAuth();
-  
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -25,7 +23,7 @@ const Profile = () => {
       toast.success(t('logout'));
       navigate('/login');
     } catch (error) {
-      toast.error('Error logging out');
+      toast.error(t('logoutError'));
     } finally {
       setIsLoggingOut(false);
     }
@@ -40,10 +38,8 @@ const Profile = () => {
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
   const displayName = fullName || profile?.email || user?.email || 'Utente';
 
-  // Deterministic pet avatar - uses adorable animal illustrations
   const petAvatarUrl = useMemo(() => {
     const seed = user?.id || 'default';
-    // Using "adventurer" style with pet-like seeds for cute animal avatars
     const petSeeds = ['Bella', 'Max', 'Luna', 'Charlie', 'Daisy', 'Buddy', 'Coco', 'Rocky', 'Milo', 'Lola'];
     const idx = seed.charCodeAt(0) % petSeeds.length;
     return `https://api.dicebear.com/9.x/thumbs/svg?seed=${petSeeds[idx]}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&shapeColor=0a5b83,1c799f,69d2e7,f1f4dc,f88c49`;
@@ -67,7 +63,6 @@ const Profile = () => {
           <p className="text-muted-foreground font-light">{t('manageAccount')}</p>
         </div>
 
-        {/* User Info */}
         {user ? (
           <Card className="p-6">
             <div className="flex items-center gap-4">
@@ -85,20 +80,18 @@ const Profile = () => {
           </Card>
         ) : (
           <Card className="p-6 text-center space-y-4">
-            <p className="text-muted-foreground">Accedi o registrati per visualizzare i tuoi dati</p>
+            <p className="text-muted-foreground">{t('loginOrRegisterData')}</p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => navigate('/login')} size="lg">
-                <LogIn className="w-5 h-5" /> Accedi
+                <LogIn className="w-5 h-5" /> {t('login')}
               </Button>
               <Button onClick={() => navigate('/register')} variant="outline" size="lg">
-                <UserPlus className="w-5 h-5" /> Registrati
+                <UserPlus className="w-5 h-5" /> {t('register')}
               </Button>
             </div>
           </Card>
         )}
 
-
-        {/* Notifications */}
         <div className="space-y-3">
           <h2 className="text-lg font-bold text-foreground px-1 pt-4">{t('notifications')}</h2>
           <Card className="divide-y divide-border">

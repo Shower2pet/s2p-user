@@ -7,19 +7,19 @@ import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { resetPasswordForEmail } from '@/services/authService';
+import { useLanguage } from '@/hooks/useLanguage';
 import { z } from 'zod';
-
-const emailSchema = z.string().trim().email('Indirizzo email non valido');
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const emailSchema = z.string().trim().email(t('enterValidEmail'));
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
       const validatedEmail = emailSchema.parse(email);
       setLoading(true);
@@ -29,7 +29,7 @@ const ForgotPassword = () => {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error((error as Error).message || 'Si è verificato un errore');
+        toast.error((error as Error).message || t('genericError'));
       }
     } finally {
       setLoading(false);
@@ -43,12 +43,12 @@ const ForgotPassword = () => {
           <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto">
             <CheckCircle className="w-8 h-8 text-success" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Check Your Email</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t('checkYourEmail')}</h1>
           <p className="text-muted-foreground font-light">
-            We've sent a password reset link to <strong>{email}</strong>
+            {t('resetLinkSent')} <strong>{email}</strong>
           </p>
           <Button onClick={() => navigate('/login')} variant="default" size="lg" className="w-full">
-            Back to Login
+            {t('backToLogin')}
           </Button>
         </Card>
       </div>
@@ -59,20 +59,20 @@ const ForgotPassword = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md p-8 space-y-6">
         <Button variant="ghost" onClick={() => navigate('/login')} className="mb-4">
-          <ArrowLeft className="w-4 h-4" /> Back
+          <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Forgot Password?</h1>
-          <p className="text-muted-foreground font-light">Enter your email and we'll send you a reset link</p>
+          <h1 className="text-3xl font-bold text-foreground">{t('forgotPasswordTitle')}</h1>
+          <p className="text-muted-foreground font-light">{t('forgotPasswordDesc')}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('email')}</Label>
             <Input id="email" type="email" placeholder="your@email.com"
               value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading} />
           </div>
           <Button type="submit" variant="default" size="lg" className="w-full" disabled={loading}>
-            {loading ? 'Invio in corso...' : 'Invia Link di Reset'}
+            {loading ? t('sending') : t('sendResetLink')}
           </Button>
         </form>
       </Card>
