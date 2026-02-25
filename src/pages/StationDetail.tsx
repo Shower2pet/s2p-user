@@ -72,9 +72,9 @@ const StationDetail = () => {
       // Verify the specific payment server-side
       verifySession({ session_id: sessionId }).then((data) => {
         if (data?.status === 'completed' || data?.status === 'already_completed') {
-          toast.success('Crediti aggiunti al tuo saldo!');
+          toast.success(t('creditsAddedToBalance'));
         } else {
-          toast.info('Pagamento in attesa di conferma');
+          toast.info(t('paymentAwaitingConfirmation'));
         }
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
@@ -82,7 +82,7 @@ const StationDetail = () => {
         queryClient.invalidateQueries({ queryKey: ['stations'] });
       }).catch((error) => {
         console.error('Verify session error:', error);
-        toast.error('Errore nella verifica del pagamento');
+        toast.error(t('paymentVerificationError'));
       });
     }
   }, [searchParams, setSearchParams, queryClient, id]);
@@ -92,7 +92,7 @@ const StationDetail = () => {
     if (!user) return;
     verifySession({ process_all_pending: true }).then((data) => {
       if (data?.credits_added > 0) {
-        toast.success(`${data.credits_added} crediti sincronizzati!`);
+        toast.success(t('creditsSynced').replace('{count}', String(data.credits_added)));
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
       }
@@ -102,7 +102,7 @@ const StationDetail = () => {
   const handleQrVerified = useCallback(() => {
     setVisibilityVerified(true);
     setShowQrScanner(false);
-    toast.success('Accesso verificato! Ora puoi attivare i servizi.');
+    toast.success(t('accessVerified'));
   }, []);
 
   const handleManualCodeVerify = () => {
@@ -111,15 +111,15 @@ const StationDetail = () => {
     if (code === station.id.toLowerCase()) {
       setVisibilityVerified(true);
       setManualCode('');
-      toast.success('Codice verificato! Ora puoi attivare i servizi.');
+      toast.success(t('codeVerified'));
     } else {
-      toast.error('Codice non valido. Riprova.');
+      toast.error(t('invalidCode'));
     }
   };
 
   const handleOpenGate = async () => {
     if (!user) {
-      toast.error('Devi effettuare il login per aprire la porta');
+      toast.error(t('loginToOpenGate'));
       navigate('/login');
       return;
     }
@@ -127,7 +127,7 @@ const StationDetail = () => {
     setIsOpeningGate(true);
     try {
       await sendGateCommand(station.id, user.id, 'OPEN');
-      toast.success('Comando di apertura inviato!');
+      toast.success(t('openCommandSent'));
     } catch (err) {
       console.error('Gate open error:', err);
       toast.error(GENERIC_ERROR_MESSAGE);
@@ -181,7 +181,7 @@ const StationDetail = () => {
 
   const handleWashOptionClick = (optId: number) => {
     if (needsVisibilityVerification) {
-      toast.error('Devi verificare il tuo accesso prima di attivare un servizio.');
+      toast.error(t('verifyAccessFirst'));
       return;
     }
     setSelectedOption(optId);
@@ -190,7 +190,7 @@ const StationDetail = () => {
 
   const handleSubscribe = async (plan: any) => {
     if (!user) {
-      toast.error('Devi effettuare il login per abbonarti');
+      toast.error(t('loginToSubscribe'));
       navigate('/login');
       return;
     }
@@ -221,7 +221,7 @@ const StationDetail = () => {
         setIsProcessing(false);
       }
     } else {
-      toast.info('Abbonamento non ancora configurato. Contatta la struttura.');
+      toast.info(t('subscriptionNotConfigured'));
     }
   };
 
@@ -276,7 +276,7 @@ const StationDetail = () => {
         await payWithCredits(body);
 
         // Payment success — go to timer page where hardware is activated
-        toast.success("Pagamento confermato! Vai alla stazione per avviare il servizio.");
+        toast.success(t('paymentConfirmed'));
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         queryClient.invalidateQueries({ queryKey: ['wallets'] });
         navigate(`/s/${station.id}/timer`);
@@ -370,8 +370,8 @@ const StationDetail = () => {
               <div className="flex items-center gap-2">
                 <DoorOpen className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="font-bold text-foreground text-sm">Accesso Struttura</p>
-                  <p className="text-xs text-muted-foreground">Apri la porta per accedere alla stazione</p>
+                  <p className="font-bold text-foreground text-sm">{t('structureAccess')}</p>
+                  <p className="text-xs text-muted-foreground">{t('openDoorDesc')}</p>
                 </div>
               </div>
               <Button
@@ -380,7 +380,7 @@ const StationDetail = () => {
                 size="sm"
               >
                 {isOpeningGate ? <Loader2 className="w-4 h-4 animate-spin" /> : !online ? <WifiOff className="w-4 h-4" /> : <DoorOpen className="w-4 h-4" />}
-                {isOpeningGate ? 'Invio...' : !online ? 'Offline' : 'Apri Porta'}
+                {isOpeningGate ? t('sendingCommand') : !online ? t('offline') : t('openGate')}
               </Button>
             </div>
           </Card>
@@ -391,17 +391,17 @@ const StationDetail = () => {
           <Card className="p-4 space-y-3 animate-fade-in border-warning/30 bg-warning/5">
             <div className="flex items-center gap-2 text-warning">
               <Lock className="w-5 h-5" />
-              <span className="font-bold text-sm">Accesso Riservato ai Clienti</span>
+              <span className="font-bold text-sm">{t('restrictedAccess')}</span>
             </div>
             {visibilityVerified ? (
               <div className="flex items-center gap-2 text-success">
                 <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-medium">Accesso verificato</span>
+                <span className="text-sm font-medium">{t('accessVerifiedLabel')}</span>
               </div>
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Per attivare un servizio, scansiona il QR code della stazione o inserisci il codice manualmente.
+                  {t('scanToVerify')}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -411,20 +411,20 @@ const StationDetail = () => {
                     className="flex-1"
                   >
                     <ScanLine className="w-4 h-4" />
-                    Scansiona QR
+                    {t('scanQr')}
                   </Button>
                 </div>
                 <div className="flex gap-2">
                   <Input
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}
-                    placeholder="Inserisci codice stazione"
+                    placeholder={t('enterStationCodePlaceholder')}
                     className="flex-1"
                     onKeyDown={(e) => e.key === 'Enter' && handleManualCodeVerify()}
                   />
                   <Button onClick={handleManualCodeVerify} size="sm" variant="secondary">
                     <KeyRound className="w-4 h-4" />
-                    Verifica
+                    {t('verify')}
                   </Button>
                 </div>
               </>
@@ -438,8 +438,8 @@ const StationDetail = () => {
             <div className="flex items-center gap-2">
               <Crown className="w-5 h-5 text-accent" />
               <div>
-                <p className="font-bold text-foreground text-sm">Abbonamento Attivo</p>
-                <p className="text-xs text-muted-foreground">Puoi avviare il lavaggio con il tuo abbonamento</p>
+                <p className="font-bold text-foreground text-sm">{t('activeSubscription')}</p>
+                <p className="text-xs text-muted-foreground">{t('canStartWithSubscription')}</p>
               </div>
             </div>
           </Card>
@@ -474,11 +474,11 @@ const StationDetail = () => {
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-destructive" />
               <div>
-                <p className="font-bold text-foreground text-sm">Stazione non disponibile</p>
+                <p className="font-bold text-foreground text-sm">{t('stationNotAvailableTitle')}</p>
                 <p className="text-xs text-muted-foreground">
-                  {station.status === 'BUSY' ? 'La stazione è attualmente in uso. Riprova tra poco.' : 
-                   station.status === 'MAINTENANCE' ? 'La stazione è in manutenzione.' :
-                   'La stazione è attualmente offline.'}
+                  {station.status === 'BUSY' ? t('stationBusyDesc') : 
+                   station.status === 'MAINTENANCE' ? t('stationMaintenanceDesc') :
+                   t('stationOfflineDesc')}
                 </p>
               </div>
             </div>
@@ -487,10 +487,10 @@ const StationDetail = () => {
 
         {/* Washing Options */}
         <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <h2 className="text-lg font-bold text-foreground">{t('washingOptions') || 'Opzioni Lavaggio'}</h2>
+          <h2 className="text-lg font-bold text-foreground">{t('washingOptions')}</h2>
           {washOptions.length === 0 ? (
             <Card className="p-4 text-center text-muted-foreground text-sm">
-              Nessuna opzione disponibile
+              {t('noOptionsAvailable')}
             </Card>
           ) : (
             washOptions.map((opt) => (
@@ -518,7 +518,7 @@ const StationDetail = () => {
                     </div>
                   </div>
                   {hasActiveSub ? (
-                    <span className="text-sm font-bold text-accent">Incluso</span>
+                    <span className="text-sm font-bold text-accent">{t('included')}</span>
                   ) : (
                     <span className="text-xl font-bold text-primary">€{opt.price.toFixed(2)}</span>
                   )}
@@ -536,7 +536,7 @@ const StationDetail = () => {
           className="w-full text-muted-foreground"
         >
           <AlertTriangle className="w-4 h-4" />
-          Segnala un problema
+          {t('reportProblem')}
         </Button>
 
         {/* Safety Info */}
@@ -556,7 +556,7 @@ const StationDetail = () => {
       <Dialog open={showCheckout && !!chosen} onOpenChange={setShowCheckout}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{hasActiveSub ? 'Avvia con Abbonamento' : t('payment')}</DialogTitle>
+            <DialogTitle>{hasActiveSub ? t('startWithSubscription') : t('payment')}</DialogTitle>
             <DialogDescription>
               {chosen?.name} – {chosen ? Math.floor(chosen.duration / 60) : 0} {t('minutes')}
             </DialogDescription>
@@ -567,29 +567,29 @@ const StationDetail = () => {
               <Card className="p-4 space-y-2 bg-accent/5 border-accent/20">
                 <div className="flex items-center gap-2">
                   <Crown className="w-5 h-5 text-accent" />
-                  <span className="font-bold text-foreground">Incluso nel tuo abbonamento</span>
+                  <span className="font-bold text-foreground">{t('includedInSubscription')}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Il lavaggio verrà conteggiato nel tuo piano attuale</p>
+                <p className="text-xs text-muted-foreground">{t('washCountedInPlan')}</p>
               </Card>
             ) : (
               <>
                 {!user && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Email *</label>
+                    <label className="text-sm font-medium text-foreground">{t('emailRequired')}</label>
                     <Input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)}
                       placeholder="email@esempio.com" required />
                     <p className="text-xs text-muted-foreground">
-                      Necessaria per ricevere lo scontrino fiscale via email
+                      {t('emailForReceipt')}
                     </p>
                     {guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail) && (
-                      <p className="text-xs text-destructive">Inserisci un indirizzo email valido</p>
+                      <p className="text-xs text-destructive">{t('enterValidEmail')}</p>
                     )}
                   </div>
                 )}
 
                 {user && walletBalance > 0 && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Metodo di pagamento</label>
+                    <label className="text-sm font-medium text-foreground">{t('paymentMethod')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => setPaymentMethod('credits')}
                         className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
@@ -598,8 +598,8 @@ const StationDetail = () => {
                         disabled={!canPayWithCredits}>
                         <Coins className="w-5 h-5 text-primary shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-foreground">Crediti</p>
-                          <p className="text-xs text-muted-foreground">€{walletBalance.toFixed(2)} disp.</p>
+                          <p className="text-sm font-bold text-foreground">{t('credits')}</p>
+                          <p className="text-xs text-muted-foreground">€{walletBalance.toFixed(2)} {t('balanceAvailable')}</p>
                         </div>
                       </button>
                       <button type="button" onClick={() => setPaymentMethod('stripe')}
@@ -608,13 +608,13 @@ const StationDetail = () => {
                         }`}>
                         <CreditCard className="w-5 h-5 text-primary shrink-0" />
                         <div>
-                          <p className="text-sm font-bold text-foreground">Carta</p>
+                          <p className="text-sm font-bold text-foreground">{t('card')}</p>
                           <p className="text-xs text-muted-foreground">Visa, MC, ...</p>
                         </div>
                       </button>
                     </div>
                     {!canPayWithCredits && walletBalance > 0 && (
-                      <p className="text-xs text-warning">Crediti insufficienti</p>
+                      <p className="text-xs text-warning">{t('insufficientCredits')}</p>
                     )}
                   </div>
                 )}
@@ -626,7 +626,7 @@ const StationDetail = () => {
                   </div>
                   {effectivePaymentMethod === 'credits' && (
                     <div className="flex justify-between text-sm text-primary">
-                      <span>Pagato con crediti</span>
+                      <span>{t('paidWithCredits')}</span>
                       <span>- €{chosen?.price.toFixed(2)}</span>
                     </div>
                   )}
@@ -654,7 +654,7 @@ const StationDetail = () => {
               {isProcessing
                 ? t('processing')
                 : hasActiveSub
-                  ? 'Avvia con Abbonamento'
+                  ? t('startWithSubscription')
                   : effectivePaymentMethod === 'credits'
                     ? `${t('activateNow')} (crediti)`
                     : `${t('payNowWithCard')} €${chosen?.price.toFixed(2)}`
@@ -685,8 +685,8 @@ const StationDetail = () => {
             </div>
           </div>
           <div className="text-center space-y-2 px-6">
-            <h2 className="text-xl font-bold text-foreground">Connessione alla stazione in corso...</h2>
-            <p className="text-sm text-muted-foreground">Stiamo attivando la stazione. Non chiudere questa pagina.</p>
+            <h2 className="text-xl font-bold text-foreground">{t('connectingToStation')}</h2>
+            <p className="text-sm text-muted-foreground">{t('activatingStation')}</p>
           </div>
         </div>
       )}
@@ -699,21 +699,21 @@ const StationDetail = () => {
               <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
                 <ShieldAlert className="w-6 h-6 text-destructive" />
               </div>
-              <DialogTitle className="text-left">Stazione non raggiungibile</DialogTitle>
+              <DialogTitle className="text-left">{t('stationUnreachable')}</DialogTitle>
             </div>
             <DialogDescription className="text-left">
-              Ci scusiamo, la stazione sembra non rispondere. I tuoi crediti sono stati rimborsati istantaneamente e il gestore è stato avvisato del problema.
+              {t('stationUnreachableDesc')}
             </DialogDescription>
           </DialogHeader>
           <Card className="p-4 bg-success/5 border-success/20">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-success" />
-              <span className="text-sm font-bold text-foreground">Crediti rimborsati con successo</span>
+              <span className="text-sm font-bold text-foreground">{t('creditsRefunded')}</span>
             </div>
           </Card>
           <DialogFooter>
             <Button onClick={() => { setShowRefundDialog(false); navigate('/'); }} className="w-full" size="lg">
-              Torna alla Home
+              {t('backToHome')}
             </Button>
           </DialogFooter>
         </DialogContent>

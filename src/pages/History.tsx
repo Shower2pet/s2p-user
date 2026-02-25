@@ -19,23 +19,18 @@ const History = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
+    if (!user) { setLoading(false); return; }
     const load = async () => {
       try {
         const data = await fetchTransactions(50);
         setTransactions(data);
       } catch (err) {
         console.error('Fetch transactions error:', err);
-        toast.error('Errore nel caricamento delle transazioni');
+        toast.error(t('transactionsLoadError'));
       } finally {
         setLoading(false);
       }
     };
-
     load();
   }, [user]);
 
@@ -44,7 +39,6 @@ const History = () => {
     try {
       const result = await downloadReceiptPdf(tx.id);
       if (result.pdf_base64) {
-        // Decode base64 and trigger download
         const byteCharacters = atob(result.pdf_base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -55,18 +49,18 @@ const History = () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `scontrino_${format(new Date(tx.created_at || ''), 'yyyyMMdd_HHmm')}.pdf`;
+        a.download = `receipt_${format(new Date(tx.created_at || ''), 'yyyyMMdd_HHmm')}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        toast.success('Scontrino scaricato');
+        toast.success(t('receiptDownloaded'));
       } else {
-        toast.info(result.message || 'Scontrino non ancora disponibile da Fiskaly');
+        toast.info(result.message || t('receiptNotAvailable'));
       }
     } catch (err) {
       console.error('Download receipt error:', err);
-      toast.error('Errore nel download dello scontrino');
+      toast.error(t('receiptDownloadError'));
     } finally {
       setDownloadingId(null);
     }
@@ -82,9 +76,9 @@ const History = () => {
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'CREDIT_TOPUP': return 'Ricarica crediti';
-      case 'WASH_SERVICE': return 'Lavaggio';
-      case 'GUEST_WASH': return 'Lavaggio ospite';
+      case 'CREDIT_TOPUP': return t('creditTopup');
+      case 'WASH_SERVICE': return t('washService');
+      case 'GUEST_WASH': return t('guestWash');
       default: return type;
     }
   };
@@ -100,7 +94,6 @@ const History = () => {
   const renderTransaction = (tx: Transaction) => {
     const TypeIcon = getTypeIcon(tx.transaction_type);
     const isDownloading = downloadingId === tx.id;
-
     return (
       <Card key={tx.id} className="p-4 hover:shadow-md transition-shadow">
         <div className="flex items-start justify-between gap-4">
@@ -128,19 +121,10 @@ const History = () => {
               <Badge className={getStatusColor(tx.status)}>{tx.status}</Badge>
             )}
             {hasReceipt(tx) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1 text-primary"
-                onClick={() => handleDownloadReceipt(tx)}
-                disabled={isDownloading}
-              >
-                {isDownloading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <FileDown className="w-3.5 h-3.5" />
-                )}
-                Scontrino
+              <Button variant="ghost" size="sm" className="text-xs gap-1 text-primary"
+                onClick={() => handleDownloadReceipt(tx)} disabled={isDownloading}>
+                {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                {t('receipt')}
               </Button>
             )}
           </div>
@@ -166,11 +150,10 @@ const History = () => {
           <h1 className="text-3xl font-bold text-foreground">{t('historyTitle')}</h1>
           <p className="text-muted-foreground font-light">{t('historyDesc')}</p>
         </div>
-
         <div className="space-y-3">
           {transactions.length > 0 ? transactions.map(renderTransaction) : (
             <Card className="p-8 text-center">
-              <p className="text-muted-foreground font-light">Nessuna transazione</p>
+              <p className="text-muted-foreground font-light">{t('noTransactions')}</p>
             </Card>
           )}
         </div>

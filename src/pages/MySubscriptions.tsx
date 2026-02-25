@@ -8,24 +8,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Crown, Calendar, Loader2 } from 'lucide-react';
 import { useMySubscriptions, UserSubscription } from '@/hooks/useSubscriptions';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/hooks/useLanguage';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
+import { it, enUS } from 'date-fns/locale';
 
 const MySubscriptions = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const { data: subscriptions, isLoading } = useMySubscriptions();
   const [hideExpired, setHideExpired] = useState(false);
+  const dateLocale = language === 'it' ? it : enUS;
 
   if (!user) {
     return (
       <AppShell>
         <div className="container max-w-lg mx-auto px-4 py-10 text-center space-y-4">
           <Crown className="w-12 h-12 text-accent mx-auto" />
-          <h1 className="text-2xl font-bold text-foreground">I Miei Abbonamenti</h1>
-          <p className="text-muted-foreground">Accedi per visualizzare i tuoi abbonamenti</p>
-          <Button onClick={() => navigate('/login')}>Accedi</Button>
+          <h1 className="text-2xl font-bold text-foreground">{t('mySubscriptions')}</h1>
+          <p className="text-muted-foreground">{t('loginToViewCredits')}</p>
+          <Button onClick={() => navigate('/login')}>{t('login')}</Button>
         </div>
       </AppShell>
     );
@@ -37,14 +40,10 @@ const MySubscriptions = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
-        return <Badge className="bg-success text-success-foreground">Attivo</Badge>;
-      case 'cancelled':
-        return <Badge variant="secondary">Cancellato</Badge>;
-      case 'expired':
-        return <Badge variant="outline" className="text-muted-foreground">Scaduto</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case 'active': return <Badge className="bg-success text-success-foreground">{t('statusActive')}</Badge>;
+      case 'cancelled': return <Badge variant="secondary">{t('statusCancelled')}</Badge>;
+      case 'expired': return <Badge variant="outline" className="text-muted-foreground">{t('statusExpired')}</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -54,14 +53,13 @@ const MySubscriptions = () => {
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
             <Crown className="w-6 h-6 text-accent" />
-            I Miei Abbonamenti
+            {t('mySubscriptions')}
           </h1>
-          <p className="text-sm text-muted-foreground">Gestisci i tuoi abbonamenti attivi</p>
+          <p className="text-sm text-muted-foreground">{t('manageYourSubscriptions')}</p>
         </div>
 
-        {/* Filter toggle */}
         <div className="flex items-center justify-between px-1">
-          <span className="text-sm text-muted-foreground">Nascondi scaduti</span>
+          <span className="text-sm text-muted-foreground">{t('hideExpired')}</span>
           <Switch checked={hideExpired} onCheckedChange={setHideExpired} />
         </div>
 
@@ -73,9 +71,9 @@ const MySubscriptions = () => {
         ) : filtered.length === 0 ? (
           <Card className="p-6 text-center space-y-3">
             <Crown className="w-10 h-10 text-muted-foreground mx-auto" />
-            <p className="text-muted-foreground">Nessun abbonamento trovato</p>
+            <p className="text-muted-foreground">{t('noSubscriptionFound')}</p>
             <Button onClick={() => navigate('/map')} variant="outline" size="sm">
-              Esplora stazioni
+              {t('exploreStations')}
             </Button>
           </Card>
         ) : (
@@ -85,7 +83,7 @@ const MySubscriptions = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-bold text-foreground">{sub.plan?.name || 'Piano'}</p>
+                      <p className="font-bold text-foreground">{sub.plan?.name || t('plan')}</p>
                       {getStatusBadge(sub.status)}
                     </div>
                     {sub.plan?.description && (
@@ -94,20 +92,20 @@ const MySubscriptions = () => {
                     <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
                       <Calendar className="w-3 h-3" />
                       <span>
-                        Dal {format(new Date(sub.starts_at), 'dd MMM yyyy', { locale: it })}
-                        {sub.ends_at && ` al ${format(new Date(sub.ends_at), 'dd MMM yyyy', { locale: it })}`}
+                        {t('from')} {format(new Date(sub.starts_at), 'dd MMM yyyy', { locale: dateLocale })}
+                        {sub.ends_at && ` ${t('to')} ${format(new Date(sub.ends_at), 'dd MMM yyyy', { locale: dateLocale })}`}
                       </span>
                     </div>
                     {sub.plan?.max_washes_per_month && sub.status === 'active' && (
                       <p className="text-xs text-primary mt-1">
-                        {sub.washes_used_this_period}/{sub.plan.max_washes_per_month} lavaggi usati
+                        {sub.washes_used_this_period}/{sub.plan.max_washes_per_month} {t('washesUsed')}
                       </p>
                     )}
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold text-accent">€{sub.plan?.price_eur?.toFixed(2) || '—'}</p>
                     <p className="text-xs text-muted-foreground">
-                      /{sub.plan?.interval === 'month' ? 'mese' : 'anno'}
+                      /{sub.plan?.interval === 'month' ? t('month') : t('year')}
                     </p>
                   </div>
                 </div>

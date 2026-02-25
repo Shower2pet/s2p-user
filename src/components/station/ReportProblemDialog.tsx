@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/hooks/useLanguage';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { reportProblem } from '@/services/maintenanceService';
@@ -16,31 +17,23 @@ interface ReportProblemDialogProps {
 
 export const ReportProblemDialog = ({ open, onOpenChange, stationId }: ReportProblemDialogProps) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!user) {
-      toast.error('Devi effettuare il login per segnalare un problema');
-      navigate('/login');
-      return;
-    }
-
-    if (!description.trim()) {
-      toast.error('Inserisci una descrizione del problema');
-      return;
-    }
-
+    if (!user) { toast.error(t('loginToReport')); navigate('/login'); return; }
+    if (!description.trim()) { toast.error(t('enterDescription')); return; }
     setIsSubmitting(true);
     try {
       await reportProblem(stationId, user.id, description.trim(), 'low');
-      toast.success('Segnalazione inviata con successo!');
+      toast.success(t('reportSent'));
       setDescription('');
       onOpenChange(false);
     } catch (err: any) {
       console.error('Report error:', err);
-      toast.error('Errore nell\'invio della segnalazione');
+      toast.error(t('reportError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -52,25 +45,23 @@ export const ReportProblemDialog = ({ open, onOpenChange, stationId }: ReportPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-warning" />
-            Segnala un Problema
+            {t('reportProblemTitle')}
           </DialogTitle>
-          <DialogDescription>
-            Descrivi il problema riscontrato con questa stazione. Il team lo prenderà in carico.
-          </DialogDescription>
+          <DialogDescription>{t('reportProblemDesc')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Descrizione *</label>
+            <label className="text-sm font-medium text-foreground">{t('description')}</label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrivi il problema riscontrato..." rows={4} maxLength={500} />
+              placeholder={t('describeProblem')} rows={4} maxLength={500} />
             <p className="text-xs text-muted-foreground text-right">{description.length}/500</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('cancel')}</Button>
           <Button onClick={handleSubmit} disabled={isSubmitting || !description.trim()}>
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
-            Invia Segnalazione
+            {t('sendReport')}
           </Button>
         </DialogFooter>
       </DialogContent>
