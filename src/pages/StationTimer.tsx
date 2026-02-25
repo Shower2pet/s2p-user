@@ -147,7 +147,11 @@ const StationTimer = () => {
       });
 
       if (!hwData?.success) {
-        toast.error('La stazione non risponde. Riprova o contatta il supporto.');
+        const isOffline = hwData?.error === 'STATION_OFFLINE';
+        toast.error(isOffline
+          ? '⚠️ La stazione risulta offline. Impossibile avviare il servizio.'
+          : 'La stazione non risponde. Riprova o contatta il supporto.'
+        );
         setStarting(false);
         return;
       }

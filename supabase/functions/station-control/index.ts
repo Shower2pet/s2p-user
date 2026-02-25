@@ -94,6 +94,41 @@ serve(async (req) => {
         throw new Error("duration_minutes is required for START_TIMED_WASH");
       }
 
+      // Heartbeat freshness check (90s threshold)
+      const supabaseCheck = await getSupabaseAdmin();
+      const { data: stationCheck, error: stationCheckErr } = await supabaseCheck
+        .from('stations')
+        .select('last_heartbeat_at, status')
+        .eq('id', station_id)
+        .maybeSingle();
+
+      if (stationCheckErr || !stationCheck) {
+        logStep("Station not found for heartbeat check", { station_id });
+        return new Response(JSON.stringify({
+          success: false,
+          error: "STATION_NOT_FOUND",
+          message: "Stazione non trovata",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        });
+      }
+
+      const lastHb = stationCheck.last_heartbeat_at ? new Date(stationCheck.last_heartbeat_at).getTime() : 0;
+      const ageSeconds = (Date.now() - lastHb) / 1000;
+
+      if (ageSeconds > 90) {
+        logStep("Heartbeat too old, refusing START", { station_id, ageSeconds });
+        return new Response(JSON.stringify({
+          success: false,
+          error: "STATION_OFFLINE",
+          message: "La stazione risulta offline. Impossibile avviare il servizio.",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 503,
+        });
+      }
+
       const onOk = await publishMqtt(station_id, "1");
       if (!onOk) {
         return new Response(JSON.stringify({
