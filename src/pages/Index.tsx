@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStations, Station, isStationOnline, StationCategory, getStationDisplayName } from '@/hooks/useStations';
 import { useGeolocation, getDistanceKm } from '@/hooks/useGeolocation';
 import { QrScanner } from '@/components/scanner/QrScanner';
-import { MapPin, Navigation, ScanLine, Unlock, X, Search, AlertTriangle, Lock, LogIn } from 'lucide-react';
+import { MapPin, Navigation, ScanLine, Unlock, X, Search, AlertTriangle, Lock, LogIn, PawPrint, Dog, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import mapboxgl from 'mapbox-gl';
@@ -223,10 +223,21 @@ const Index = () => {
     return (
       <Card
         key={station.id}
-        className={`p-4 cursor-pointer transition-all ${selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''}`}
+        className={`p-4 cursor-pointer transition-all overflow-hidden relative ${selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''}`}
         onClick={() => setSelectedStation(station)}
       >
-        <div className="flex items-start justify-between gap-3">
+        {/* Pet-themed decorative outlines */}
+        <div className="absolute top-2 right-12 opacity-[0.06] pointer-events-none">
+          <PawPrint className="w-8 h-8 text-foreground" strokeWidth={1.2} />
+        </div>
+        <div className="absolute bottom-1 right-3 opacity-[0.04] pointer-events-none rotate-[-20deg]">
+          <Dog className="w-12 h-12 text-foreground" strokeWidth={1} />
+        </div>
+        <div className="absolute top-1/2 right-28 -translate-y-1/2 opacity-[0.04] pointer-events-none rotate-[15deg]">
+          <Heart className="w-6 h-6 text-foreground" strokeWidth={1.2} />
+        </div>
+
+        <div className="flex items-start justify-between gap-3 relative z-10">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 rounded-full ${catStyle.bg} flex items-center justify-center flex-shrink-0`}>
               {station.visibility === 'RESTRICTED' ? (
@@ -251,7 +262,7 @@ const Index = () => {
           </span>
         </div>
         {selectedStation?.id === station.id && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+          <div className="flex gap-2 mt-3 pt-3 border-t border-border relative z-10">
             <Button variant="default" size="sm" className="flex-1"
               onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
             >
