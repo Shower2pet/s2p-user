@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
-import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Coins, Crown } from 'lucide-react';
+import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Coins, Crown, LogIn, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,19 +58,33 @@ const Profile = () => {
         </div>
 
         {/* User Info */}
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="w-16 h-16">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-                {getInitials(profile?.first_name ?? null, profile?.last_name ?? null, profile?.email ?? null)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-foreground">{displayName}</h2>
-              <p className="text-sm text-muted-foreground font-light">{profile?.email || user?.email}</p>
+        {user ? (
+          <Card className="p-6">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-16 h-16">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+                  {getInitials(profile?.first_name ?? null, profile?.last_name ?? null, profile?.email ?? null)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-foreground">{displayName}</h2>
+                <p className="text-sm text-muted-foreground font-light">{profile?.email || user?.email}</p>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card className="p-6 text-center space-y-4">
+            <p className="text-muted-foreground">Accedi o registrati per visualizzare i tuoi dati</p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => navigate('/login')} size="lg">
+                <LogIn className="w-5 h-5" /> Accedi
+              </Button>
+              <Button onClick={() => navigate('/register')} variant="outline" size="lg">
+                <UserPlus className="w-5 h-5" /> Registrati
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Wallets grouped by structure */}
         {wallets && wallets.length > 0 && (
@@ -129,13 +143,15 @@ const Profile = () => {
             </button>
           </Card>
 
-          <Button onClick={handleLogout} disabled={isLoggingOut} variant="destructive" size="lg" className="w-full mt-6">
-            {isLoggingOut ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> {t('loggingOut')}</>
-            ) : (
-              <><LogOut className="w-5 h-5" /> {t('logout')}</>
-            )}
-          </Button>
+          {user && (
+            <Button onClick={handleLogout} disabled={isLoggingOut} variant="destructive" size="lg" className="w-full mt-6">
+              {isLoggingOut ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> {t('loggingOut')}</>
+              ) : (
+                <><LogOut className="w-5 h-5" /> {t('logout')}</>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </AppShell>
