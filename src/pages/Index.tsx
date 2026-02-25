@@ -40,21 +40,54 @@ const Index = () => {
   const [noStationsMessage, setNoStationsMessage] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<StationCategory | 'ALL'>('ALL');
   const [showQrScanner, setShowQrScanner] = useState(false);
+  const [showAllStations, setShowAllStations] = useState(false);
   const { data: stations, isLoading } = useStations();
   const { position } = useGeolocation();
 
   const visibleStations = useMemo(() => {
     const filtered = (stations?.filter(s => s.visibility !== 'HIDDEN') || [])
       .filter(s => categoryFilter === 'ALL' || s.category === categoryFilter);
-    if (position) {
-      return [...filtered].sort((a, b) => {
+
+    // Sort: available first, then by distance
+    const sorted = [...filtered].sort((a, b) => {
+      const aOnline = isStationOnline(a) ? 0 : 1;
+      const bOnline = isStationOnline(b) ? 0 : 1;
+      if (aOnline !== bOnline) return aOnline - bOnline;
+
+      if (position) {
         const distA = (a.geo_lat && a.geo_lng) ? getDistanceKm(position.lat, position.lng, a.geo_lat, a.geo_lng) : Infinity;
         const distB = (b.geo_lat && b.geo_lng) ? getDistanceKm(position.lat, position.lng, b.geo_lat, b.geo_lng) : Infinity;
         return distA - distB;
-      });
-    }
-    return filtered;
+      }
+      return 0;
+    });
+
+    return sorted;
   }, [stations, categoryFilter, position]);
+
+  // Split into nearby available and the rest
+  const { nearbyStations, otherStations } = useMemo(() => {
+    const nearby: Station[] = [];
+    const other: Station[] = [];
+
+    for (const s of visibleStations) {
+      const online = isStationOnline(s);
+      if (online && position && s.geo_lat && s.geo_lng) {
+        const dist = getDistanceKm(position.lat, position.lng, s.geo_lat, s.geo_lng);
+        if (dist <= 100) {
+          nearby.push(s);
+          continue;
+        }
+      } else if (online && !position) {
+        // No geolocation — show all available in the nearby section
+        nearby.push(s);
+        continue;
+      }
+      other.push(s);
+    }
+
+    return { nearbyStations: nearby, otherStations: other };
+  }, [visibleStations, position]);
 
   const getDistanceLabel = (station: Station): string | null => {
     if (!position || !station.geo_lat || !station.geo_lng) return null;
@@ -414,7 +447,29 @@ const Index = () => {
         {/* Stations List */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-foreground">{t('nearbyStations')}</h2>
-          {visibleStations.map(renderStationCard)}
+          {nearbyStations.length > 0 ? (
+            nearbyStations.map(renderStationCard)
+          ) : (
+            <p className="text-sm text-muted-foreground">Nessuna stazione disponibile nelle vicinanze</p>
+          )}
+
+          {otherStations.length > 0 && !showAllStations && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setShowAllStations(true)}
+            >
+              Mostra altre {otherStations.length} stazioni
+            </Button>
+          )}
+
+          {showAllStations && otherStations.length > 0 && (
+            <>
+              <h2 className="text-sm font-bold text-foreground pt-2">Altre stazioni</h2>
+              {otherStations.map(renderStationCard)}
+            </>
+          )}
         </div>
       </div>
 
