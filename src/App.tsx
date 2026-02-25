@@ -1,10 +1,12 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { AuthProvider } from "@/hooks/useAuth";
+import { logErrorToDb, GENERIC_ERROR_MESSAGE } from "@/services/errorLogService";
+import { toast } from "sonner";
 
 import Index from "./pages/Index";
 import Payment from "./pages/Payment";
@@ -25,7 +27,30 @@ import StationDetail from "./pages/StationDetail";
 import StationTimer from "./pages/StationTimer";
 import MySubscriptions from "./pages/MySubscriptions";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      logErrorToDb({
+        error_message: error.message,
+        error_stack: error instanceof Error ? error.stack : undefined,
+        error_context: 'QueryCache',
+        severity: 'error',
+      });
+      toast.error(GENERIC_ERROR_MESSAGE);
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      logErrorToDb({
+        error_message: error.message,
+        error_stack: error instanceof Error ? error.stack : undefined,
+        error_context: 'MutationCache',
+        severity: 'error',
+      });
+      toast.error(GENERIC_ERROR_MESSAGE);
+    },
+  }),
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
