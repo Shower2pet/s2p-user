@@ -59,9 +59,8 @@ export const isStationMaintenance = (station: Station): boolean => {
   return station.status === 'MAINTENANCE';
 };
 
-const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station => {
+const mapRow = (row: any): Station => {
   const options = Array.isArray(row.washing_options) ? row.washing_options : [];
-  const struct = row.structure_id ? structuresMap.get(row.structure_id) : null;
   return {
     id: row.id,
     type: row.type as StationType,
@@ -74,12 +73,12 @@ const enrichWithStructure = (row: any, structuresMap: Map<string, any>): Station
     last_heartbeat_at: row.last_heartbeat_at,
     washing_options: options as WashingOption[],
     structure_id: row.structure_id,
-    structure_name: struct?.name ?? null,
-    structure_address: struct?.address ?? null,
-    structure_description: struct?.description ?? null,
-    structure_geo_lat: struct?.geo_lat ?? null,
-    structure_geo_lng: struct?.geo_lng ?? null,
-    structure_owner_id: struct?.owner_id ?? null,
+    structure_name: row.structure_name ?? null,
+    structure_address: null,
+    structure_description: null,
+    structure_geo_lat: null,
+    structure_geo_lng: null,
+    structure_owner_id: null,
     has_access_gate: row.has_access_gate ?? false,
     access_code: row.access_code ?? null,
   };
@@ -90,24 +89,9 @@ export const useStations = () => {
     queryKey: ['stations'],
     refetchInterval: 30_000, // Poll every 30s for status changes
     queryFn: async () => {
-      // Use RPC function to get public station data (bypasses RLS safely)
       const { data: stationsData, error } = await supabase.rpc('get_public_stations');
       if (error) throw error;
-
-      // Fetch structures (publicly readable)
-      const structureIds = [...new Set((stationsData || []).map((s: any) => s.structure_id).filter(Boolean))];
-      const structuresMap = new Map<string, any>();
-
-      if (structureIds.length > 0) {
-        const { data: structs } = await supabase
-          .from('structures')
-          .select('id, name, address, description, geo_lat, geo_lng, owner_id')
-          .in('id', structureIds);
-        
-        (structs || []).forEach((s: any) => structuresMap.set(s.id, s));
-      }
-
-      return (stationsData || []).map((row: any) => enrichWithStructure(row, structuresMap));
+      return (stationsData || []).map(mapRow);
     },
   });
 };
@@ -118,25 +102,10 @@ export const useStation = (stationId: string | undefined) => {
     refetchInterval: 30_000, // Poll every 30s for status changes
     queryFn: async () => {
       if (!stationId) return null;
-
       const { data: stationsData, error } = await supabase.rpc('get_public_stations');
       if (error) throw error;
-
       const row = (stationsData || []).find((s: any) => s.id === stationId);
-      if (!row) return null;
-
-      const structuresMap = new Map<string, any>();
-      if (row.structure_id) {
-        const { data: structs } = await supabase
-          .from('structures')
-          .select('id, name, address, description, geo_lat, geo_lng, owner_id')
-          .eq('id', row.structure_id)
-          .maybeSingle();
-        
-        if (structs) structuresMap.set(structs.id, structs);
-      }
-
-      return enrichWithStructure(row, structuresMap);
+      return row ? mapRow(row) : null;
     },
     enabled: !!stationId,
   });
