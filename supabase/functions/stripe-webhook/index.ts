@@ -67,6 +67,17 @@ serve(async (req) => {
       logStep("generate-receipt triggered", payload);
     };
 
+    // Helper: fire-and-forget send-email
+    const triggerEmail = (to: string, type: string, data: Record<string, unknown>) => {
+      if (!supabaseUrl || !serviceKey || !to) return;
+      fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+        body: JSON.stringify({ to, type, data }),
+      }).catch((e) => logStep("send-email trigger error", { error: String(e) }));
+      logStep("send-email triggered", { to, type });
+    };
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -139,6 +150,26 @@ serve(async (req) => {
 
           logStep("Credit pack processing complete");
 
+          // Email: conferma acquisto crediti
+          const recipientEmail = guestEmailFromStripe || session.customer_details?.email;
+          if (recipientEmail) {
+            // Resolve structure name for email
+            let structureName = "";
+            if (structureId) {
+              const { data: struct } = await supabaseClient
+                .from("structures")
+                .select("name")
+                .eq("id", structureId)
+                .maybeSingle();
+              structureName = struct?.name || "";
+            }
+            triggerEmail(recipientEmail, "credit_pack_confirmation", {
+              credits: creditsFromMeta,
+              amount: (session.amount_total || 0) / 100,
+              structure_name: structureName,
+            });
+          }
+
         } else if (productType === 'session') {
           logStep("Session payment - resolving wash_session for receipt");
 
@@ -162,6 +193,17 @@ serve(async (req) => {
             });
           }
 
+          // Email: conferma acquisto sessione lavaggio
+          const sessionRecipient = guestEmailFromStripe || session.customer_details?.email;
+          if (sessionRecipient) {
+            const optionName = session.metadata?.option_name || "Lavaggio";
+            triggerEmail(sessionRecipient, "purchase_confirmation", {
+              amount: (session.amount_total || 0) / 100,
+              option_name: optionName,
+              station_id: session.metadata?.station_id || "",
+            });
+          }
+
         } else if (session.mode === 'subscription') {
           logStep("Subscription payment");
           // ── Scontrino fiscale per abbonamento ──
@@ -170,6 +212,15 @@ serve(async (req) => {
             triggerReceipt({
               stripe_session_id: session.id,
               product_type: "subscription",
+              amount: amountCents / 100,
+            });
+          }
+
+          // Email: conferma abbonamento
+          const subRecipient = guestEmailFromStripe || session.customer_details?.email;
+          if (subRecipient && amountCents > 0) {
+            triggerEmail(subRecipient, "subscription_confirmation", {
+              plan_name: session.metadata?.plan_name || "Abbonamento",
               amount: amountCents / 100,
             });
           }

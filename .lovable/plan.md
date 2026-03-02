@@ -1,76 +1,51 @@
+## Email nell'ecosistema Shower2Pet — Stato implementazione
 
+### Provider scelto: Resend con dominio custom shower2pet.it
 
-## Email nell'ecosistema Shower2Pet — Analisi e Piano
+### Stato fasi
 
-### Due categorie di email
+| Fase | Stato |
+|------|-------|
+| 1. Provider + secret RESEND_API_KEY | ✅ Completato |
+| 2. Edge Function `send-email` | ✅ Completato |
+| 3. Template HTML brandizzati | ✅ Completato (6 tipi) |
+| 4. Integrazione stripe-webhook | ✅ Completato |
+| 5. Email auth custom (opzionale) | ⏳ Da fare |
 
-Le email che ti servono si dividono in due categorie fondamentalmente diverse:
+### Tipi di email implementati
 
-**1. Email di autenticazione** (gestite da Supabase Auth):
-- Conferma registrazione account
-- Recupero password
-- Magic link (se lo usi)
+- `purchase_confirmation` — Conferma lavaggio con importo e opzione
+- `credit_pack_confirmation` — Conferma acquisto crediti con saldo
+- `subscription_confirmation` — Conferma attivazione abbonamento
+- `partner_credentials` — Credenziali temporanee partner (usabile da Console)
+- `maintenance_ticket_opened` — Notifica apertura ticket manutenzione
+- `maintenance_ticket_closed` — Notifica chiusura ticket
+- `generic` — Email generica con subject e message custom
 
-**2. Email transazionali/operative** (NON gestite da Supabase Auth):
-- Conferma acquisto + scontrino PDF dopo un lavaggio
-- Invio credenziali temporanee al partner durante l'onboarding
-- Notifica apertura/chiusura ticket di manutenzione
-- Conferma acquisto pacchetto crediti
-- Conferma attivazione/rinnovo abbonamento
+### Come usare da altri flussi (Console o Edge Functions)
 
-### Cosa puoi fare con l'infrastruttura attuale
+```typescript
+// Da una Edge Function con service_role_key:
+await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
+  },
+  body: JSON.stringify({
+    to: "destinatario@email.com",
+    type: "partner_credentials",
+    data: {
+      email: "partner@email.com",
+      temp_password: "TempPass123!",
+      partner_name: "Mario Rossi",
+      console_url: "https://s2p-console.lovable.app",
+    },
+  }),
+});
+```
 
-Supabase da solo **non basta** per la seconda categoria. Supabase Auth gestisce solo le email di autenticazione (categoria 1), ma non ha un servizio di invio email generico.
+### Requisiti DNS su Aruba per Resend
 
-### Cosa ti serve in più
-
-Hai bisogno di un **servizio di invio email** (SMTP relay o API). Le opzioni principali:
-
-| Servizio | Come funziona | Costo |
-|----------|--------------|-------|
-| **Resend** | API moderna, si integra bene con Edge Functions | Gratuito fino a 100 email/giorno |
-| **SMTP di Aruba** | Usi il tuo dominio shower2pet.it direttamente | Già incluso nel tuo hosting |
-| **SendGrid / Mailgun** | API + SMTP | Piano gratuito disponibile |
-
-### Usare il dominio shower2pet.it con Aruba
-
-Si, e possibile. Hai due strade:
-
-**Opzione A — SMTP Aruba direttamente dalle Edge Functions:**
-- Usi le credenziali SMTP di Aruba (host, porta, user, password) come secrets in Supabase
-- Le Edge Functions inviano email via SMTP usando il tuo dominio
-- Vantaggio: zero costi aggiuntivi, email da `noreply@shower2pet.it`
-- Svantaggio: Deno (Edge Functions) ha supporto SMTP limitato, richiede librerie specifiche
-
-**Opzione B — Resend con dominio custom (consigliata):**
-- Configuri il dominio shower2pet.it su Resend (aggiungendo record DNS su Aruba)
-- Le Edge Functions chiamano l'API Resend (molto semplice, HTTP POST)
-- Le email arrivano da `noreply@shower2pet.it`
-- Vantaggio: affidabilita, deliverability, semplicissimo da integrare
-- Svantaggio: limite 100 email/giorno nel piano gratuito (poi $20/mese per 50k email)
-
-### Piano di implementazione proposto
-
-**Fase 1 — Scegliere il provider e configurare il dominio**
-
-**Fase 2 — Creare una Edge Function `send-email`** che accetta tipo di email, destinatario e dati, e invia tramite il provider scelto.
-
-**Fase 3 — Creare i template HTML** per ogni tipo di email:
-- Conferma acquisto (con link/allegato scontrino)
-- Credenziali partner
-- Notifica ticket manutenzione
-- Conferma crediti/abbonamento
-
-**Fase 4 — Integrare le chiamate** nei flussi esistenti:
-- `stripe-webhook` → dopo pagamento confermato, chiama `send-email`
-- `create-checkout` → per guest, dopo conferma
-- Onboarding partner (dalla Console) → invio credenziali
-- `maintenance_logs` → notifica apertura ticket
-
-**Fase 5 — Email di autenticazione custom** (opzionale):
-- Personalizzare le email di Supabase Auth con il branding Shower2Pet usando il sistema Lovable Auth Email Templates
-
-### Decisione necessaria
-
-Prima di procedere serve sapere quale provider email vuoi usare.
-
+Configurare su Aruba i record DNS forniti da Resend per il dominio shower2pet.it (MX, TXT per SPF/DKIM).
+Finché i DNS non sono verificati, Resend invierà da un dominio temporaneo.
