@@ -977,6 +977,29 @@ export type Database = {
           total_washes: number
         }[]
       }
+      get_console_users: {
+        Args: { search_query?: string }
+        Returns: {
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          is_guest: boolean
+          last_name: string
+          phone: string
+          total_washes: number
+        }[]
+      }
+      get_note_authors: {
+        Args: { author_ids: string[] }
+        Returns: {
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          role: Database["public"]["Enums"]["user_role"]
+        }[]
+      }
       get_public_stations: {
         Args: never
         Returns: {
@@ -999,6 +1022,19 @@ export type Database = {
           type: string
           visibility: string
           washing_options: Json
+        }[]
+      }
+      get_station_users: {
+        Args: { p_search?: string; p_station_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          id: string
+          is_guest: boolean
+          last_name: string
+          last_wash_at: string
+          phone: string
+          total_washes: number
         }[]
       }
       handle_station_heartbeat: {
