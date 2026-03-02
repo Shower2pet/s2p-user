@@ -244,13 +244,27 @@ serve(async (req) => {
     const { subject, html } = buildEmail(type, data || {});
     const from = (data?.from as string) || "Shower2Pet <noreply@shower2pet.com>";
 
+    // Build attachments if receipt PDF is provided
+    const attachments: { filename: string; content: string }[] = [];
+    if (data?.receipt_pdf_base64) {
+      attachments.push({
+        filename: `scontrino_shower2pet.pdf`,
+        content: data.receipt_pdf_base64 as string,
+      });
+    }
+
+    const emailPayload: Record<string, unknown> = { from, to: [to], subject, html };
+    if (attachments.length > 0) {
+      emailPayload.attachments = attachments;
+    }
+
     const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${resendApiKey}`,
       },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify(emailPayload),
     });
 
     const resendData = await resendRes.json();
