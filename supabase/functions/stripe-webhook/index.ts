@@ -150,38 +150,21 @@ serve(async (req) => {
 
           logStep("Credit pack processing complete");
 
-          // Email: conferma acquisto crediti
-          const recipientEmail = guestEmailFromStripe || session.customer_details?.email;
-          if (recipientEmail) {
-            let structureName = "";
-            if (structureId) {
-              const { data: struct } = await supabaseClient
-                .from("structures")
-                .select("name")
-                .eq("id", structureId)
-                .maybeSingle();
-              structureName = struct?.name || "";
-            }
-            triggerEmail(recipientEmail, "credit_pack_confirmation", {
-              credits: creditsFromMeta,
-              amount: (session.amount_total || 0) / 100,
-              structure_name: structureName,
-            });
-          }
-
         } else if (productType === 'session') {
           logStep("Session payment - resolving wash_session for receipt");
 
           // Trova la wash_session associata alla stripe_session
           const { data: washSession } = await supabaseClient
             .from('wash_sessions')
-            .select('id, option_name')
+            .select('id')
             .eq('stripe_session_id', session.id)
             .maybeSingle();
 
           if (washSession?.id) {
+            // ── Scontrino fiscale per pagamento sessione lavaggio ──
             triggerReceipt({ session_id: washSession.id });
           } else {
+            // Fallback: usa stripe_session_id direttamente
             const amountCents = session.amount_total || 0;
             triggerReceipt({
               stripe_session_id: session.id,
@@ -190,33 +173,14 @@ serve(async (req) => {
             });
           }
 
-          // Email: conferma acquisto sessione lavaggio
-          const sessionRecipient = guestEmailFromStripe || session.customer_details?.email;
-          if (sessionRecipient) {
-            const optionName = washSession?.option_name || session.metadata?.option_name || "Lavaggio";
-            triggerEmail(sessionRecipient, "purchase_confirmation", {
-              amount: (session.amount_total || 0) / 100,
-              option_name: optionName,
-              station_id: session.metadata?.station_id || "",
-            });
-          }
-
         } else if (session.mode === 'subscription') {
           logStep("Subscription payment");
+          // ── Scontrino fiscale per abbonamento ──
           const amountCents = session.amount_total || 0;
           if (amountCents > 0) {
             triggerReceipt({
               stripe_session_id: session.id,
               product_type: "subscription",
-              amount: amountCents / 100,
-            });
-          }
-
-          // Email: conferma abbonamento
-          const subRecipient = guestEmailFromStripe || session.customer_details?.email;
-          if (subRecipient && amountCents > 0) {
-            triggerEmail(subRecipient, "subscription_confirmation", {
-              plan_name: session.metadata?.plan_name || "Abbonamento",
               amount: amountCents / 100,
             });
           }
