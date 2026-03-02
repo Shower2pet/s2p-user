@@ -1,46 +1,76 @@
 
-# Migrazione MQTT: da HiveMQ a EMQX con Webhook
 
-## Stato: ✅ Completata e ottimizzata
+## Email nell'ecosistema Shower2Pet — Analisi e Piano
 
-### Cosa è stato fatto
+### Due categorie di email
 
-1. **Creata `emqx-webhook` Edge Function** — riceve POST da EMQX per:
-   - `client.connected` → chiama `handle_station_heartbeat` (stazione online, aggiorna `last_heartbeat_at`)
-   - `client.disconnected` → chiama `mark_station_offline` (stazione offline)
-   - `message.publish` su `shower2pet/{id}/status` → aggiorna `last_heartbeat_at` (necessario finché il firmware invia heartbeat periodici)
+Le email che ti servono si dividono in due categorie fondamentalmente diverse:
 
-2. **Eliminata `check-heartbeat`** — non più necessaria, EMQX notifica in push
+**1. Email di autenticazione** (gestite da Supabase Auth):
+- Conferma registrazione account
+- Recupero password
+- Magic link (se lo usi)
 
-3. **Rimossa `auto_offline_expired_heartbeats`** — il webhook gestisce tutto in tempo reale
+**2. Email transazionali/operative** (NON gestite da Supabase Auth):
+- Conferma acquisto + scontrino PDF dopo un lavaggio
+- Invio credenziali temporanee al partner durante l'onboarding
+- Notifica apertura/chiusura ticket di manutenzione
+- Conferma acquisto pacchetto crediti
+- Conferma attivazione/rinnovo abbonamento
 
-4. **Autenticazione webhook** — Bearer token via secret `EMQX_WEBHOOK_SECRET`
+### Cosa puoi fare con l'infrastruttura attuale
 
-5. **Rimosso cron job `check-heartbeat-cron`** — non più necessario, eliminato dal DB
+Supabase da solo **non basta** per la seconda categoria. Supabase Auth gestisce solo le email di autenticazione (categoria 1), ma non ha un servizio di invio email generico.
 
-6. **Semplificato heartbeat** — rimosso handler `message.publish` dal webhook e check client-side su `last_heartbeat_at`. Il campo `last_heartbeat_at` resta nel DB come safety net (usato da `get_public_stations()` per marcare OFFLINE stazioni con heartbeat stale).
+### Cosa ti serve in più
 
-### Configurazione EMQX attiva
+Hai bisogno di un **servizio di invio email** (SMTP relay o API). Le opzioni principali:
 
-- **HTTP Server Connector** con TLS abilitato (TLS Verify OFF)
-- **2 regole** nel Rule Engine:
-  - `SELECT * FROM "$events/client_connected"` → webhook
-  - `SELECT * FROM "$events/client_disconnected"` → webhook
-- ⚠️ La regola `shower2pet/+/status` può essere **rimossa** dal pannello EMQX (il firmware può smettere di inviare heartbeat periodici)
+| Servizio | Come funziona | Costo |
+|----------|--------------|-------|
+| **Resend** | API moderna, si integra bene con Edge Functions | Gratuito fino a 100 email/giorno |
+| **SMTP di Aruba** | Usi il tuo dominio shower2pet.it direttamente | Già incluso nel tuo hosting |
+| **SendGrid / Mailgun** | API + SMTP | Piano gratuito disponibile |
 
-### Architettura status stazione
+### Usare il dominio shower2pet.it con Aruba
 
-```
-Firmware si connette a EMQX
-  → EMQX invia client.connected → webhook → handle_station_heartbeat (AVAILABLE + last_heartbeat_at = now())
+Si, e possibile. Hai due strade:
 
-Firmware si disconnette (o keepalive timeout)
-  → EMQX invia client.disconnected → webhook → mark_station_offline (OFFLINE)
+**Opzione A — SMTP Aruba direttamente dalle Edge Functions:**
+- Usi le credenziali SMTP di Aruba (host, porta, user, password) come secrets in Supabase
+- Le Edge Functions inviano email via SMTP usando il tuo dominio
+- Vantaggio: zero costi aggiuntivi, email da `noreply@shower2pet.it`
+- Svantaggio: Deno (Edge Functions) ha supporto SMTP limitato, richiede librerie specifiche
 
-Safety net DB:
-  → get_public_stations() controlla last_heartbeat_at: se > 90s → sovrascrive status a OFFLINE
-```
+**Opzione B — Resend con dominio custom (consigliata):**
+- Configuri il dominio shower2pet.it su Resend (aggiungendo record DNS su Aruba)
+- Le Edge Functions chiamano l'API Resend (molto semplice, HTTP POST)
+- Le email arrivano da `noreply@shower2pet.it`
+- Vantaggio: affidabilita, deliverability, semplicissimo da integrare
+- Svantaggio: limite 100 email/giorno nel piano gratuito (poi $20/mese per 50k email)
 
-### File ancora attivi con MQTT
-- `station-control/index.ts` — publish comandi relay (invariato, usa MQTT_HOST/USER/PASSWORD)
-- `check-expired-sessions/index.ts` — publish OFF a fine sessione (invariato)
+### Piano di implementazione proposto
+
+**Fase 1 — Scegliere il provider e configurare il dominio**
+
+**Fase 2 — Creare una Edge Function `send-email`** che accetta tipo di email, destinatario e dati, e invia tramite il provider scelto.
+
+**Fase 3 — Creare i template HTML** per ogni tipo di email:
+- Conferma acquisto (con link/allegato scontrino)
+- Credenziali partner
+- Notifica ticket manutenzione
+- Conferma crediti/abbonamento
+
+**Fase 4 — Integrare le chiamate** nei flussi esistenti:
+- `stripe-webhook` → dopo pagamento confermato, chiama `send-email`
+- `create-checkout` → per guest, dopo conferma
+- Onboarding partner (dalla Console) → invio credenziali
+- `maintenance_logs` → notifica apertura ticket
+
+**Fase 5 — Email di autenticazione custom** (opzionale):
+- Personalizzare le email di Supabase Auth con il branding Shower2Pet usando il sistema Lovable Auth Email Templates
+
+### Decisione necessaria
+
+Prima di procedere serve sapere quale provider email vuoi usare.
+
