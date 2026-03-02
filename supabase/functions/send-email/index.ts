@@ -242,7 +242,7 @@ serve(async (req) => {
     logStep("Building email", { to, type });
 
     const { subject, html } = buildEmail(type, data || {});
-    const from = (data?.from as string) || "Shower2Pet <noreply@shower2pet.it>";
+    const from = (data?.from as string) || "Shower2Pet <noreply@shower2pet.com>";
 
     const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
