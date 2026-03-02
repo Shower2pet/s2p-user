@@ -1,51 +1,70 @@
-## Email nell'ecosistema Shower2Pet — Stato implementazione
 
-### Provider scelto: Resend con dominio custom shower2pet.it
 
-### Stato fasi
+## Piano: Gestire tutte le email con Resend
 
-| Fase | Stato |
-|------|-------|
-| 1. Provider + secret RESEND_API_KEY | ✅ Completato |
-| 2. Edge Function `send-email` | ✅ Completato |
-| 3. Template HTML brandizzati | ✅ Completato (6 tipi) |
-| 4. Integrazione stripe-webhook | ✅ Completato |
-| 5. Email auth custom (opzionale) | ⏳ Da fare |
+### Approccio: SMTP di Resend per le email di autenticazione
 
-### Tipi di email implementati
+Il modo più semplice e affidabile è configurare Resend come provider SMTP custom nelle impostazioni Auth di Supabase. Questo permette di inviare tutte le email (auth + transazionali) dal dominio `shower2pet.it` tramite Resend, senza creare hook aggiuntivi.
 
-- `purchase_confirmation` — Conferma lavaggio con importo e opzione
-- `credit_pack_confirmation` — Conferma acquisto crediti con saldo
-- `subscription_confirmation` — Conferma attivazione abbonamento
-- `partner_credentials` — Credenziali temporanee partner (usabile da Console)
-- `maintenance_ticket_opened` — Notifica apertura ticket manutenzione
-- `maintenance_ticket_closed` — Notifica chiusura ticket
-- `generic` — Email generica con subject e message custom
+### Cosa serve
 
-### Come usare da altri flussi (Console o Edge Functions)
+#### 1. Configurazione su Resend Dashboard
+Dalla dashboard di Resend (resend.com/domains), il dominio `shower2pet.it` è già verificato. Serve solo recuperare le credenziali SMTP:
 
-```typescript
-// Da una Edge Function con service_role_key:
-await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
-  },
-  body: JSON.stringify({
-    to: "destinatario@email.com",
-    type: "partner_credentials",
-    data: {
-      email: "partner@email.com",
-      temp_password: "TempPass123!",
-      partner_name: "Mario Rossi",
-      console_url: "https://s2p-console.lovable.app",
-    },
-  }),
-});
+- Vai su **resend.com/settings/smtp**
+- Le credenziali SMTP sono:
+  - **Host:** `smtp.resend.com`
+  - **Port:** `465` (SSL) oppure `587` (STARTTLS)
+  - **Username:** `resend`
+  - **Password:** la tua API Key (la stessa `RESEND_API_KEY` già configurata)
+
+#### 2. Configurazione su Supabase Dashboard
+Vai su **Supabase Dashboard → Authentication → SMTP Settings** (`https://supabase.com/dashboard/project/rbdzinajiyswzdeoenil/auth/smtp`):
+
+- Abilita **Custom SMTP**
+- **Sender email:** `noreply@shower2pet.it`
+- **Sender name:** `Shower2Pet`
+- **Host:** `smtp.resend.com`
+- **Port:** `465`
+- **Username:** `resend`
+- **Password:** incolla la tua Resend API Key
+- **Minimum interval:** 30 secondi (o come preferisci)
+
+#### 3. Personalizzazione template Auth in Supabase
+Nella stessa sezione Auth → **Email Templates** (`https://supabase.com/dashboard/project/rbdzinajiyswzdeoenil/auth/templates`), personalizza i template HTML per:
+
+- **Confirm signup** — conferma registrazione
+- **Reset password** — recupero password
+- **Magic link** — accesso con link
+- **Change email** — cambio email
+
+#### 4. Modifiche al codice (Edge Function `send-email`)
+Aggiungere template brandizzati per le email auth (opzionale, se vuoi gestire anche le auth email via Edge Function in futuro), ma con l'approccio SMTP non serve nessuna modifica al codice. Le email auth passano direttamente da Supabase → Resend SMTP.
+
+### Risultato finale
+
+```text
+Supabase Auth (SMTP → Resend)        Edge Function (API → Resend)
+┌──────────────────────────┐         ┌──────────────────────────┐
+│ Conferma registrazione   │         │ Conferma acquisto        │
+│ Reset password           │         │ Crediti acquistati       │
+│ Magic link               │         │ Abbonamento attivato     │
+│ Cambio email             │         │ Credenziali partner      │
+│                          │         │ Ticket manutenzione      │
+└──────────────────────────┘         └──────────────────────────┘
+  smtp.resend.com                      send-email → Resend API
+  Template: Supabase Dashboard         Template: Edge Function
+  Dominio: shower2pet.it               Dominio: shower2pet.it
 ```
 
-### Requisiti DNS su Aruba per Resend
+### Riepilogo passi
 
-Configurare su Aruba i record DNS forniti da Resend per il dominio shower2pet.it (MX, TXT per SPF/DKIM).
-Finché i DNS non sono verificati, Resend invierà da un dominio temporaneo.
+| # | Dove | Azione |
+|---|------|--------|
+| 1 | Resend Dashboard | Verificare credenziali SMTP (già disponibili) |
+| 2 | Supabase Dashboard → Auth → SMTP | Configurare SMTP custom con le credenziali Resend |
+| 3 | Supabase Dashboard → Auth → Templates | Personalizzare i 4 template HTML con branding Shower2Pet |
+| 4 | Nessuna modifica al codice | Le email transazionali funzionano già via `send-email` |
+
+**Nessuna modifica al codice è necessaria.** Serve solo configurazione nelle due dashboard. Se vuoi posso fornirti i template HTML brandizzati da incollare nella sezione Email Templates di Supabase.
+
