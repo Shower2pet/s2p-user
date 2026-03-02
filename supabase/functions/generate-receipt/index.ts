@@ -438,10 +438,11 @@ serve(async (req) => {
     await updateReceipt({ status: "SENT", fiskaly_record_id: fiskalyRecordId });
 
     // ── Salva fiscal_doc_url sulla transazione per accesso utente ──────
+    let transactionForEmail: { user_id?: string; guest_email?: string; structure_id?: string; total_value?: number; stripe_payment_id?: string; credits_purchased?: number } | null = null;
+
     if (fiskalyRecordId && fiskalyRecordId !== "SUCCESS_NO_ID") {
       const fiscalDocRef = `fiskaly:${fiskalyRecordId}`;
       if (resolvedSessionId) {
-        // Trova la transazione dalla wash_session (match by station_id)
         const { data: ws } = await supabase
           .from("wash_sessions")
           .select("station_id, stripe_session_id")
@@ -453,6 +454,13 @@ serve(async (req) => {
             .update({ fiscal_doc_url: fiscalDocRef, fiscal_status: "SENT" })
             .eq("stripe_payment_id", ws.stripe_session_id);
           log("fiscal_doc_url saved on transaction via stripe_session_id");
+
+          const { data: txData } = await supabase
+            .from("transactions")
+            .select("user_id, guest_email, structure_id, total_value, stripe_payment_id, credits_purchased")
+            .eq("stripe_payment_id", ws.stripe_session_id)
+            .maybeSingle();
+          transactionForEmail = txData;
         }
       } else if (stripe_session_id) {
         await supabase
@@ -460,7 +468,87 @@ serve(async (req) => {
           .update({ fiscal_doc_url: fiscalDocRef, fiscal_status: "SENT" })
           .eq("stripe_payment_id", stripe_session_id as string);
         log("fiscal_doc_url saved on transaction via stripe_session_id");
+
+        const { data: txData } = await supabase
+          .from("transactions")
+          .select("user_id, guest_email, structure_id, total_value, stripe_payment_id, credits_purchased")
+          .eq("stripe_payment_id", stripe_session_id as string)
+          .maybeSingle();
+        transactionForEmail = txData;
       }
+    }
+
+    // ── Invia email di conferma con scontrino ─────────────────────────────
+    try {
+      let recipientEmail: string | null = null;
+
+      // Resolve email: from profile (registered user) or guest_email
+      if (transactionForEmail?.user_id) {
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", transactionForEmail.user_id)
+          .maybeSingle();
+        recipientEmail = userProfile?.email || null;
+      }
+      if (!recipientEmail && transactionForEmail?.guest_email) {
+        recipientEmail = transactionForEmail.guest_email;
+      }
+
+      if (recipientEmail) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+        if (supabaseUrl && serviceKey) {
+          let emailType: string;
+          let emailData: Record<string, unknown>;
+
+          if (product_type === "credit_pack") {
+            // Resolve structure name
+            let structureName = "";
+            if (transactionForEmail?.structure_id) {
+              const { data: struct } = await supabase
+                .from("structures")
+                .select("name")
+                .eq("id", transactionForEmail.structure_id)
+                .maybeSingle();
+              structureName = struct?.name || "";
+            }
+            emailType = "credit_pack_confirmation";
+            emailData = {
+              credits: transactionForEmail?.credits_purchased || 0,
+              amount: amountFloat,
+              structure_name: structureName,
+            };
+          } else if (product_type === "subscription") {
+            emailType = "subscription_confirmation";
+            emailData = {
+              plan_name: bodyDescription || "Abbonamento",
+              amount: amountFloat,
+            };
+          } else {
+            // Wash session purchase
+            emailType = "purchase_confirmation";
+            emailData = {
+              amount: amountFloat,
+              option_name: receiptDescription,
+              station_id: "",
+            };
+          }
+
+          // Send email
+          fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+            body: JSON.stringify({ to: recipientEmail, type: emailType, data: emailData }),
+          }).catch((e) => log("send-email trigger error", { error: String(e) }));
+          log("Confirmation email triggered", { to: recipientEmail, type: emailType });
+        }
+      } else {
+        log("No recipient email found, skipping confirmation email");
+      }
+    } catch (emailErr) {
+      log("Email trigger error (non-blocking)", { error: (emailErr as Error).message });
     }
 
     return new Response(JSON.stringify({ success: true, data: receiptData }), {
