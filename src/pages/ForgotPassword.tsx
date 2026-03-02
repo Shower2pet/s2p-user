@@ -10,7 +10,7 @@ import { resetPasswordForEmail } from '@/services/authService';
 import { useLanguage } from '@/hooks/useLanguage';
 import { z } from 'zod';
 
-const RESET_PASSWORD_REDIRECT_URL = 'https://shower2pet.com/reset-password';
+const RESET_PASSWORD_REDIRECT_URL = `${import.meta.env.VITE_APP_URL || window.location.origin}/reset-password`;
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
