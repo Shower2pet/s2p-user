@@ -10,6 +10,8 @@ import { resetPasswordForEmail } from '@/services/authService';
 import { useLanguage } from '@/hooks/useLanguage';
 import { z } from 'zod';
 
+const RESET_PASSWORD_REDIRECT_URL = 'https://shower2pet.com/reset-password';
+
 const ForgotPassword = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -23,7 +25,7 @@ const ForgotPassword = () => {
     try {
       const validatedEmail = emailSchema.parse(email);
       setLoading(true);
-      await resetPasswordForEmail(validatedEmail, `${window.location.origin}/reset-password`);
+      await resetPasswordForEmail(validatedEmail, RESET_PASSWORD_REDIRECT_URL);
       setSubmitted(true);
     } catch (error) {
       if (error instanceof z.ZodError) {
