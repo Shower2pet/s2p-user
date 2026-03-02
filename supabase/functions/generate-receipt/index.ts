@@ -478,11 +478,33 @@ serve(async (req) => {
       }
     }
 
+    // ── Fetch PDF dallo scontrino Fiskaly ────────────────────────────────
+    let receiptPdfBase64: string | null = null;
+    if (fiskalyRecordId && fiskalyRecordId !== "SUCCESS_NO_ID") {
+      try {
+        const pdfRes = await fetch(`${baseUrl}/records/${fiskalyRecordId}?compliance-artifact`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${bearer}`,
+            "X-Api-Version": API_VERSION,
+          },
+        });
+        if (pdfRes.ok) {
+          const pdfData = await pdfRes.json();
+          receiptPdfBase64 = pdfData?.content?.compliance?.artifact?.data || null;
+          log("Receipt PDF fetched", { hasPdf: !!receiptPdfBase64 });
+        } else {
+          log("Receipt PDF fetch failed (non-blocking)", { status: pdfRes.status });
+        }
+      } catch (pdfErr) {
+        log("Receipt PDF fetch error (non-blocking)", { error: (pdfErr as Error).message });
+      }
+    }
+
     // ── Invia email di conferma con scontrino ─────────────────────────────
     try {
       let recipientEmail: string | null = null;
 
-      // Resolve email: from profile (registered user) or guest_email
       if (transactionForEmail?.user_id) {
         const { data: userProfile } = await supabase
           .from("profiles")
@@ -504,7 +526,6 @@ serve(async (req) => {
           let emailData: Record<string, unknown>;
 
           if (product_type === "credit_pack") {
-            // Resolve structure name
             let structureName = "";
             if (transactionForEmail?.structure_id) {
               const { data: struct } = await supabase
@@ -527,7 +548,6 @@ serve(async (req) => {
               amount: amountFloat,
             };
           } else {
-            // Wash session purchase
             emailType = "purchase_confirmation";
             emailData = {
               amount: amountFloat,
@@ -536,13 +556,17 @@ serve(async (req) => {
             };
           }
 
-          // Send email
+          // Attach receipt PDF if available
+          if (receiptPdfBase64) {
+            emailData.receipt_pdf_base64 = receiptPdfBase64;
+          }
+
           fetch(`${supabaseUrl}/functions/v1/send-email`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
             body: JSON.stringify({ to: recipientEmail, type: emailType, data: emailData }),
           }).catch((e) => log("send-email trigger error", { error: String(e) }));
-          log("Confirmation email triggered", { to: recipientEmail, type: emailType });
+          log("Confirmation email triggered", { to: recipientEmail, type: emailType, hasPdf: !!receiptPdfBase64 });
         }
       } else {
         log("No recipient email found, skipping confirmation email");
