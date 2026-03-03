@@ -16,8 +16,8 @@ const Credits = () => {
   if (!user) {
     return (
       <AppShell>
-        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6 text-center">
-          <h1 className="text-3xl font-bold text-foreground">{t('myCredits')}</h1>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4 text-center">
+          <h1 className="text-2xl font-bold text-foreground">{t('myCredits')}</h1>
           <p className="text-muted-foreground">{t('loginToViewCredits')}</p>
           <Button onClick={() => navigate('/login')}>{t('login')}</Button>
         </div>
@@ -27,9 +27,9 @@ const Credits = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">{t('myCredits')}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t('myCredits')}</h1>
         </div>
 
         <div className="space-y-3">
