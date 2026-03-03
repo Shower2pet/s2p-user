@@ -417,7 +417,7 @@ const Index = () => {
             className={`flex-1 ${categoryFilter !== 'TUB' ? 'border-primary/40 text-primary hover:bg-primary/10' : ''}`}
             onClick={() => setCategoryFilter('TUB')}
           >
-            <span className="w-3 h-3 rounded-full bg-primary border-2 border-foreground/30 inline-block mr-1.5" />
+            <span className="w-3 h-3 rounded-full bg-primary border-2 border-background inline-block mr-1.5" />
             {t('tubs')}
           </Button>
           <Button
@@ -425,7 +425,7 @@ const Index = () => {
             className={`flex-1 ${categoryFilter !== 'SHOWER' ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10' : ''}`}
             onClick={() => setCategoryFilter('SHOWER')}
           >
-            <span className="w-3 h-3 rounded-full bg-success border-2 border-foreground/30 inline-block mr-1.5" />
+            <span className="w-3 h-3 rounded-full bg-success border-2 border-background inline-block mr-1.5" />
             {t('showers')}
           </Button>
         </div>
