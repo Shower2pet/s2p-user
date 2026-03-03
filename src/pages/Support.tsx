@@ -28,13 +28,13 @@ const Support = () => {
 
   return (
     <AppShell showNav={false}>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
         <Button variant="ghost" onClick={() => navigate('/profile')}>
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
 
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">{t('helpAndSupport')}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t('helpAndSupport')}</h1>
           <p className="text-muted-foreground font-light">{t('hereToHelp')}</p>
         </div>
 

@@ -19,9 +19,9 @@ const ActiveSession = () => {
 
   return (
     <AppShell showNav={false}>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
-        <div className="text-center space-y-3">
-          <h1 className="text-3xl font-bold text-foreground">
+      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">
             {branding.station.name}
           </h1>
           <Badge className="bg-success text-foreground">
