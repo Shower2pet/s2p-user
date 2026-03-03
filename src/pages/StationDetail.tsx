@@ -4,9 +4,9 @@ import { StationIdentityBlock } from '@/components/station/StationIdentityBlock'
 import { MapPreview } from '@/components/station/MapPreview';
 import { SafetyInfo } from '@/components/station/SafetyInfo';
 import { ReportProblemDialog } from '@/components/station/ReportProblemDialog';
-import { SubscriptionPlansList } from '@/components/station/SubscriptionPlansList';
+// import { SubscriptionPlansList } from '@/components/station/SubscriptionPlansList'; // Hidden for now
 import { useStation, isStationOnline, getStationDisplayName } from '@/hooks/useStations';
-import { useSubscriptionPlans, useActiveSubscriptionForOwner } from '@/hooks/useSubscriptions';
+// import { useSubscriptionPlans, useActiveSubscriptionForOwner } from '@/hooks/useSubscriptions'; // Hidden for now
 import { useCreditPackagesForStructure } from '@/hooks/useCreditPackages';
 import { CreditPackagesList } from '@/components/station/CreditPackagesList';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -36,8 +36,9 @@ const StationDetail = () => {
   const queryClient = useQueryClient();
   const { data: station, isLoading, error } = useStation(id);
   const { data: wallet } = useWalletForStructure(station?.structure_id);
-  const { data: plans } = useSubscriptionPlans(station?.structure_owner_id);
-  const { data: activeSub } = useActiveSubscriptionForOwner(station?.structure_owner_id);
+  // Subscriptions hidden for now
+  const plans: any[] = [];
+  const activeSub = null;
   const { data: creditPackages } = useCreditPackagesForStructure(station?.structure_id);
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -432,30 +433,7 @@ const StationDetail = () => {
           </Card>
         )}
 
-        {/* Active subscription banner */}
-        {hasActiveSub && (
-          <Card className="p-4 border-accent/30 bg-accent/5 animate-fade-in">
-            <div className="flex items-center gap-2">
-              <Crown className="w-5 h-5 text-accent" />
-              <div>
-                <p className="font-bold text-foreground text-sm">{t('activeSubscription')}</p>
-                <p className="text-xs text-muted-foreground">{t('canStartWithSubscription')}</p>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Subscription Plans (only if no active subscription) */}
-        {!hasActiveSub && plans && plans.length > 0 && (
-          <div className="animate-fade-in" style={{ animationDelay: '0.08s' }}>
-            <SubscriptionPlansList
-              plans={plans}
-              activePlanId={activeSub?.plan_id}
-              onSubscribe={handleSubscribe}
-              isProcessing={isProcessing}
-            />
-          </div>
-        )}
+        {/* Subscription Plans & Banner — hidden for now */}
 
         {/* Credit Packages */}
         {creditPackages && creditPackages.length > 0 && (
