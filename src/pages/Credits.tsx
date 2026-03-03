@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { useWallets } from '@/hooks/useWallet';
-import { Wallet } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,13 +30,10 @@ const Credits = () => {
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground">{t('myCredits')}</h1>
+          <p className="text-muted-foreground font-light">{t('balancesByStructure')}</p>
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-primary" />
-            {t('balancesByStructure')}
-          </h2>
           {walletsLoading ? (
             <Card className="p-4 text-center text-muted-foreground">{t('loading')}</Card>
           ) : wallets && wallets.length > 0 ? (
@@ -49,9 +46,9 @@ const Credits = () => {
               </Card>
             ))
           ) : (
-            <Card className="p-6 text-center space-y-2">
-              <p className="text-muted-foreground">{t('noCreditsAvailable')}</p>
-              <p className="text-sm text-muted-foreground">{t('buyCreditsFromStation')}</p>
+            <Card className="p-8 text-center space-y-2">
+              <p className="text-muted-foreground font-light">{t('noCreditsAvailable')}</p>
+              <p className="text-sm text-muted-foreground font-light">{t('buyCreditsFromStation')}</p>
             </Card>
           )}
         </div>
