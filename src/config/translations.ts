@@ -45,11 +45,12 @@ export const translations: Record<string, Record<string, string>> = {
     step3Desc: 'Use the dryer to leave your dog clean and dry',
     
     // Safety
-    safetyRecommendations: 'Safety recommendations',
-    safety1: 'Always supervise your pet during the wash',
-    safety2: 'Check water temperature before starting',
-    safety3: 'Keep your dog calm and secured',
-    safety4: 'Use the dryer carefully, avoiding eyes and ears',
+    safetyRecommendations: 'Usage rules',
+    safety1: '🐕 Secure your dog by leashing it to the station for the entire wash',
+    safety2: '🚿 Check the water temperature before starting',
+    safety3: '💨 Do not direct the airflow into eyes or ears',
+    safety4: '🧹 Leave the tub clean after use',
+    safety5: '⚠️ Always supervise your pet during the session',
     
     // Features
     waterSystem: 'Water System',
@@ -433,11 +434,12 @@ export const translations: Record<string, Record<string, string>> = {
     step3Desc: "Usa l'asciugatrice per lasciare il tuo cane pulito e asciutto",
     
     // Safety
-    safetyRecommendations: 'Raccomandazioni di sicurezza',
-    safety1: 'Supervisiona sempre il tuo animale durante il lavaggio',
-    safety2: "Controlla la temperatura dell'acqua prima di iniziare",
-    safety3: 'Mantieni il tuo cane calmo e sicuro',
-    safety4: "Usa l'asciugatrice con attenzione, evitando occhi e orecchie",
+    safetyRecommendations: 'Regolamento di utilizzo',
+    safety1: '🐕 Metti in sicurezza il cane legandolo alla postazione per tutta la durata del lavaggio',
+    safety2: "🚿 Controlla la temperatura dell'acqua prima di iniziare",
+    safety3: "💨 Non indirizzare il flusso d'aria negli occhi o nelle orecchie",
+    safety4: '🧹 Lascia la vasca pulita dopo l\'uso',
+    safety5: '⚠️ Supervisiona sempre il tuo animale durante la sessione',
     
     // Features
     waterSystem: 'Sistema Acqua',

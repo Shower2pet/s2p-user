@@ -10,6 +10,7 @@ export const SafetyInfo = () => {
     t('safety2'),
     t('safety3'),
     t('safety4'),
+    t('safety5'),
   ];
 
   return (
