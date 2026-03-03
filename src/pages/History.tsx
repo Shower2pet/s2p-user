@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
 import { Calendar, Clock, MapPin, CreditCard, Loader2, Coins, FileDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,7 @@ import { fetchTransactions, downloadReceiptPdf } from '@/services/transactionSer
 
 const History = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +134,18 @@ const History = () => {
       </Card>
     );
   };
+
+  if (!user) {
+    return (
+      <AppShell>
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6 text-center">
+          <h1 className="text-3xl font-bold text-foreground">{t('historyTitle')}</h1>
+          <p className="text-muted-foreground">{t('loginToViewHistory')}</p>
+          <Button onClick={() => navigate('/login')}>{t('login')}</Button>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (loading) {
     return (
