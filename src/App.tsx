@@ -23,6 +23,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Support from "./pages/Support";
 
 import NotFound from "./pages/NotFound";
+import AboutUs from "./pages/AboutUs";
 import StationDetail from "./pages/StationDetail";
 import StationTimer from "./pages/StationTimer";
 
@@ -78,6 +79,7 @@ const App = () => (
               
               <Route path="/s/:id" element={<StationDetail />} />
               <Route path="/s/:id/timer" element={<StationTimer />} />
+              <Route path="/about" element={<AboutUs />} />
               
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
