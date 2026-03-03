@@ -387,6 +387,26 @@ export const translations: Record<string, Record<string, string>> = {
     
     // Only Clients label
     onlyClients: 'Only Clients',
+
+    // About Us
+    aboutUs: 'About Us',
+    aboutUsTitle: 'About Shower2Pet',
+    aboutUsIntro: 'Shower2Pet is the first network of self-service dog wash stations designed to make grooming your four-legged friend quick, easy and affordable. Our innovative stations offer professional-grade washing and drying, available 24/7.',
+    aboutMissionTitle: 'Our Mission',
+    aboutMissionDesc: 'We believe every dog deserves to be clean and happy, without the stress of traditional grooming. Our self-service stations put you in control — choose the wash you need, at your own pace, at a fair price.',
+    aboutFeature1Title: 'Professional Wash',
+    aboutFeature1Desc: 'Hot water, shampoo dispensers and adjustable pressure for a thorough clean.',
+    aboutFeature2Title: 'Pet-Friendly',
+    aboutFeature2Desc: 'Designed with your pet\'s comfort and safety in mind.',
+    aboutFeature3Title: 'Safe & Hygienic',
+    aboutFeature3Desc: 'Sanitised stations with high-quality materials and regular maintenance.',
+    aboutFeature4Title: 'Made with Love',
+    aboutFeature4Desc: 'Born from a passion for animals and innovation.',
+    aboutHowTitle: 'How It Works',
+    aboutStep1: 'Find a station near you on the map or scan the QR code on-site.',
+    aboutStep2: 'Choose a wash programme and pay with card or credits.',
+    aboutStep3: 'Wash and dry your dog — done! Leave the station clean for the next user.',
+    aboutFooter: '© Shower2Pet — Self-service dog wash stations',
   },
   it: {
     // Navigation
@@ -776,6 +796,26 @@ export const translations: Record<string, Record<string, string>> = {
     
     // Only Clients label
     onlyClients: 'Solo Clienti',
+
+    // About Us
+    aboutUs: 'Chi Siamo',
+    aboutUsTitle: 'Chi è Shower2Pet',
+    aboutUsIntro: 'Shower2Pet è la prima rete di postazioni self-service per il lavaggio dei cani, pensata per rendere la toelettatura del tuo amico a quattro zampe rapida, semplice e conveniente. Le nostre stazioni innovative offrono lavaggio e asciugatura professionali, disponibili 24/7.',
+    aboutMissionTitle: 'La Nostra Missione',
+    aboutMissionDesc: 'Crediamo che ogni cane meriti di essere pulito e felice, senza lo stress della toelettatura tradizionale. Le nostre postazioni self-service ti mettono al comando — scegli il lavaggio che ti serve, con i tuoi tempi, a un prezzo giusto.',
+    aboutFeature1Title: 'Lavaggio Professionale',
+    aboutFeature1Desc: 'Acqua calda, erogatori di shampoo e pressione regolabile per una pulizia completa.',
+    aboutFeature2Title: 'Pet-Friendly',
+    aboutFeature2Desc: 'Progettate pensando al comfort e alla sicurezza del tuo animale.',
+    aboutFeature3Title: 'Sicuro e Igienico',
+    aboutFeature3Desc: 'Postazioni sanificate con materiali di qualità e manutenzione regolare.',
+    aboutFeature4Title: 'Fatto con Amore',
+    aboutFeature4Desc: 'Nato dalla passione per gli animali e l\'innovazione.',
+    aboutHowTitle: 'Come Funziona',
+    aboutStep1: 'Trova una stazione vicino a te sulla mappa o scansiona il QR code sul posto.',
+    aboutStep2: 'Scegli un programma di lavaggio e paga con carta o crediti.',
+    aboutStep3: 'Lava e asciuga il tuo cane — fatto! Lascia la postazione pulita per il prossimo utente.',
+    aboutFooter: '© Shower2Pet — Postazioni self-service per il lavaggio dei cani',
   },
 };
 

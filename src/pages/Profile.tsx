@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
-import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Crown, LogIn, UserPlus } from 'lucide-react';
+import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Crown, LogIn, UserPlus, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -123,6 +123,13 @@ const Profile = () => {
               <div className="flex items-center gap-3">
                 <HelpCircle className="w-5 h-5 text-muted-foreground" />
                 <span className="font-light text-foreground">{t('helpSupport')}</span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <button onClick={() => navigate('/about')} className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Info className="w-5 h-5 text-muted-foreground" />
+                <span className="font-light text-foreground">{t('aboutUs')}</span>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </button>
