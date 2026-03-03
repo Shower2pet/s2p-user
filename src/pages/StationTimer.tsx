@@ -135,10 +135,10 @@ const StationTimer = () => {
 
     if (shower) {
       setStep('rating');
-      updateSessionStep(sess.id, 'rating', 'COMPLETED');
+      updateSessionStep(sess.id, 'rating', 'COMPLETED', { isGuest: !user });
     } else {
       setStep('cleanup');
-      updateSessionStep(sess.id, 'cleanup');
+      updateSessionStep(sess.id, 'cleanup', undefined, { isGuest: !user });
     }
   }, []);
 
@@ -188,6 +188,7 @@ const StationTimer = () => {
           resolvedStartedAt,
           resolvedEndsAt,
           isShowerStation ? 'timer' : 'rules',
+          { isGuest: !user },
         ).catch((e) => console.warn('[SESSION] timing update fallback failed:', e));
       }
 
@@ -254,7 +255,7 @@ const StationTimer = () => {
 
       if (remaining <= 0) {
         setStep('rating');
-        updateSessionStep(session.id, 'rating', 'COMPLETED');
+        updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
       }
     };
 
@@ -272,7 +273,7 @@ const StationTimer = () => {
       setSanitizeSeconds((prev) => {
         if (prev <= 1) {
           setStep('rating');
-          if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
+          if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
           return 0;
         }
         return prev - 1;
@@ -290,7 +291,7 @@ const StationTimer = () => {
   const handleAcceptRules = () => {
     setStep('timer');
     setIsActive(true);
-    if (session) updateSessionStep(session.id, 'timer');
+    if (session) updateSessionStep(session.id, 'timer', undefined, { isGuest: !user });
   };
 
   const handleStopManual = async () => {
@@ -325,10 +326,10 @@ const StationTimer = () => {
 
     if (isShowerStation) {
       setStep('rating');
-      updateSessionStep(session.id, 'rating', 'COMPLETED');
+      updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
     } else {
       setStep('cleanup');
-      updateSessionStep(session.id, 'cleanup');
+      updateSessionStep(session.id, 'cleanup', undefined, { isGuest: !user });
     }
     toast.success(t('washEnded'));
   };
@@ -336,14 +337,14 @@ const StationTimer = () => {
   const handleCleanupResponse = async (clean: boolean) => {
     if (clean) {
       setStep('rating');
-      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED');
+      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
     } else {
       const courtesyDuration = 60;
       setCourtesySeconds(courtesyDuration);
       setStep('courtesy');
       if (session) {
         const courtesyEndsAt = new Date(Date.now() + courtesyDuration * 1000).toISOString();
-        await updateCourtesyEnd(session.id, courtesyEndsAt);
+        await updateCourtesyEnd(session.id, courtesyEndsAt, { isGuest: !user });
         setSession({ ...session, ends_at: courtesyEndsAt });
       }
     }
