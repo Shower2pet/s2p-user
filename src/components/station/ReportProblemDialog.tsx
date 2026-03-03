@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { reportProblem } from '@/services/maintenanceService';
+import { logErrorToDb } from '@/services/errorLogService';
 
 interface ReportProblemDialogProps {
   open: boolean;
@@ -33,6 +34,13 @@ export const ReportProblemDialog = ({ open, onOpenChange, stationId }: ReportPro
       onOpenChange(false);
     } catch (err: any) {
       console.error('Report error:', err);
+      logErrorToDb({
+        error_message: err?.message || 'Unknown maintenance report error',
+        error_stack: err?.stack,
+        error_context: `ReportProblem: station=${stationId}`,
+        severity: 'error',
+        component: 'ReportProblemDialog',
+      });
       toast.error(t('reportError'));
     } finally {
       setIsSubmitting(false);
