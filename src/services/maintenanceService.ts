@@ -18,4 +18,21 @@ export const reportProblem = async (
     status: 'open',
   });
   if (error) throw error;
+
+  // Send notification email to support (fire-and-forget)
+  try {
+    await supabase.functions.invoke('send-email', {
+      body: {
+        to: 'supporto@shower2pet.com',
+        type: 'maintenance_ticket_opened',
+        data: {
+          station_id: stationId,
+          reason,
+          severity,
+        },
+      },
+    });
+  } catch (emailErr) {
+    console.error('Failed to send maintenance email:', emailErr);
+  }
 };
