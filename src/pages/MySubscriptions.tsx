@@ -24,7 +24,7 @@ const MySubscriptions = () => {
   if (!user) {
     return (
       <AppShell>
-        <div className="container max-w-lg mx-auto px-4 py-10 text-center space-y-4">
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4 text-center">
           <Crown className="w-12 h-12 text-accent mx-auto" />
           <h1 className="text-2xl font-bold text-foreground">{t('mySubscriptions')}</h1>
           <p className="text-muted-foreground">{t('loginToViewCredits')}</p>
@@ -49,7 +49,7 @@ const MySubscriptions = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-lg mx-auto px-4 py-6 space-y-6">
+      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
             <Crown className="w-6 h-6 text-accent" />
