@@ -23,7 +23,7 @@ export const reportProblem = async (
   try {
     await supabase.functions.invoke('send-email', {
       body: {
-        to: 'supporto@shower2pet.com',
+        to: 'alberto.c@shower2pet.com',
         type: 'maintenance_ticket_opened',
         data: {
           station_id: stationId,
