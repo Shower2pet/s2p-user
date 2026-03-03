@@ -9,6 +9,18 @@ export const fetchActiveSession = async (
   stationId: string,
   opts: { stripeSessionId?: string | null; userId?: string | null },
 ): Promise<WashSession | null> => {
+  // Guest flow: use edge function to bypass RLS
+  if (opts.stripeSessionId && !opts.userId) {
+    const { data, error } = await supabase.functions.invoke('get-guest-session', {
+      body: { stripe_session_id: opts.stripeSessionId, station_id: stationId },
+    });
+    if (error) {
+      console.error('[SESSION] get-guest-session error:', error);
+      return null;
+    }
+    return (data?.session as WashSession) ?? null;
+  }
+
   let query = supabase
     .from('wash_sessions')
     .select('*')
@@ -33,12 +45,21 @@ export const fetchActiveSession = async (
   return (data as WashSession) ?? null;
 };
 
-/* ── Update step / status ────────────────────────────────── */
+/* ── Update step / status (supports guest via edge function) ── */
 export const updateSessionStep = async (
   sessionId: string,
   step: string,
   status?: string,
+  opts?: { isGuest?: boolean },
 ) => {
+  if (opts?.isGuest) {
+    const body: Record<string, string> = { session_id: sessionId, step };
+    if (status) body.status = status;
+    const { error } = await supabase.functions.invoke('update-guest-session', { body });
+    if (error) throw error;
+    return;
+  }
+
   const updates: Record<string, string> = { step };
   if (status) updates.status = status;
   const { error } = await supabase.from('wash_sessions').update(updates).eq('id', sessionId);
@@ -51,7 +72,16 @@ export const updateSessionTiming = async (
   startedAt: string,
   endsAt: string,
   step: string,
+  opts?: { isGuest?: boolean },
 ) => {
+  if (opts?.isGuest) {
+    const { error } = await supabase.functions.invoke('update-guest-session', {
+      body: { session_id: sessionId, started_at: startedAt, ends_at: endsAt, step },
+    });
+    if (error) throw error;
+    return;
+  }
+
   const { error } = await supabase
     .from('wash_sessions')
     .update({ started_at: startedAt, ends_at: endsAt, step })
@@ -60,7 +90,19 @@ export const updateSessionTiming = async (
 };
 
 /* ── Update courtesy end time ────────────────────────────── */
-export const updateCourtesyEnd = async (sessionId: string, endsAt: string) => {
+export const updateCourtesyEnd = async (
+  sessionId: string,
+  endsAt: string,
+  opts?: { isGuest?: boolean },
+) => {
+  if (opts?.isGuest) {
+    const { error } = await supabase.functions.invoke('update-guest-session', {
+      body: { session_id: sessionId, step: 'courtesy', ends_at: endsAt },
+    });
+    if (error) throw error;
+    return;
+  }
+
   const { error } = await supabase
     .from('wash_sessions')
     .update({ step: 'courtesy', ends_at: endsAt })

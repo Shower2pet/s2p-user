@@ -182,6 +182,8 @@ serve(async (req) => {
       sessionParams.customer = customerId;
     } else if (userEmail) {
       sessionParams.customer_email = userEmail;
+    } else if (body.guest_email) {
+      sessionParams.customer_email = body.guest_email;
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
