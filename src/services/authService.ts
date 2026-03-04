@@ -11,6 +11,16 @@ export const signInWithPassword = async (email: string, password: string) => {
   return data;
 };
 
+/* ── Google OAuth ─────────────────────────────────────────── */
+export const signInWithGoogle = async (redirectTo: string) => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo },
+  });
+  if (error) throw error;
+  return data;
+};
+
 /* ── Sign-up ─────────────────────────────────────────────── */
 export const signUp = async (
   email: string,

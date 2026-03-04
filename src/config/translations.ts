@@ -104,6 +104,8 @@ export const translations: Record<string, Record<string, string>> = {
     invalidOrExpiredLink: 'Invalid or expired link',
     verifying: 'Verifying...',
     genericError: 'An unexpected error occurred',
+    continueWithGoogle: 'Continue with Google',
+    orDivider: 'or',
     
     // Language
     language: 'Language',
@@ -513,6 +515,8 @@ export const translations: Record<string, Record<string, string>> = {
     invalidOrExpiredLink: 'Link non valido o scaduto',
     verifying: 'Verifica in corso...',
     genericError: 'Si è verificato un errore imprevisto',
+    continueWithGoogle: 'Continua con Google',
+    orDivider: 'oppure',
     
     // Language
     language: 'Lingua',
