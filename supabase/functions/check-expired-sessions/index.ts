@@ -77,8 +77,9 @@ serve(async (req) => {
 
     const { data: expired, error } = await supabase
       .from('wash_sessions')
-      .select('id, station_id, ends_at')
+      .select('id, station_id, ends_at, step')
       .eq('status', 'ACTIVE')
+      .neq('step', 'ready')
       .lt('ends_at', new Date().toISOString());
 
     if (error) throw error;
