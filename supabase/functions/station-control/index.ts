@@ -165,7 +165,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { station_id, command, duration_minutes, session_id } = await req.json();
+    const body = await req.json();
+    const { station_id, command, session_id } = body;
+    // Accept both duration_minutes and duration_seconds for backward compatibility
+    const duration_minutes = body.duration_minutes ?? (body.duration_seconds ? body.duration_seconds / 60 : undefined);
 
     if (!station_id || typeof station_id !== "string") {
       throw new Error("station_id is required");
