@@ -344,7 +344,7 @@ const StationDetail = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
         {/* Station Identity */}
         <div className="animate-fade-in">
           <StationIdentityBlock

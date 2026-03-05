@@ -15,7 +15,7 @@ export const StationIdentityBlock = ({ name, status, description }: StationIdent
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between">
-        <h1 className="text-2xl font-bold text-foreground leading-tight">{name}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">{name}</h1>
         <StationStatusBadge status={status} />
       </div>
       {description && (

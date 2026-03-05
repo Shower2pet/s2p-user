@@ -451,17 +451,17 @@ const StationTimer = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary to-[hsl(206,100%,20%)] flex flex-col">
-      <div className="mx-auto max-w-[480px] w-full flex-1 flex flex-col px-4 py-6">
+      <div className="mx-auto max-w-lg w-full flex-1 flex flex-col px-4 sm:px-6 py-4 sm:py-6">
         {/* Logo */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6 sm:mb-8">
           <div className="bg-white/90 rounded-2xl px-4 py-2">
-            <img src={logo} alt="Shower2Pet" className="h-10 object-contain" />
+            <img src={logo} alt="Shower2Pet" className="h-8 sm:h-10 object-contain" />
           </div>
         </div>
 
         {/* Station name + type badge */}
         {station && (
-          <div className="text-center mb-4">
+          <div className="text-center mb-3 sm:mb-4">
             <p className="text-primary-foreground/80 text-sm font-light">
               {getStationDisplayName(station)}
             </p>
@@ -473,13 +473,13 @@ const StationTimer = () => {
 
         {/* STEP: Ready — waiting for user to start */}
         {step === 'ready' && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-6">
-            <div className="w-24 h-24 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-              <StationIcon className="h-12 w-12 text-primary-foreground" />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 sm:gap-6">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+              <StationIcon className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
             </div>
-            <div className="text-center space-y-2">
-              <p className="text-2xl font-bold text-primary-foreground">{t('paymentConfirmedCheck')}</p>
-              <p className="text-primary-foreground/80 text-base">
+            <div className="text-center space-y-1.5 sm:space-y-2">
+              <p className="text-xl sm:text-2xl font-bold text-primary-foreground">{t('paymentConfirmedCheck')}</p>
+              <p className="text-primary-foreground/80 text-sm sm:text-base">
                 {session.option_name} — {Math.floor(session.total_seconds / 60)} minuti
               </p>
             </div>
@@ -529,7 +529,7 @@ const StationTimer = () => {
         {(step === 'timer' || step === 'courtesy') && (
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="relative">
-              <svg className="w-64 h-64 transform -rotate-90">
+              <svg viewBox="0 0 256 256" className="w-48 h-48 sm:w-64 sm:h-64 transform -rotate-90">
                 <circle cx="128" cy="128" r="110" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="12" />
                 <circle
                   cx="128" cy="128" r="110" fill="none" stroke="white" strokeWidth="12"
@@ -545,11 +545,11 @@ const StationTimer = () => {
 
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 {step === 'courtesy' ? (
-                  <AlertTriangle className="h-12 w-12 text-warning mb-2" />
+                  <AlertTriangle className="h-8 w-8 sm:h-12 sm:w-12 text-warning mb-2" />
                 ) : (
-                  <StationIcon className="h-12 w-12 text-primary-foreground/80 mb-2" />
+                  <StationIcon className="h-8 w-8 sm:h-12 sm:w-12 text-primary-foreground/80 mb-2" />
                 )}
-                <span className="text-5xl font-bold text-primary-foreground tabular-nums">
+                <span className="text-4xl sm:text-5xl font-bold text-primary-foreground tabular-nums">
                   {step === 'courtesy'
                     ? `0:${courtesySeconds.toString().padStart(2, '0')}`
                     : `${minutes}:${seconds.toString().padStart(2, '0')}`
@@ -562,7 +562,7 @@ const StationTimer = () => {
             </div>
 
             {/* Status pills */}
-            <div className="mt-8 flex gap-4">
+            <div className="mt-6 sm:mt-8 flex flex-wrap gap-3 sm:gap-4 justify-center">
               <div className="flex items-center gap-2 rounded-full bg-primary-foreground/20 px-4 py-2">
                 <Droplets className="h-5 w-5 text-primary-foreground" />
                 <span className="text-sm text-primary-foreground">{t('waterSystem')}</span>
@@ -593,15 +593,15 @@ const StationTimer = () => {
 
         {/* Rating step */}
         {step === 'rating' && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-6">
-            <CheckCircle className="h-16 w-16 text-primary-foreground" />
-            <p className="text-xl font-bold text-primary-foreground">{t('sessionFinished')}</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 sm:gap-6">
+            <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-primary-foreground" />
+            <p className="text-lg sm:text-xl font-bold text-primary-foreground">{t('sessionFinished')}</p>
             <p className="text-primary-foreground/70 text-sm">{t('howWasIt')}</p>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button key={star} onClick={() => setRating(star)}>
                   <Star
-                    className={`w-10 h-10 transition-colors ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 transition-colors ${
                       star <= rating ? 'text-warning fill-warning' : 'text-primary-foreground/30'
                     }`}
                   />
@@ -638,9 +638,9 @@ const StationTimer = () => {
             <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center">
               <Sparkles className="h-10 w-10 text-primary-foreground" />
             </div>
-            <p className="text-xl font-bold text-primary-foreground">{t('cleanupTimerTitle')}</p>
-            <p className="text-primary-foreground/70 text-sm">{t('cleanupTimerDesc')}</p>
-            <p className="text-5xl font-bold text-primary-foreground tabular-nums">
+            <p className="text-lg sm:text-xl font-bold text-primary-foreground">{t('cleanupTimerTitle')}</p>
+            <p className="text-primary-foreground/70 text-xs sm:text-sm">{t('cleanupTimerDesc')}</p>
+            <p className="text-4xl sm:text-5xl font-bold text-primary-foreground tabular-nums">
               0:{cleanupTimerSeconds.toString().padStart(2, '0')}
             </p>
           </div>

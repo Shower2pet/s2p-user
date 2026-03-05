@@ -58,12 +58,12 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-md p-8 space-y-6">
-        <div className="text-center space-y-2">
-          <img src={shower2petLogo} alt="Shower2Pet" className="h-16 w-auto mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-foreground">{t('login')}</h1>
-          <p className="text-muted-foreground font-light">{t('loginSubtitle')}</p>
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 sm:px-6 py-6 sm:py-8">
+      <Card className="w-full max-w-md p-6 sm:p-8 space-y-5 sm:space-y-6">
+        <div className="text-center space-y-1.5 sm:space-y-2">
+          <img src={shower2petLogo} alt="Shower2Pet" className="h-12 sm:h-16 w-auto mx-auto mb-3 sm:mb-4" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('login')}</h1>
+          <p className="text-sm sm:text-base text-muted-foreground font-light">{t('loginSubtitle')}</p>
         </div>
 
         <Button

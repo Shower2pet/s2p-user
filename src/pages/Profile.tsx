@@ -57,16 +57,16 @@ const Profile = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">{t('myProfile')}</h1>
-          <p className="text-muted-foreground font-light">{t('manageAccount')}</p>
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
+        <div className="text-center space-y-1.5 sm:space-y-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('myProfile')}</h1>
+          <p className="text-sm sm:text-base text-muted-foreground font-light">{t('manageAccount')}</p>
         </div>
 
         {user ? (
-          <Card className="p-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="w-16 h-16">
+          <Card className="p-4 sm:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Avatar className="w-14 h-14 sm:w-16 sm:h-16">
                 <AvatarImage src={petAvatarUrl} alt="Pet avatar" />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
                   {getInitials(profile?.first_name ?? null, profile?.last_name ?? null, profile?.email ?? null)}
