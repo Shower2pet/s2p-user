@@ -331,7 +331,7 @@ const Index = () => {
       <AppShell>
         <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
           <Skeleton className="h-10 w-48 mx-auto" />
-          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-48 sm:h-64 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
       </AppShell>
@@ -340,24 +340,24 @@ const Index = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
         {/* Hero */}
-        <div className="text-center space-y-2 animate-fade-in">
-          <h1 className="text-2xl font-bold text-primary leading-tight">{t('heroTitle')}</h1>
+        <div className="text-center space-y-1.5 sm:space-y-2 animate-fade-in">
+          <h1 className="text-xl sm:text-2xl font-bold text-primary leading-tight">{t('heroTitle')}</h1>
         </div>
 
         {/* QR Scanner Button */}
         <Card
-          className="p-5 rounded-3xl shadow-floating bg-gradient-to-br from-primary to-primary/80 text-primary-foreground cursor-pointer hover:scale-[1.02] transition-all duration-300 animate-slide-up"
+          className="p-4 sm:p-5 rounded-3xl shadow-floating bg-gradient-to-br from-primary to-primary/80 text-primary-foreground cursor-pointer hover:scale-[1.02] transition-all duration-300 animate-slide-up"
           onClick={() => setShowQrScanner(true)}
         >
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-primary-foreground/20 flex items-center justify-center">
-              <ScanLine className="w-7 h-7" />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary-foreground/20 flex items-center justify-center shrink-0">
+              <ScanLine className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
-            <div className="flex-1">
-              <p className="text-lg font-bold">{t('scanQrCode')}</p>
-              <p className="text-sm opacity-80">{t('scanQrCodeDesc')}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-base sm:text-lg font-bold">{t('scanQrCode')}</p>
+              <p className="text-xs sm:text-sm opacity-80">{t('scanQrCodeDesc')}</p>
             </div>
           </div>
         </Card>
@@ -448,7 +448,7 @@ const Index = () => {
         {/* Map */}
         {MAPBOX_TOKEN && (
           <Card className="overflow-hidden rounded-2xl animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <div ref={mapContainer} className="w-full h-64" />
+            <div ref={mapContainer} className="w-full h-48 sm:h-64" />
           </Card>
         )}
 

@@ -28,15 +28,15 @@ export const CountdownTimer = ({ initialSeconds, onComplete }: CountdownTimerPro
   const progress = (seconds / initialSeconds) * 100;
 
   return (
-    <Card className="p-8 bg-gradient-to-br from-primary/5 to-sky/10 border-2 border-primary/20 shadow-lg">
-      <div className="flex flex-col items-center gap-6">
+    <Card className="p-6 sm:p-8 bg-gradient-to-br from-primary/5 to-sky/10 border-2 border-primary/20 shadow-lg">
+      <div className="flex flex-col items-center gap-4 sm:gap-6">
         <div className="flex items-center gap-2 text-primary">
           <Timer className="w-6 h-6" />
           <span className="text-sm font-bold uppercase tracking-wide">Time Remaining</span>
         </div>
         
         <div className="relative">
-          <svg className="w-48 h-48 transform -rotate-90">
+          <svg viewBox="0 0 192 192" className="w-40 h-40 sm:w-48 sm:h-48 transform -rotate-90">
             <circle
               cx="96"
               cy="96"
@@ -62,7 +62,7 @@ export const CountdownTimer = ({ initialSeconds, onComplete }: CountdownTimerPro
           
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-6xl font-bold text-foreground tabular-nums">
+              <div className="text-5xl sm:text-6xl font-bold text-foreground tabular-nums">
                 {String(minutes).padStart(2, '0')}:{String(remainingSeconds).padStart(2, '0')}
               </div>
               <div className="text-sm text-muted-foreground font-light mt-2">
