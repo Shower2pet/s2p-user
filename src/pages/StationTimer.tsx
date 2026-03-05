@@ -48,6 +48,7 @@ const StationTimer = () => {
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [rulesAccepted, setRulesAccepted] = useState(false);
 
   const autoStopFiredRef = useRef(false);
 
@@ -202,12 +203,9 @@ const StationTimer = () => {
 
       autoStopFiredRef.current = false;
 
-      if (isShowerStation) {
-        setStep('timer');
-        setIsActive(true);
-      } else {
-        setStep('rules');
-      }
+      // Rules already accepted in 'ready' step — go directly to timer
+      setStep('timer');
+      setIsActive(true);
     } catch (err) {
       console.error('Hardware activation error:', err);
       toast.error(GENERIC_ERROR_MESSAGE);
@@ -329,11 +327,7 @@ const StationTimer = () => {
   const seconds = secondsLeft % 60;
   const progress = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
 
-  const handleAcceptRules = () => {
-    setStep('timer');
-    setIsActive(true);
-    if (session) updateSessionStep(session.id, 'timer', undefined, { isGuest: !user });
-  };
+  // handleAcceptRules removed — rules are now accepted in 'ready' step
 
   const handleStopManual = async () => {
     if (!session) return;
@@ -501,11 +495,32 @@ const StationTimer = () => {
                 {session.option_name} — {Math.floor(session.total_seconds / 60)} minuti
               </p>
             </div>
+
+            {/* Rules */}
+            <div className="w-full max-w-xs bg-primary-foreground/10 rounded-xl p-4 space-y-2.5">
+              <p className="text-primary-foreground font-semibold text-sm">{t('rules')}</p>
+              <div className="space-y-1.5 text-primary-foreground/80 text-xs">
+                <p className="flex items-center gap-2"><PawPrint className="w-3.5 h-3.5 shrink-0" /> {t('keepDogLeashed')}</p>
+                <p className="flex items-center gap-2"><Droplets className="w-3.5 h-3.5 shrink-0" /> {t('checkWaterTemp')}</p>
+                <p className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 shrink-0" /> {t('leaveTubClean')}</p>
+                <p className="flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {t('alwaysSupervise')}</p>
+              </div>
+              <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rulesAccepted}
+                  onChange={(e) => setRulesAccepted(e.target.checked)}
+                  className="w-4 h-4 rounded accent-primary-foreground"
+                />
+                <span className="text-primary-foreground text-xs font-medium">{t('acceptRules')}</span>
+              </label>
+            </div>
+
             <Button
               onClick={handleStartService}
-              disabled={starting}
+              disabled={starting || !rulesAccepted}
               size="lg"
-              className="w-full max-w-xs h-16 text-lg rounded-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-0 shadow-glow-primary"
+              className="w-full max-w-xs h-16 text-lg rounded-full bg-primary-foreground text-primary hover:bg-primary-foreground/90 border-0 shadow-glow-primary disabled:opacity-50"
             >
               {starting ? (
                 <Loader2 className="w-6 h-6 animate-spin" />
@@ -520,28 +535,7 @@ const StationTimer = () => {
           </div>
         )}
 
-        {/* STEP: Rules (TUB only) */}
-        {!isShowerStation && (
-          <Dialog open={step === 'rules'} onOpenChange={() => {}}>
-            <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
-              <DialogHeader>
-                <DialogTitle>{t('rules')}</DialogTitle>
-                <DialogDescription>{t('readAndAccept')}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p className="flex items-center gap-2"><PawPrint className="w-4 h-4 shrink-0" /> {t('keepDogLeashed')}</p>
-                <p className="flex items-center gap-2"><Droplets className="w-4 h-4 shrink-0" /> {t('checkWaterTemp')}</p>
-                <p className="flex items-center gap-2"><Sparkles className="w-4 h-4 shrink-0" /> {t('leaveTubClean')}</p>
-                <p className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {t('alwaysSupervise')}</p>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAcceptRules} className="w-full" size="lg">
-                  <Check className="w-4 h-4" /> {t('acceptAndStart')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        {/* Rules dialog removed — rules shown inline in 'ready' step */}
 
         {/* STEP: Timer */}
         {(step === 'timer' || step === 'courtesy') && (
