@@ -371,8 +371,8 @@ const StationTimer = () => {
 
   const handleCleanupResponse = async (clean: boolean) => {
     if (clean) {
-      setStep('rating');
-      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+      // Tub declared clean — still run auto-clean (relay 2) before finishing
+      setStep('auto_clean_notice');
     } else {
       // Start 1-min cleanup timer with relay ON for water
       setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
@@ -392,8 +392,8 @@ const StationTimer = () => {
 
   const handleCleanupCheck2Response = async (clean: boolean) => {
     if (clean) {
-      setStep('rating');
-      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+      // Tub declared clean — still run auto-clean (relay 2) before finishing
+      setStep('auto_clean_notice');
     } else {
       if (cleanupAttempt < 1) {
         // Second attempt: start another 1-min timer with relay ON
@@ -411,7 +411,7 @@ const StationTimer = () => {
           }
         }
       } else {
-        // After 2nd timer: show auto-clean notice
+        // After 2nd timer: auto-clean notice
         setStep('auto_clean_notice');
       }
     }
