@@ -16,11 +16,12 @@ import { sendStationCommand } from '@/services/stationService';
 import { logErrorToDb, GENERIC_ERROR_MESSAGE } from '@/services/errorLogService';
 // receiptService rimosso: gli scontrini Fiskaly vengono triggerati solo dal stripe-webhook server-side
 
-type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'cleanup_timer' | 'cleanup_check2' | 'auto_clean_notice' | 'auto_clean' | 'courtesy' | 'sanitizing' | 'rating';
+type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'cleanup_timer' | 'cleanup_check2' | 'remove_dog' | 'auto_clean_countdown' | 'auto_clean' | 'courtesy' | 'sanitizing' | 'rating';
 
 const SANITIZE_SECONDS = 30;
 const CLEANUP_TIMER_SECONDS = 60;
-const AUTO_CLEAN_SECONDS = 30;
+const AUTO_CLEAN_COUNTDOWN_SECONDS = 30;
+const AUTO_CLEAN_SECONDS = 60;
 
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
@@ -43,8 +44,9 @@ const StationTimer = () => {
   const [rating, setRating] = useState(0);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
   const [cleanupTimerSeconds, setCleanupTimerSeconds] = useState(CLEANUP_TIMER_SECONDS);
-  const [cleanupAttempt, setCleanupAttempt] = useState(0); // 0=first ask, 1=after 1st timer, 2=after 2nd timer
+  const [cleanupAttempt, setCleanupAttempt] = useState(0);
   const [autoCleanSeconds, setAutoCleanSeconds] = useState(AUTO_CLEAN_SECONDS);
+  const [autoCleanCountdown, setAutoCleanCountdown] = useState(AUTO_CLEAN_COUNTDOWN_SECONDS);
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
@@ -304,7 +306,25 @@ const StationTimer = () => {
     return () => clearInterval(interval);
   }, [step]);
 
-  // Auto-clean countdown (30s relay 2)
+  // Auto-clean countdown (30s before relay 2 starts)
+  useEffect(() => {
+    if (step !== 'auto_clean_countdown') return;
+
+    const interval = setInterval(() => {
+      setAutoCleanCountdown((prev) => {
+        if (prev <= 1) {
+          // Countdown done — start relay 2
+          handleStartAutoClean();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [step]);
+
+  // Auto-clean countdown (60s relay 2 running)
   useEffect(() => {
     if (step !== 'auto_clean') return;
 
@@ -371,8 +391,8 @@ const StationTimer = () => {
 
   const handleCleanupResponse = async (clean: boolean) => {
     if (clean) {
-      // Tub declared clean — still run auto-clean (relay 2) before finishing
-      setStep('auto_clean_notice');
+      // Tub is clean — proceed to remove dog prompt
+      setStep('remove_dog');
     } else {
       // Start 1-min cleanup timer with relay ON for water
       setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
@@ -392,8 +412,8 @@ const StationTimer = () => {
 
   const handleCleanupCheck2Response = async (clean: boolean) => {
     if (clean) {
-      // Tub declared clean — still run auto-clean (relay 2) before finishing
-      setStep('auto_clean_notice');
+      // Tub is clean — proceed to remove dog prompt
+      setStep('remove_dog');
     } else {
       if (cleanupAttempt < 1) {
         // Second attempt: start another 1-min timer with relay ON
@@ -411,10 +431,17 @@ const StationTimer = () => {
           }
         }
       } else {
-        // After 2nd timer: auto-clean notice
-        setStep('auto_clean_notice');
+        // After 2nd timer: proceed to remove dog anyway
+        setStep('remove_dog');
       }
     }
+  };
+
+  // User confirmed dog is out → start 30s countdown before auto-clean
+  const handleDogRemoved = () => {
+    setAutoCleanCountdown(AUTO_CLEAN_COUNTDOWN_SECONDS);
+    setStep('auto_clean_countdown');
+    if (session) updateSessionStep(session.id, 'auto_clean_countdown', undefined, { isGuest: !user });
   };
 
   const handleStartAutoClean = async () => {
@@ -678,23 +705,37 @@ const StationTimer = () => {
           </Dialog>
         )}
 
-        {/* Auto-clean notice (TUB only) */}
+        {/* Remove dog from tub prompt (TUB only) */}
         {!isShowerStation && (
-          <Dialog open={step === 'auto_clean_notice'} onOpenChange={() => {}}>
+          <Dialog open={step === 'remove_dog'} onOpenChange={() => {}}>
             <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
               <DialogHeader>
-                <DialogTitle>{t('tubCleaning')}</DialogTitle>
-                <DialogDescription>{t('autoCleanStarting')}</DialogDescription>
+                <DialogTitle>{t('removeDogTitle')}</DialogTitle>
+                <DialogDescription>{t('removeDogDesc')}</DialogDescription>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground">{t('autoCleanDesc')}</p>
-              <Button onClick={handleStartAutoClean} className="w-full" size="lg">
-                <Check className="w-4 h-4" /> OK
+              <p className="text-sm text-muted-foreground">{t('autoCleanWarning')}</p>
+              <Button onClick={handleDogRemoved} className="w-full" size="lg">
+                <Check className="w-4 h-4" /> {t('dogRemovedConfirm')}
               </Button>
             </DialogContent>
           </Dialog>
         )}
 
-        {/* Auto-clean in progress (TUB only) */}
+        {/* Auto-clean countdown — 30s before relay 2 starts (TUB only) */}
+        {step === 'auto_clean_countdown' && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+              <AlertTriangle className="h-10 w-10 text-primary-foreground" />
+            </div>
+            <p className="text-lg sm:text-xl font-bold text-primary-foreground">{t('autoCleanStartingSoon')}</p>
+            <p className="text-primary-foreground/70 text-xs sm:text-sm text-center">{t('autoCleanCountdownDesc')}</p>
+            <p className="text-4xl sm:text-5xl font-bold text-primary-foreground tabular-nums">
+              0:{autoCleanCountdown.toString().padStart(2, '0')}
+            </p>
+          </div>
+        )}
+
+        {/* Auto-clean in progress — relay 2 running (TUB only) */}
         {step === 'auto_clean' && (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center animate-pulse">
@@ -702,7 +743,7 @@ const StationTimer = () => {
             </div>
             <p className="text-xl font-bold text-primary-foreground">{t('autoCleanInProgress')}</p>
             <p className="text-3xl font-bold text-primary-foreground tabular-nums">
-              0:{autoCleanSeconds.toString().padStart(2, '0')}
+              {Math.floor(autoCleanSeconds / 60)}:{(autoCleanSeconds % 60).toString().padStart(2, '0')}
             </p>
             <p className="text-primary-foreground/70 text-sm">{t('autoCleanDesc')}</p>
           </div>

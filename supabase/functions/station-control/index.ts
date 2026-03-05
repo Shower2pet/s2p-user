@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
 
     // ── AUTO_CLEAN (relay2 pulse for 30s) ──
     if (command === "AUTO_CLEAN") {
-      const cleanDurationMs = 30 * 1000; // 30 seconds
+      const cleanDurationMs = 60 * 1000; // 60 seconds
       const topic = `shower2pet/${station_id}/relay2/pulse`;
       const ok = await publishMqtt(topic, cleanDurationMs.toString());
 
