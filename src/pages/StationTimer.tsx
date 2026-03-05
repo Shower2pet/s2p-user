@@ -380,10 +380,19 @@ const StationTimer = () => {
       setStep('rating');
       if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
     } else {
-      // First or second "no" → start 1-min cleanup timer
+      // Start 1-min cleanup timer with relay ON for water
       setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
       setStep('cleanup_timer');
-      if (session) updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+      if (session) {
+        updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+        try {
+          await sendStationCommand(session.station_id, 'PULSE', {
+            duration_minutes: CLEANUP_TIMER_SECONDS / 60,
+          });
+        } catch (err) {
+          console.error('[CLEANUP] relay ON failed:', err);
+        }
+      }
     }
   };
 
@@ -393,11 +402,20 @@ const StationTimer = () => {
       if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
     } else {
       if (cleanupAttempt < 1) {
-        // Second attempt: start another 1-min timer
+        // Second attempt: start another 1-min timer with relay ON
         setCleanupAttempt(1);
         setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
         setStep('cleanup_timer');
-        if (session) updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+        if (session) {
+          updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+          try {
+            await sendStationCommand(session.station_id, 'PULSE', {
+              duration_minutes: CLEANUP_TIMER_SECONDS / 60,
+            });
+          } catch (err) {
+            console.error('[CLEANUP] relay ON failed:', err);
+          }
+        }
       } else {
         // After 2nd timer: show auto-clean notice
         setStep('auto_clean_notice');
