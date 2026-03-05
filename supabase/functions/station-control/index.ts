@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
 
     logStep("Request", { station_id, command, duration_minutes, session_id });
 
-    const validCommands = ["START_TIMED_WASH", "PULSE", "ON", "OFF"];
+    const validCommands = ["START_TIMED_WASH", "PULSE", "ON", "OFF", "AUTO_CLEAN"];
     if (!command || !validCommands.includes(command)) {
       throw new Error(`Invalid command. Must be one of: ${validCommands.join(", ")}`);
     }
@@ -313,6 +313,27 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: ok, topic, payload: durationMs.toString() }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: ok ? 200 : 503,
+      });
+    }
+
+    // ── AUTO_CLEAN (relay2 pulse for 30s) ──
+    if (command === "AUTO_CLEAN") {
+      const cleanDurationMs = 30 * 1000; // 30 seconds
+      const topic = `shower2pet/${station_id}/relay2/pulse`;
+      const ok = await publishMqtt(topic, cleanDurationMs.toString());
+
+      if (ok && userId) {
+        try {
+          await adminClient.from("gate_commands").insert({
+            station_id, command, user_id: userId, status: "sent",
+          });
+        } catch { /* ignore logging failures */ }
+      }
+
+      logStep("AUTO_CLEAN result", { ok, topic, durationMs: cleanDurationMs });
+      return new Response(JSON.stringify({ success: ok, topic, payload: cleanDurationMs.toString() }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: ok ? 200 : 503,
       });
