@@ -16,9 +16,11 @@ import { sendStationCommand } from '@/services/stationService';
 import { logErrorToDb, GENERIC_ERROR_MESSAGE } from '@/services/errorLogService';
 // receiptService rimosso: gli scontrini Fiskaly vengono triggerati solo dal stripe-webhook server-side
 
-type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'courtesy' | 'sanitizing' | 'rating';
+type WashStep = 'ready' | 'rules' | 'timer' | 'cleanup' | 'cleanup_timer' | 'cleanup_check2' | 'auto_clean_notice' | 'auto_clean' | 'courtesy' | 'sanitizing' | 'rating';
 
 const SANITIZE_SECONDS = 30;
+const CLEANUP_TIMER_SECONDS = 60;
+const AUTO_CLEAN_SECONDS = 30;
 
 const StationTimer = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +42,9 @@ const StationTimer = () => {
   const [courtesySeconds, setCourtesySeconds] = useState(60);
   const [rating, setRating] = useState(0);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
+  const [cleanupTimerSeconds, setCleanupTimerSeconds] = useState(CLEANUP_TIMER_SECONDS);
+  const [cleanupAttempt, setCleanupAttempt] = useState(0); // 0=first ask, 1=after 1st timer, 2=after 2nd timer
+  const [autoCleanSeconds, setAutoCleanSeconds] = useState(AUTO_CLEAN_SECONDS);
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
@@ -283,6 +288,42 @@ const StationTimer = () => {
     return () => clearInterval(interval);
   }, [step, session]);
 
+  // Cleanup timer countdown (1 minute for manual cleaning)
+  useEffect(() => {
+    if (step !== 'cleanup_timer') return;
+
+    const interval = setInterval(() => {
+      setCleanupTimerSeconds((prev) => {
+        if (prev <= 1) {
+          // Timer done — ask again
+          setStep('cleanup_check2');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [step]);
+
+  // Auto-clean countdown (30s relay 2)
+  useEffect(() => {
+    if (step !== 'auto_clean') return;
+
+    const interval = setInterval(() => {
+      setAutoCleanSeconds((prev) => {
+        if (prev <= 1) {
+          setStep('rating');
+          if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [step, session]);
+
   const totalSeconds = session?.total_seconds || 300;
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
@@ -339,14 +380,47 @@ const StationTimer = () => {
       setStep('rating');
       if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
     } else {
-      const courtesyDuration = 60;
-      setCourtesySeconds(courtesyDuration);
-      setStep('courtesy');
-      if (session) {
-        const courtesyEndsAt = new Date(Date.now() + courtesyDuration * 1000).toISOString();
-        await updateCourtesyEnd(session.id, courtesyEndsAt, { isGuest: !user });
-        setSession({ ...session, ends_at: courtesyEndsAt });
+      // First or second "no" → start 1-min cleanup timer
+      setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
+      setStep('cleanup_timer');
+      if (session) updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+    }
+  };
+
+  const handleCleanupCheck2Response = async (clean: boolean) => {
+    if (clean) {
+      setStep('rating');
+      if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+    } else {
+      if (cleanupAttempt < 1) {
+        // Second attempt: start another 1-min timer
+        setCleanupAttempt(1);
+        setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
+        setStep('cleanup_timer');
+        if (session) updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+      } else {
+        // After 2nd timer: show auto-clean notice
+        setStep('auto_clean_notice');
       }
+    }
+  };
+
+  const handleStartAutoClean = async () => {
+    if (!session) return;
+    setAutoCleanSeconds(AUTO_CLEAN_SECONDS);
+    setStep('auto_clean');
+
+    try {
+      await sendStationCommand(session.station_id, 'AUTO_CLEAN');
+    } catch (err) {
+      console.error('[AUTO_CLEAN] command failed:', err);
+      logErrorToDb({
+        error_message: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        error_context: `AUTO_CLEAN command failed for station ${session.station_id}`,
+        component: 'StationTimer',
+        severity: 'error',
+      });
     }
   };
 
@@ -537,14 +611,15 @@ const StationTimer = () => {
           </div>
         )}
 
-        {/* Cleanup check dialog (TUB only) */}
+        {/* Cleanup check dialog — first ask (TUB only) */}
         {!isShowerStation && (
           <Dialog open={step === 'cleanup'} onOpenChange={() => {}}>
             <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
               <DialogHeader>
                 <DialogTitle>{t('tubCleaning')}</DialogTitle>
-                <DialogDescription>{t('didYouLeaveTubClean')}</DialogDescription>
+                <DialogDescription>{t('removeDogFromTub')}</DialogDescription>
               </DialogHeader>
+              <p className="text-sm text-muted-foreground">{t('didYouLeaveTubClean')}</p>
               <div className="flex gap-3">
                 <Button onClick={() => handleCleanupResponse(true)} className="flex-1" size="lg">
                   <Check className="w-4 h-4" /> {t('yes')}
@@ -555,6 +630,70 @@ const StationTimer = () => {
               </div>
             </DialogContent>
           </Dialog>
+        )}
+
+        {/* Cleanup timer — 1 minute to clean (TUB only) */}
+        {step === 'cleanup_timer' && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+              <Sparkles className="h-10 w-10 text-primary-foreground" />
+            </div>
+            <p className="text-xl font-bold text-primary-foreground">{t('cleanupTimerTitle')}</p>
+            <p className="text-primary-foreground/70 text-sm">{t('cleanupTimerDesc')}</p>
+            <p className="text-5xl font-bold text-primary-foreground tabular-nums">
+              0:{cleanupTimerSeconds.toString().padStart(2, '0')}
+            </p>
+          </div>
+        )}
+
+        {/* Cleanup check 2 — second ask after timer (TUB only) */}
+        {!isShowerStation && (
+          <Dialog open={step === 'cleanup_check2'} onOpenChange={() => {}}>
+            <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+              <DialogHeader>
+                <DialogTitle>{t('tubCleaning')}</DialogTitle>
+                <DialogDescription>{t('isTubCleanNow')}</DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-3">
+                <Button onClick={() => handleCleanupCheck2Response(true)} className="flex-1" size="lg">
+                  <Check className="w-4 h-4" /> {t('yes')}
+                </Button>
+                <Button onClick={() => handleCleanupCheck2Response(false)} variant="outline" className="flex-1" size="lg">
+                  <X className="w-4 h-4" /> {t('no')}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Auto-clean notice (TUB only) */}
+        {!isShowerStation && (
+          <Dialog open={step === 'auto_clean_notice'} onOpenChange={() => {}}>
+            <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+              <DialogHeader>
+                <DialogTitle>{t('tubCleaning')}</DialogTitle>
+                <DialogDescription>{t('autoCleanStarting')}</DialogDescription>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{t('autoCleanDesc')}</p>
+              <Button onClick={handleStartAutoClean} className="w-full" size="lg">
+                <Check className="w-4 h-4" /> OK
+              </Button>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Auto-clean in progress (TUB only) */}
+        {step === 'auto_clean' && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-primary-foreground/20 flex items-center justify-center animate-pulse">
+              <Droplets className="h-10 w-10 text-primary-foreground" />
+            </div>
+            <p className="text-xl font-bold text-primary-foreground">{t('autoCleanInProgress')}</p>
+            <p className="text-3xl font-bold text-primary-foreground tabular-nums">
+              0:{autoCleanSeconds.toString().padStart(2, '0')}
+            </p>
+            <p className="text-primary-foreground/70 text-sm">{t('autoCleanDesc')}</p>
+          </div>
         )}
 
         {/* Bottom buttons */}
