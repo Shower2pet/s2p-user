@@ -267,8 +267,8 @@ Deno.serve(async (req) => {
       let sessionUpdated = false;
       if (session_id) {
         try {
-          const isShower = stationCheck.type?.toUpperCase() === "BRACCO";
-          const sessionStep = isShower ? "timer" : "rules";
+          // Rules are now accepted before starting — always go to timer
+          const sessionStep = "timer";
 
           const { error: updateError } = await adminClient
             .from("wash_sessions")
