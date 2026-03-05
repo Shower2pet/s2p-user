@@ -75,11 +75,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    // Only expire sessions that are actively running (timer step)
+    // Exclude: ready (not started), rules (reading rules), cleanup/auto_clean steps (post-wash cleaning)
     const { data: expired, error } = await supabase
       .from('wash_sessions')
       .select('id, station_id, ends_at, step')
       .eq('status', 'ACTIVE')
-      .neq('step', 'ready')
+      .in('step', ['timer', 'courtesy'])
       .lt('ends_at', new Date().toISOString());
 
     if (error) throw error;
