@@ -145,6 +145,26 @@ function mqttPublishNative(
   });
 }
 
+/* ── Board lookup: station_id → board_id (fallback station_id) ── */
+
+async function resolveBoardId(adminClient: ReturnType<typeof getAdminClient>, stationId: string): Promise<string> {
+  try {
+    const { data } = await adminClient
+      .from("boards")
+      .select("id")
+      .eq("station_id", stationId)
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) {
+      logStep("Resolved board_id", { stationId, boardId: data.id });
+      return data.id;
+    }
+  } catch (e) {
+    logStep("Board lookup failed, using station_id as fallback", { error: String(e) });
+  }
+  return stationId;
+}
+
 /* ── MQTT publish helper ──────────────────────────────────── */
 
 async function publishMqtt(topic: string, payload: string): Promise<boolean> {
@@ -212,6 +232,9 @@ Deno.serve(async (req) => {
 
     const adminClient = getAdminClient();
 
+    // Resolve board_id for MQTT topics (fallback to station_id)
+    const boardId = await resolveBoardId(adminClient, station_id);
+
     // ── START_TIMED_WASH ──
     if (command === "START_TIMED_WASH") {
       if (!duration_minutes || duration_minutes <= 0) {
@@ -250,7 +273,7 @@ Deno.serve(async (req) => {
       }
 
       // Publish ON
-      const onOk = await publishMqtt(`shower2pet/${station_id}/relay1/command`, "1");
+      const onOk = await publishMqtt(`shower2pet/${boardId}/relay1/command`, "1");
       if (!onOk) {
         return new Response(JSON.stringify({
           success: false,
@@ -304,7 +327,7 @@ Deno.serve(async (req) => {
         throw new Error("duration_minutes is required for PULSE (1-120)");
       }
       const durationMs = Math.round(duration_minutes * 60 * 1000);
-      const topic = `shower2pet/${station_id}/relay1/pulse`;
+      const topic = `shower2pet/${boardId}/relay1/pulse`;
       const ok = await publishMqtt(topic, durationMs.toString());
 
       if (ok && userId) {
@@ -324,7 +347,7 @@ Deno.serve(async (req) => {
     // ── AUTO_CLEAN (relay2 pulse for 30s) ──
     if (command === "AUTO_CLEAN") {
       const cleanDurationMs = 60 * 1000; // 60 seconds
-      const topic = `shower2pet/${station_id}/relay2/pulse`;
+      const topic = `shower2pet/${boardId}/relay2/pulse`;
       const ok = await publishMqtt(topic, cleanDurationMs.toString());
 
       if (ok && userId) {
@@ -343,7 +366,7 @@ Deno.serve(async (req) => {
     }
 
     // ── ON / OFF ──
-    const topic = `shower2pet/${station_id}/relay1/command`;
+    const topic = `shower2pet/${boardId}/relay1/command`;
     const payload = command === "ON" ? "1" : "0";
     const ok = await publishMqtt(topic, payload);
 

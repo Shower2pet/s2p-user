@@ -18,12 +18,31 @@ function getSupabaseAdmin() {
 }
 
 /**
- * Extract station_id from EMQX clientid.
- * clientid === station_id (confirmed by user).
+ * Extract board_id from EMQX clientid.
+ * Boards connect with their board_id (e.g. ETH_1, WIFI_2).
+ * Ignore our own edge function clients (prefix 's2p-').
  */
-function extractStationId(clientid: string): string | null {
-  if (!clientid || clientid.startsWith('s2p-')) return null; // ignore our own edge function clients
+function extractBoardId(clientid: string): string | null {
+  if (!clientid || clientid.startsWith('s2p-')) return null;
   return clientid;
+}
+
+/**
+ * Resolve board_id → station_id via boards table.
+ * Falls back to treating boardId as station_id for backward compat.
+ */
+async function resolveStationId(supabase: ReturnType<typeof getSupabaseAdmin>, boardId: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("boards")
+      .select("station_id")
+      .eq("id", boardId)
+      .maybeSingle();
+    if (data?.station_id) {
+      return data.station_id;
+    }
+  } catch { /* fallback */ }
+  return boardId;
 }
 
 serve(async (req) => {
@@ -60,37 +79,43 @@ serve(async (req) => {
 
     // ── client.connected ──
     if (event === "client.connected") {
-      const stationId = extractStationId(body.clientid);
-      if (!stationId) {
+      const boardId = extractBoardId(body.clientid);
+      if (!boardId) {
         log("Ignoring non-station client", { clientid: body.clientid });
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      log("Station connected", { stationId });
-      const { error } = await supabase.rpc('handle_station_heartbeat', { p_station_id: stationId });
-      if (error) log("DB heartbeat error", { stationId, error: error.message });
+      log("Board connected", { boardId });
+      // Try handle_board_heartbeat first (resolves board→station internally)
+      const { error } = await supabase.rpc('handle_board_heartbeat', { p_board_id: boardId });
+      if (error) {
+        // Fallback: treat as station_id directly
+        log("Board heartbeat failed, trying station fallback", { boardId, error: error.message });
+        await supabase.rpc('handle_station_heartbeat', { p_station_id: boardId });
+      }
 
-      return new Response(JSON.stringify({ ok: true, action: "heartbeat", station_id: stationId }), {
+      return new Response(JSON.stringify({ ok: true, action: "heartbeat", board_id: boardId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // ── client.disconnected ──
     if (event === "client.disconnected") {
-      const stationId = extractStationId(body.clientid);
-      if (!stationId) {
+      const boardId = extractBoardId(body.clientid);
+      if (!boardId) {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      log("Station disconnected", { stationId, reason: body.reason });
+      log("Board disconnected", { boardId, reason: body.reason });
+      const stationId = await resolveStationId(supabase, boardId);
       const { error } = await supabase.rpc('mark_station_offline', { p_station_id: stationId });
-      if (error) log("DB offline error", { stationId, error: error.message });
+      if (error) log("DB offline error", { boardId, stationId, error: error.message });
 
-      return new Response(JSON.stringify({ ok: true, action: "offline", station_id: stationId }), {
+      return new Response(JSON.stringify({ ok: true, action: "offline", board_id: boardId, station_id: stationId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -100,22 +125,26 @@ serve(async (req) => {
       const topic = body.topic || "";
       const parts = topic.split('/');
 
-      // Match shower2pet/{stationId}/status
+      // Match shower2pet/{boardId}/status
       if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
-        const stationId = parts[1];
+        const boardId = parts[1];
         const payload = body.payload || "";
 
         if (payload.toLowerCase() === 'offline') {
-          log("LWT offline via publish", { stationId });
+          log("LWT offline via publish", { boardId });
+          const stationId = await resolveStationId(supabase, boardId);
           const { error } = await supabase.rpc('mark_station_offline', { p_station_id: stationId });
-          if (error) log("DB offline error", { stationId, error: error.message });
+          if (error) log("DB offline error", { boardId, stationId, error: error.message });
         } else {
-          // Just update last_heartbeat_at to keep station fresh
-          const { error } = await supabase.rpc('handle_station_heartbeat', { p_station_id: stationId });
-          if (error) log("DB heartbeat error", { stationId, error: error.message });
+          // Use handle_board_heartbeat which resolves board→station internally
+          const { error } = await supabase.rpc('handle_board_heartbeat', { p_board_id: boardId });
+          if (error) {
+            log("Board heartbeat failed, trying station fallback", { boardId, error: error.message });
+            await supabase.rpc('handle_station_heartbeat', { p_station_id: boardId });
+          }
         }
 
-        return new Response(JSON.stringify({ ok: true, action: "status_publish", station_id: stationId }), {
+        return new Response(JSON.stringify({ ok: true, action: "status_publish", board_id: boardId }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
