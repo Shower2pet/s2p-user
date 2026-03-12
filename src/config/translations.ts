@@ -423,6 +423,10 @@ export const translations: Record<string, Record<string, string>> = {
     aboutStep2: 'Choose a wash programme and pay with card or credits.',
     aboutStep3: 'Wash and dry your dog — done! Leave the station clean for the next user.',
     aboutFooter: '© Shower2Pet — Self-service dog wash stations',
+    showcase: 'Showcase',
+    showcaseStation: 'Showcase Station',
+    showcaseDesc: 'This is a display station. It is not available for use.',
+    showcaseOnly: 'Display only',
   },
   it: {
     // Navigation
