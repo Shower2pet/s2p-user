@@ -295,7 +295,12 @@ const StationTimer = () => {
     const interval = setInterval(() => {
       setCleanupTimerSeconds((prev) => {
         if (prev <= 1) {
-          // Timer done — ask again
+          // Timer done — turn OFF relay and ask again
+          if (session) {
+            sendStationCommand(session.station_id, 'OFF').catch((err) =>
+              console.error('[CLEANUP] relay OFF failed:', err)
+            );
+          }
           setStep('cleanup_check2');
           return 0;
         }
@@ -304,7 +309,7 @@ const StationTimer = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, session]);
 
   // Auto-clean countdown (30s before relay 2 starts)
   useEffect(() => {
@@ -400,9 +405,7 @@ const StationTimer = () => {
       if (session) {
         updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
         try {
-          await sendStationCommand(session.station_id, 'PULSE', {
-            duration_minutes: CLEANUP_TIMER_SECONDS / 60,
-          });
+          await sendStationCommand(session.station_id, 'ON');
         } catch (err) {
           console.error('[CLEANUP] relay ON failed:', err);
         }
@@ -423,9 +426,7 @@ const StationTimer = () => {
         if (session) {
           updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
           try {
-            await sendStationCommand(session.station_id, 'PULSE', {
-              duration_minutes: CLEANUP_TIMER_SECONDS / 60,
-            });
+            await sendStationCommand(session.station_id, 'ON');
           } catch (err) {
             console.error('[CLEANUP] relay ON failed:', err);
           }
