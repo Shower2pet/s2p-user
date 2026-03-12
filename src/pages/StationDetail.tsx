@@ -379,7 +379,7 @@ const StationDetail = () => {
             </div>
           </Card>
         )}
-        {station.has_access_gate && (
+        {!isShowcase && station.has_access_gate && (
           <Card className="p-4 space-y-2 animate-fade-in border-primary/30 bg-primary/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
