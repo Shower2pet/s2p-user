@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
         throw new Error("duration_minutes is required for PULSE (1-120)");
       }
       const durationMs = Math.round(duration_minutes * 60 * 1000);
-      const topic = `shower2pet/${station_id}/relay1/pulse`;
+      const topic = `shower2pet/${boardId}/relay1/pulse`;
       const ok = await publishMqtt(topic, durationMs.toString());
 
       if (ok && userId) {
