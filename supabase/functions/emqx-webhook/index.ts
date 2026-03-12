@@ -79,37 +79,43 @@ serve(async (req) => {
 
     // ── client.connected ──
     if (event === "client.connected") {
-      const stationId = extractStationId(body.clientid);
-      if (!stationId) {
+      const boardId = extractBoardId(body.clientid);
+      if (!boardId) {
         log("Ignoring non-station client", { clientid: body.clientid });
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      log("Station connected", { stationId });
-      const { error } = await supabase.rpc('handle_station_heartbeat', { p_station_id: stationId });
-      if (error) log("DB heartbeat error", { stationId, error: error.message });
+      log("Board connected", { boardId });
+      // Try handle_board_heartbeat first (resolves board→station internally)
+      const { error } = await supabase.rpc('handle_board_heartbeat', { p_board_id: boardId });
+      if (error) {
+        // Fallback: treat as station_id directly
+        log("Board heartbeat failed, trying station fallback", { boardId, error: error.message });
+        await supabase.rpc('handle_station_heartbeat', { p_station_id: boardId });
+      }
 
-      return new Response(JSON.stringify({ ok: true, action: "heartbeat", station_id: stationId }), {
+      return new Response(JSON.stringify({ ok: true, action: "heartbeat", board_id: boardId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // ── client.disconnected ──
     if (event === "client.disconnected") {
-      const stationId = extractStationId(body.clientid);
-      if (!stationId) {
+      const boardId = extractBoardId(body.clientid);
+      if (!boardId) {
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      log("Station disconnected", { stationId, reason: body.reason });
+      log("Board disconnected", { boardId, reason: body.reason });
+      const stationId = await resolveStationId(supabase, boardId);
       const { error } = await supabase.rpc('mark_station_offline', { p_station_id: stationId });
-      if (error) log("DB offline error", { stationId, error: error.message });
+      if (error) log("DB offline error", { boardId, stationId, error: error.message });
 
-      return new Response(JSON.stringify({ ok: true, action: "offline", station_id: stationId }), {
+      return new Response(JSON.stringify({ ok: true, action: "offline", board_id: boardId, station_id: stationId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
