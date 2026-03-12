@@ -91,6 +91,26 @@ const StationTimer = () => {
             setIsActive(true);
           }
         }
+
+        // Restore timed cleanup steps from DB ends_at
+        if (currentStep === 'cleanup_timer' || currentStep === 'auto_clean_countdown' || currentStep === 'auto_clean') {
+          const endsAt = new Date(data.ends_at).getTime();
+          const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+          if (remaining > 0) {
+            if (currentStep === 'cleanup_timer') setCleanupTimerSeconds(remaining);
+            else if (currentStep === 'auto_clean_countdown') setAutoCleanCountdown(remaining);
+            else if (currentStep === 'auto_clean') setAutoCleanSeconds(remaining);
+          } else {
+            // Timer already expired — advance to next step
+            if (currentStep === 'cleanup_timer') setStep('cleanup_check2');
+            else if (currentStep === 'auto_clean_countdown') {
+              // Will trigger auto-clean via useEffect
+              setAutoCleanCountdown(0);
+            } else if (currentStep === 'auto_clean') {
+              setAutoCleanSeconds(0);
+            }
+          }
+        }
         setLoading(false);
       } else if (retries < maxRetries) {
         retries++;
