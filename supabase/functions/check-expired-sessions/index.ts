@@ -130,7 +130,7 @@ serve(async (req) => {
       if (newerActive && newerActive.length > 0) {
         log("Skipping OFF — newer active session exists", { station: session.station_id });
       } else {
-        const ok = await publishMqttOff(session.station_id);
+        const ok = await publishMqttOff(supabase, session.station_id);
         log("OFF result", { station: session.station_id, success: ok });
       }
 
