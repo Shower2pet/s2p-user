@@ -145,6 +145,26 @@ function mqttPublishNative(
   });
 }
 
+/* ── Board lookup: station_id → board_id (fallback station_id) ── */
+
+async function resolveBoardId(adminClient: ReturnType<typeof getAdminClient>, stationId: string): Promise<string> {
+  try {
+    const { data } = await adminClient
+      .from("boards")
+      .select("id")
+      .eq("station_id", stationId)
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) {
+      logStep("Resolved board_id", { stationId, boardId: data.id });
+      return data.id;
+    }
+  } catch (e) {
+    logStep("Board lookup failed, using station_id as fallback", { error: String(e) });
+  }
+  return stationId;
+}
+
 /* ── MQTT publish helper ──────────────────────────────────── */
 
 async function publishMqtt(topic: string, payload: string): Promise<boolean> {
