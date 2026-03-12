@@ -477,48 +477,50 @@ const StationDetail = () => {
           </Card>
         )}
 
-        {/* Washing Options */}
-        <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <h2 className="text-lg font-bold text-foreground">{t('washingOptions')}</h2>
-          {washOptions.length === 0 ? (
-            <Card className="p-4 text-center text-muted-foreground text-sm">
-              {t('noOptionsAvailable')}
-            </Card>
-          ) : (
-            washOptions.map((opt) => (
-              <Card
-                key={opt.id}
-                className={`p-4 transition-all ${
-                  !online ? 'opacity-50 cursor-not-allowed' :
-                  needsVisibilityVerification ? 'opacity-60 cursor-pointer' : 'cursor-pointer'
-                } ${
-                  selectedOption === opt.id && online ? 'ring-2 ring-primary shadow-glow-primary' : online ? 'hover:shadow-md' : ''
-                }`}
-                onClick={() => online && handleWashOptionClick(opt.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
-                      {hasActiveSub ? <Crown className="w-5 h-5 text-accent" /> : <Coins className="w-5 h-5 text-primary" />}
-                    </div>
-                    <div>
-                      <p className="font-bold text-foreground">{opt.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Timer className="w-3 h-3" />
-                        <span>{Math.floor(opt.duration / 60)} {t('minutes')}</span>
+        {/* Washing Options — hidden for showcase */}
+        {!isShowcase && (
+          <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <h2 className="text-lg font-bold text-foreground">{t('washingOptions')}</h2>
+            {washOptions.length === 0 ? (
+              <Card className="p-4 text-center text-muted-foreground text-sm">
+                {t('noOptionsAvailable')}
+              </Card>
+            ) : (
+              washOptions.map((opt) => (
+                <Card
+                  key={opt.id}
+                  className={`p-4 transition-all ${
+                    !online ? 'opacity-50 cursor-not-allowed' :
+                    needsVisibilityVerification ? 'opacity-60 cursor-pointer' : 'cursor-pointer'
+                  } ${
+                    selectedOption === opt.id && online ? 'ring-2 ring-primary shadow-glow-primary' : online ? 'hover:shadow-md' : ''
+                  }`}
+                  onClick={() => online && handleWashOptionClick(opt.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+                        {hasActiveSub ? <Crown className="w-5 h-5 text-accent" /> : <Coins className="w-5 h-5 text-primary" />}
+                      </div>
+                      <div>
+                        <p className="font-bold text-foreground">{opt.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Timer className="w-3 h-3" />
+                          <span>{Math.floor(opt.duration / 60)} {t('minutes')}</span>
+                        </div>
                       </div>
                     </div>
+                    {hasActiveSub ? (
+                      <span className="text-sm font-bold text-accent">{t('included')}</span>
+                    ) : (
+                      <span className="text-xl font-bold text-primary">€{opt.price.toFixed(2)}</span>
+                    )}
                   </div>
-                  {hasActiveSub ? (
-                    <span className="text-sm font-bold text-accent">{t('included')}</span>
-                  ) : (
-                    <span className="text-xl font-bold text-primary">€{opt.price.toFixed(2)}</span>
-                  )}
-                </div>
-              </Card>
-            ))
-          )}
-        </div>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Report Problem Button */}
         <Button
