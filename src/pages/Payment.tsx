@@ -37,7 +37,7 @@ const Payment = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
         <Button variant="ghost" onClick={() => navigate('/')} className="mb-4">
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
