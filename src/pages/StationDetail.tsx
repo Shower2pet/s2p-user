@@ -450,7 +450,7 @@ const StationDetail = () => {
         {/* Subscription Plans & Banner — hidden for now */}
 
         {/* Credit Packages */}
-        {creditPackages && creditPackages.length > 0 && (
+        {!isShowcase && creditPackages && creditPackages.length > 0 && (
           <div className="animate-fade-in" style={{ animationDelay: '0.09s' }}>
             <CreditPackagesList
               packages={creditPackages}
