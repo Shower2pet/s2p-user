@@ -357,11 +357,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── AUTO_CLEAN (relay2 pulse for 30s) ──
+    // ── AUTO_CLEAN (relay2 ON — long duration, OFF sent by frontend/cleanup) ──
     if (command === "AUTO_CLEAN") {
-      const cleanDurationMs = 60 * 1000; // 60 seconds
-      const topic = `shower2pet/${boardId}/relay2/pulse`;
-      const ok = await publishMqtt(topic, cleanDurationMs.toString());
+      const topic = `shower2pet/${boardId}/relay2/command`;
+      const ok = await publishMqtt(topic, "1");
 
       if (ok && userId) {
         try {
@@ -371,8 +370,20 @@ Deno.serve(async (req) => {
         } catch { /* ignore logging failures */ }
       }
 
-      logStep("AUTO_CLEAN result", { ok, topic, durationMs: cleanDurationMs });
-      return new Response(JSON.stringify({ success: ok, topic, payload: cleanDurationMs.toString() }), {
+      logStep("AUTO_CLEAN result", { ok, topic, payload: "1" });
+      return new Response(JSON.stringify({ success: ok, topic, payload: "1" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: ok ? 200 : 503,
+      });
+    }
+
+    // ── AUTO_CLEAN_OFF (relay2 OFF) ──
+    if (command === "AUTO_CLEAN_OFF") {
+      const topic = `shower2pet/${boardId}/relay2/command`;
+      const ok = await publishMqtt(topic, "0");
+
+      logStep("AUTO_CLEAN_OFF result", { ok, topic });
+      return new Response(JSON.stringify({ success: ok }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: ok ? 200 : 503,
       });
