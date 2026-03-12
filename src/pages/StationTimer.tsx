@@ -318,8 +318,7 @@ const StationTimer = () => {
     const interval = setInterval(() => {
       setAutoCleanCountdown((prev) => {
         if (prev <= 1) {
-          // Countdown done — start relay 2
-          handleStartAutoClean();
+          clearInterval(interval);
           return 0;
         }
         return prev - 1;
@@ -329,15 +328,21 @@ const StationTimer = () => {
     return () => clearInterval(interval);
   }, [step]);
 
-  // Auto-clean countdown (60s relay 2 running)
+  // Trigger auto-clean when countdown reaches 0
+  useEffect(() => {
+    if (step === 'auto_clean_countdown' && autoCleanCountdown === 0) {
+      handleStartAutoClean();
+    }
+  }, [step, autoCleanCountdown]);
+
+  // Auto-clean timer (60s relay 2 running)
   useEffect(() => {
     if (step !== 'auto_clean') return;
 
     const interval = setInterval(() => {
       setAutoCleanSeconds((prev) => {
         if (prev <= 1) {
-          setStep('rating');
-          if (session) updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+          clearInterval(interval);
           return 0;
         }
         return prev - 1;
@@ -345,7 +350,18 @@ const StationTimer = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step, session]);
+  }, [step]);
+
+  // Send relay2 OFF when auto_clean timer reaches 0
+  useEffect(() => {
+    if (step === 'auto_clean' && autoCleanSeconds === 0 && session) {
+      sendStationCommand(session.station_id, 'AUTO_CLEAN_OFF').catch((err) =>
+        console.error('[AUTO_CLEAN] relay2 OFF failed:', err)
+      );
+      setStep('rating');
+      updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+    }
+  }, [step, autoCleanSeconds, session]);
 
   const totalSeconds = session?.total_seconds || 300;
   const minutes = Math.floor(secondsLeft / 60);
