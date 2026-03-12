@@ -273,7 +273,7 @@ Deno.serve(async (req) => {
       }
 
       // Publish ON
-      const onOk = await publishMqtt(`shower2pet/${station_id}/relay1/command`, "1");
+      const onOk = await publishMqtt(`shower2pet/${boardId}/relay1/command`, "1");
       if (!onOk) {
         return new Response(JSON.stringify({
           success: false,
