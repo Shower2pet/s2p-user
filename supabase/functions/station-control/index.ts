@@ -377,9 +377,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── AUTO_CLEAN_OFF (relay2 OFF) ──
+    // ── AUTO_CLEAN_OFF (relay3 OFF) ──
     if (command === "AUTO_CLEAN_OFF") {
-      const topic = `shower2pet/${boardId}/relay2/command`;
+      const topic = `shower2pet/${boardId}/relay3/command`;
       const ok = await publishMqtt(topic, "0");
 
       logStep("AUTO_CLEAN_OFF result", { ok, topic });
