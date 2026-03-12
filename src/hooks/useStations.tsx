@@ -32,6 +32,7 @@ export interface Station {
   structure_owner_id: string | null;
   has_access_gate: boolean;
   access_code: string | null;
+  is_showcase: boolean;
 }
 
 export const getStationCategory = (type: string): StationCategory =>
