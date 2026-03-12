@@ -46,14 +46,33 @@ function connectMqtt(): Promise<mqtt.MqttClient> {
   });
 }
 
-async function publishMqttOff(stationId: string): Promise<boolean> {
-  const topic = `shower2pet/${stationId}/relay1/command`;
-  log("MQTT OFF publish", { topic, stationId });
+async function resolveBoardId(supabase: ReturnType<typeof createClient>, stationId: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("boards")
+      .select("id")
+      .eq("station_id", stationId)
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) {
+      log("Resolved board_id", { stationId, boardId: data.id });
+      return data.id;
+    }
+  } catch (e) {
+    log("Board lookup failed, using station_id as fallback", { error: String(e) });
+  }
+  return stationId;
+}
+
+async function publishMqttOff(supabase: ReturnType<typeof createClient>, stationId: string): Promise<boolean> {
+  const boardId = await resolveBoardId(supabase, stationId);
+  const topic = `shower2pet/${boardId}/relay1/command`;
+  log("MQTT OFF publish", { topic, stationId, boardId });
 
   try {
     const client = await connectMqtt();
     await client.publishAsync(topic, "0", { qos: 1, retain: true });
-    log("MQTT published OFF OK", { stationId });
+    log("MQTT published OFF OK", { stationId, boardId });
     client.end();
     return true;
   } catch (e) {
