@@ -480,7 +480,10 @@ const StationTimer = () => {
   const handleDogRemoved = () => {
     setAutoCleanCountdown(AUTO_CLEAN_COUNTDOWN_SECONDS);
     setStep('auto_clean_countdown');
-    if (session) updateSessionStep(session.id, 'auto_clean_countdown', undefined, { isGuest: !user });
+    if (session) {
+      const endsAt = new Date(Date.now() + AUTO_CLEAN_COUNTDOWN_SECONDS * 1000).toISOString();
+      updateSessionTiming(session.id, session.started_at, endsAt, 'auto_clean_countdown', { isGuest: !user });
+    }
   };
 
   const handleStartAutoClean = async () => {
