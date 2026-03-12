@@ -125,22 +125,26 @@ serve(async (req) => {
       const topic = body.topic || "";
       const parts = topic.split('/');
 
-      // Match shower2pet/{stationId}/status
+      // Match shower2pet/{boardId}/status
       if (parts.length === 3 && parts[0] === 'shower2pet' && parts[2] === 'status') {
-        const stationId = parts[1];
+        const boardId = parts[1];
         const payload = body.payload || "";
 
         if (payload.toLowerCase() === 'offline') {
-          log("LWT offline via publish", { stationId });
+          log("LWT offline via publish", { boardId });
+          const stationId = await resolveStationId(supabase, boardId);
           const { error } = await supabase.rpc('mark_station_offline', { p_station_id: stationId });
-          if (error) log("DB offline error", { stationId, error: error.message });
+          if (error) log("DB offline error", { boardId, stationId, error: error.message });
         } else {
-          // Just update last_heartbeat_at to keep station fresh
-          const { error } = await supabase.rpc('handle_station_heartbeat', { p_station_id: stationId });
-          if (error) log("DB heartbeat error", { stationId, error: error.message });
+          // Use handle_board_heartbeat which resolves board→station internally
+          const { error } = await supabase.rpc('handle_board_heartbeat', { p_board_id: boardId });
+          if (error) {
+            log("Board heartbeat failed, trying station fallback", { boardId, error: error.message });
+            await supabase.rpc('handle_station_heartbeat', { p_station_id: boardId });
+          }
         }
 
-        return new Response(JSON.stringify({ ok: true, action: "status_publish", station_id: stationId }), {
+        return new Response(JSON.stringify({ ok: true, action: "status_publish", board_id: boardId }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
