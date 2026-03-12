@@ -426,14 +426,13 @@ const StationTimer = () => {
 
   const handleCleanupResponse = async (clean: boolean) => {
     if (clean) {
-      // Tub is clean — proceed to remove dog prompt
       setStep('remove_dog');
     } else {
-      // Start 1-min cleanup timer with relay ON for water
+      const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
       setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
       setStep('cleanup_timer');
       if (session) {
-        const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
+        setSession({ ...session, ends_at: endsAt, step: 'cleanup_timer' });
         updateSessionTiming(session.id, session.started_at, endsAt, 'cleanup_timer', { isGuest: !user });
         try {
           await sendStationCommand(session.station_id, 'ON');
