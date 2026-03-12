@@ -461,7 +461,7 @@ const StationDetail = () => {
         )}
 
         {/* Offline banner */}
-        {!online && (
+        {!isShowcase && !online && (
           <Card className="p-4 border-destructive/30 bg-destructive/5 animate-fade-in">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-destructive" />
