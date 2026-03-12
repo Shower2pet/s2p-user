@@ -312,76 +312,70 @@ const StationTimer = () => {
   useEffect(() => {
     if (step !== 'cleanup_timer') return;
 
-    const interval = setInterval(() => {
-      setCleanupTimerSeconds((prev) => {
-        if (prev <= 1) {
-          // Timer done — turn OFF relay and ask again
-          if (session) {
-            sendStationCommand(session.station_id, 'OFF').catch((err) =>
-              console.error('[CLEANUP] relay OFF failed:', err)
-            );
-          }
-          setStep('cleanup_check2');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  // Cleanup timer countdown (synced from session.ends_at)
+  useEffect(() => {
+    if (step !== 'cleanup_timer' || !session?.ends_at) return;
 
+    const endsAt = new Date(session.ends_at).getTime();
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+      setCleanupTimerSeconds(remaining);
+
+      if (remaining <= 0) {
+        // Timer done — turn OFF relay and ask again
+        sendStationCommand(session.station_id, 'OFF').catch((err) =>
+          console.error('[CLEANUP] relay OFF failed:', err)
+        );
+        setStep('cleanup_check2');
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [step, session]);
+  }, [step, session?.ends_at, session?.station_id]);
 
-  // Auto-clean countdown (30s before relay 2 starts)
+  // Auto-clean countdown (30s before relay 3 starts, synced from session.ends_at)
   useEffect(() => {
-    if (step !== 'auto_clean_countdown') return;
+    if (step !== 'auto_clean_countdown' || !session?.ends_at) return;
 
-    const interval = setInterval(() => {
-      setAutoCleanCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const endsAt = new Date(session.ends_at).getTime();
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+      setAutoCleanCountdown(remaining);
 
+      if (remaining <= 0) {
+        handleStartAutoClean();
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, session?.ends_at]);
 
-  // Trigger auto-clean when countdown reaches 0
+  // Auto-clean timer (60s relay 3 running, synced from session.ends_at)
   useEffect(() => {
-    if (step === 'auto_clean_countdown' && autoCleanCountdown === 0) {
-      handleStartAutoClean();
-    }
-  }, [step, autoCleanCountdown]);
+    if (step !== 'auto_clean' || !session?.ends_at) return;
 
-  // Auto-clean timer (60s relay 2 running)
-  useEffect(() => {
-    if (step !== 'auto_clean') return;
+    const endsAt = new Date(session.ends_at).getTime();
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+      setAutoCleanSeconds(remaining);
 
-    const interval = setInterval(() => {
-      setAutoCleanSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      if (remaining <= 0) {
+        sendStationCommand(session.station_id, 'AUTO_CLEAN_OFF').catch((err) =>
+          console.error('[AUTO_CLEAN] relay3 OFF failed:', err)
+        );
+        setStep('rating');
+        updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
+      }
+    };
 
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [step]);
-
-  // Send relay2 OFF when auto_clean timer reaches 0
-  useEffect(() => {
-    if (step === 'auto_clean' && autoCleanSeconds === 0 && session) {
-      sendStationCommand(session.station_id, 'AUTO_CLEAN_OFF').catch((err) =>
-        console.error('[AUTO_CLEAN] relay2 OFF failed:', err)
-      );
-      setStep('rating');
-      updateSessionStep(session.id, 'rating', 'COMPLETED', { isGuest: !user });
-    }
-  }, [step, autoCleanSeconds, session]);
+  }, [step, session?.ends_at, session?.station_id, session?.id]);
 
   const totalSeconds = session?.total_seconds || 300;
   const minutes = Math.floor(secondsLeft / 60);
