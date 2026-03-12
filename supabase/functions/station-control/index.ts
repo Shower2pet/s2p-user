@@ -366,7 +366,7 @@ Deno.serve(async (req) => {
     }
 
     // ── ON / OFF ──
-    const topic = `shower2pet/${station_id}/relay1/command`;
+    const topic = `shower2pet/${boardId}/relay1/command`;
     const payload = command === "ON" ? "1" : "0";
     const ok = await publishMqtt(topic, payload);
 
