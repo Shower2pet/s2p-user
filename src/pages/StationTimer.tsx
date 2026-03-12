@@ -449,12 +449,12 @@ const StationTimer = () => {
       setStep('remove_dog');
     } else {
       if (cleanupAttempt < 1) {
-        // Second attempt: start another 1-min timer with relay ON
         setCleanupAttempt(1);
+        const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
         setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
         setStep('cleanup_timer');
         if (session) {
-          const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
+          setSession({ ...session, ends_at: endsAt, step: 'cleanup_timer' });
           updateSessionTiming(session.id, session.started_at, endsAt, 'cleanup_timer', { isGuest: !user });
           try {
             await sendStationCommand(session.station_id, 'ON');
@@ -463,7 +463,6 @@ const StationTimer = () => {
           }
         }
       } else {
-        // After 2nd timer: proceed to remove dog anyway
         setStep('remove_dog');
       }
     }
