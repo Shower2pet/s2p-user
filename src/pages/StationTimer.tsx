@@ -491,6 +491,11 @@ const StationTimer = () => {
     setAutoCleanSeconds(AUTO_CLEAN_SECONDS);
     setStep('auto_clean');
 
+    // Persist ends_at so page refresh can resume
+    const endsAt = new Date(Date.now() + AUTO_CLEAN_SECONDS * 1000).toISOString();
+    updateSessionTiming(session.id, session.started_at, endsAt, 'auto_clean', { isGuest: !user })
+      .catch((e) => console.warn('[AUTO_CLEAN] timing update failed:', e));
+
     try {
       await sendStationCommand(session.station_id, 'AUTO_CLEAN');
     } catch (err) {
