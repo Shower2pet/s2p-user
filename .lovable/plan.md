@@ -1,156 +1,70 @@
 
 
-# Checklist di Testing - Shower2Pet User App
+## Piano: Gestire tutte le email con Resend
 
-Ecco la checklist completa in formato Markdown con checkbox, pronta per Notion:
+### Approccio: SMTP di Resend per le email di autenticazione
 
-```markdown
-# 🧪 Testing Checklist - Shower2Pet User App
+Il modo più semplice e affidabile è configurare Resend come provider SMTP custom nelle impostazioni Auth di Supabase. Questo permette di inviare tutte le email (auth + transazionali) dal dominio `shower2pet.it` tramite Resend, senza creare hook aggiuntivi.
 
-## 1. UI/UX
+### Cosa serve
 
-- [ ] Ottimizzare layout mobile-first (375px, 390px, 414px)
-- [ ] Rendere decente per desktop (1280px+)
-- [ ] Controllare tutte le traduzioni IT/EN (chiavi mancanti, testi coerenti)
-- [ ] Rendere uniforme stile (spaziature, font, colori, bordi)
-- [ ] Decidere sfondo (gradient, colore solido, pattern)
-- [ ] Verificare banner installazione PWA su mobile
-- [ ] Verificare touch target minimi (44x44px) su mobile
+#### 1. Configurazione su Resend Dashboard
+Dalla dashboard di Resend (resend.com/domains), il dominio `shower2pet.it` è già verificato. Serve solo recuperare le credenziali SMTP:
 
-## 2. Gestione Profilo Utente
+- Vai su **resend.com/settings/smtp**
+- Le credenziali SMTP sono:
+  - **Host:** `smtp.resend.com`
+  - **Port:** `465` (SSL) oppure `587` (STARTTLS)
+  - **Username:** `resend`
+  - **Password:** la tua API Key (la stessa `RESEND_API_KEY` già configurata)
 
-### 2.1 Registrazione
-- [ ] Registrazione con email e password
-- [ ] Verificare che non si possa registrare più di un utente con la stessa email
-- [ ] Verificare invio email di conferma
-- [ ] Registrazione con account Google
+#### 2. Configurazione su Supabase Dashboard
+Vai su **Supabase Dashboard → Authentication → SMTP Settings** (`https://supabase.com/dashboard/project/rbdzinajiyswzdeoenil/auth/smtp`):
 
-### 2.2 Login
-- [ ] Login con email e password
-- [ ] Login con credenziali errate (messaggio errore corretto)
-- [ ] Flusso "Password dimenticata" (invio email, reset, nuovo login)
-- [ ] Login con account Google
-- [ ] Verificare URL visualizzato durante OAuth Google
+- Abilita **Custom SMTP**
+- **Sender email:** `noreply@shower2pet.it`
+- **Sender name:** `Shower2Pet`
+- **Host:** `smtp.resend.com`
+- **Port:** `465`
+- **Username:** `resend`
+- **Password:** incolla la tua Resend API Key
+- **Minimum interval:** 30 secondi (o come preferisci)
 
-### 2.3 Logout
-- [ ] Logout funzionante
-- [ ] Dopo logout, redirect a login e nessun accesso a pagine protette
+#### 3. Personalizzazione template Auth in Supabase
+Nella stessa sezione Auth → **Email Templates** (`https://supabase.com/dashboard/project/rbdzinajiyswzdeoenil/auth/templates`), personalizza i template HTML per:
 
-### 2.4 Cancellazione Profilo
-- [ ] ⚠️ **DA IMPLEMENTARE** — Dialog di conferma, eliminazione da Supabase Auth, pulizia dati correlati
+- **Confirm signup** — conferma registrazione
+- **Reset password** — recupero password
+- **Magic link** — accesso con link
+- **Change email** — cambio email
 
-## 3. Gestione Stazioni
+#### 4. Modifiche al codice (Edge Function `send-email`)
+Aggiungere template brandizzati per le email auth (opzionale, se vuoi gestire anche le auth email via Edge Function in futuro), ma con l'approccio SMTP non serve nessuna modifica al codice. Le email auth passano direttamente da Supabase → Resend SMTP.
 
-### 3.1 Visualizzazione Home
-- [ ] Visualizzazione corretta dati stazione nella lista
-- [ ] Visualizzazione corretta su mappa (marker, popup)
-- [ ] Informazioni stazione (nome, indirizzo, tipo)
-- [ ] Stato stazione corretto
+### Risultato finale
 
-### 3.2 Stazioni Vetrina (Showcase)
-- [ ] Marker viola con icona ✨ nella lista e sulla mappa
-- [ ] Nessuna opzione di pagamento/attivazione
-- [ ] Banner informativo nella pagina dettaglio
-- [ ] Visibili anche senza struttura/owner associato
-
-### 3.3 Visibilità e Stato
-- [ ] Corretta visibilità in base alla configurazione del partner (PUBLIC, RESTRICTED)
-- [ ] Stato "Disponibile" visualizzato correttamente
-- [ ] Stato "Offline" visualizzato correttamente
-- [ ] Stato "Occupato" visualizzato correttamente
-- [ ] Stato "Manutenzione" visualizzato correttamente
-
-### 3.4 Accesso Limitato
-- [ ] Funzionamento porta automatica (gate command)
-- [ ] Funzionamento codice di sblocco
-
-### 3.5 Segnalazioni
-- [ ] Invio ticket/segnalazione problema
-- [ ] Verifica ricezione ticket lato partner
-
-## 4. Pagamento
-
-### 4.1 Opzioni di Lavaggio
-- [ ] Visualizzazione corretta delle opzioni di lavaggio per stazione
-- [ ] Prezzi e durate corretti
-
-### 4.2 Acquisto Crediti
-- [ ] Visualizzazione pacchetti crediti disponibili
-- [ ] Flusso pagamento Stripe per crediti
-- [ ] Scontrino ricevuto via email
-- [ ] Scontrino visibile nella pagina storico
-- [ ] Crediti aggiunti correttamente al wallet
-
-### 4.3 Selezione Metodo di Pagamento
-- [ ] Crediti selezionati di default se sufficienti
-- [ ] Possibilità di scegliere Stripe se si preferisce
-
-### 4.4 Pagamento Lavaggio Singolo
-- [ ] Pagamento con crediti — crediti scalati correttamente
-- [ ] Pagamento con Stripe — flusso completo
-- [ ] Redirect corretto dopo pagamento Stripe (successo/errore)
-
-### 4.5 Abbonamenti B2C
-- [ ] Acquisto piano abbonamento
-- [ ] Utilizzo abbonamento per pagare lavaggi
-- [ ] Verifica limiti mensili di utilizzo
-- [ ] Gestione portale cliente Stripe (disdetta, modifica)
-
-### 4.6 Flusso Guest (senza account)
-- [ ] Acquisto lavaggio senza registrazione
-- [ ] Inserimento email per ricevuta
-- [ ] Ricezione scontrino via email
-- [ ] Nessun accesso a crediti/abbonamenti
-
-## 5. Lavaggio
-
-### 5.1 Pre-lavaggio
-- [ ] Visualizzazione regole/informazioni necessarie prima del lavaggio
-- [ ] Conferma accettazione regole
-
-### 5.2 Avvio Lavaggio
-- [ ] Accensione relè corretta dopo conferma utente
-- [ ] Prevenzione doppio click su "Avvia Servizio"
-
-### 5.3 Timer Lavaggio
-- [ ] Timer visualizzato correttamente durante il lavaggio
-- [ ] Timer persiste correttamente dopo ricarica pagina
-- [ ] Timer persiste dopo cambio pagina e ritorno
-- [ ] Comportamento corretto se si chiude completamente la pagina (sessione scade lato server)
-
-### 5.4 Flusso Pulizia — DOCCIA (Bracco)
-- [ ] Prompt richiesta pulizia zona lavaggio
-- [ ] Se sporco: +1 minuto di lavaggio per pulire, poi stop
-- [ ] Se pulito: fine diretta
-
-### 5.5 Flusso Pulizia — VASCA (Setter)
-- [ ] Prompt richiesta pulizia manuale vasca
-- [ ] Prompt avviso pulizia automatica
-- [ ] Conferma rimozione cane dalla vasca
-- [ ] Countdown 30 secondi pulizia automatica (corretto dopo refresh)
-- [ ] Monitoraggio flusso pulizia automatica (relè corretto)
-- [ ] Fine pulizia automatica
-
-### 5.6 Fine Lavaggio
-- [ ] Schermata di fine lavaggio corretta
-- [ ] Sessione salvata nello storico
-
-### 5.7 Rating
-- [ ] ⚠️ **DA IMPLEMENTARE** — Salvataggio stelle nel database, calcolo media per stazione, visualizzazione in dettaglio stazione e console partner
-
-## 6. Storico e Ricevute
-
-- [ ] Pagina storico lavaggi con lista completa
-- [ ] Download PDF ricevuta per ogni transazione
-- [ ] Email di conferma ricevuta dopo ogni acquisto
-
-## 7. Edge Cases Critici
-
-- [ ] Stazione va offline dopo il pagamento ma prima dell'avvio
-- [ ] Fallimento redirect Stripe (utente torna senza completare)
-- [ ] Comportamento con connessione instabile durante il lavaggio
-- [ ] Scadenza sessione lato server (check-expired-sessions)
-- [ ] Tentativo di avvio lavaggio su stazione già occupata
-- [ ] Doppio pagamento simultaneo sulla stessa stazione
+```text
+Supabase Auth (SMTP → Resend)        Edge Function (API → Resend)
+┌──────────────────────────┐         ┌──────────────────────────┐
+│ Conferma registrazione   │         │ Conferma acquisto        │
+│ Reset password           │         │ Crediti acquistati       │
+│ Magic link               │         │ Abbonamento attivato     │
+│ Cambio email             │         │ Credenziali partner      │
+│                          │         │ Ticket manutenzione      │
+└──────────────────────────┘         └──────────────────────────┘
+  smtp.resend.com                      send-email → Resend API
+  Template: Supabase Dashboard         Template: Edge Function
+  Dominio: shower2pet.it               Dominio: shower2pet.it
 ```
+
+### Riepilogo passi
+
+| # | Dove | Azione |
+|---|------|--------|
+| 1 | Resend Dashboard | Verificare credenziali SMTP (già disponibili) |
+| 2 | Supabase Dashboard → Auth → SMTP | Configurare SMTP custom con le credenziali Resend |
+| 3 | Supabase Dashboard → Auth → Templates | Personalizzare i 4 template HTML con branding Shower2Pet |
+| 4 | Nessuna modifica al codice | Le email transazionali funzionano già via `send-email` |
+
+**Nessuna modifica al codice è necessaria.** Serve solo configurazione nelle due dashboard. Se vuoi posso fornirti i template HTML brandizzati da incollare nella sezione Email Templates di Supabase.
 

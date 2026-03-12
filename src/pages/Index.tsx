@@ -419,24 +419,24 @@ const Index = () => {
         )}
 
         {/* Category filter */}
-        <div className="flex gap-2 animate-slide-up" style={{ animationDelay: '0.15s' }}>
-          <Button variant={categoryFilter === 'ALL' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => setCategoryFilter('ALL')}>
+        <div className="flex gap-1.5 sm:gap-2 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+          <Button variant={categoryFilter === 'ALL' ? 'default' : 'outline'} size="sm" className="flex-1 px-2 sm:px-4 text-xs sm:text-sm" onClick={() => setCategoryFilter('ALL')}>
             {t('allCategories')}
           </Button>
           <Button
             variant={categoryFilter === 'TUB' ? 'default' : 'outline'} size="sm"
-            className={`flex-1 ${categoryFilter !== 'TUB' ? 'border-primary/40 text-primary hover:bg-primary/10' : ''}`}
+            className={`flex-1 px-2 sm:px-4 text-xs sm:text-sm ${categoryFilter !== 'TUB' ? 'border-primary/40 text-primary hover:bg-primary/10' : ''}`}
             onClick={() => setCategoryFilter('TUB')}
           >
-            <span className="w-3 h-3 rounded-full bg-primary border-2 border-background inline-block mr-1.5" />
+            <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-primary border-2 border-background inline-block mr-1" />
             {t('tubs')}
           </Button>
           <Button
             variant={categoryFilter === 'SHOWER' ? 'default' : 'outline'} size="sm"
-            className={`flex-1 ${categoryFilter !== 'SHOWER' ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10' : ''}`}
+            className={`flex-1 px-2 sm:px-4 text-xs sm:text-sm ${categoryFilter !== 'SHOWER' ? 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10' : ''}`}
             onClick={() => setCategoryFilter('SHOWER')}
           >
-            <span className="w-3 h-3 rounded-full bg-success border-2 border-background inline-block mr-1.5" />
+            <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-success border-2 border-background inline-block mr-1" />
             {t('showers')}
           </Button>
         </div>

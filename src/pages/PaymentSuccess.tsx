@@ -90,12 +90,12 @@ const PaymentSuccess = () => {
 
   return (
     <AppShell showNav={false}>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
         <div className="text-center space-y-4">
           <div className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center mx-auto">
             <CheckCircle className="w-12 h-12 text-success" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">{t('paymentSuccessful')}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('paymentSuccessful')}</h1>
           <p className="text-lg text-muted-foreground font-light">
             {t('creditsAddedSuccess')}
           </p>

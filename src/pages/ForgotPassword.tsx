@@ -59,12 +59,12 @@ const ForgotPassword = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-md p-8 space-y-6">
+      <Card className="w-full max-w-md p-6 sm:p-8 space-y-5 sm:space-y-6">
         <Button variant="ghost" onClick={() => navigate('/login')} className="mb-4">
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">{t('forgotPasswordTitle')}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('forgotPasswordTitle')}</h1>
           <p className="text-muted-foreground font-light">{t('forgotPasswordDesc')}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

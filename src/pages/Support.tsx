@@ -28,18 +28,18 @@ const Support = () => {
 
   return (
     <AppShell showNav={false}>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
         <Button variant="ghost" onClick={() => navigate('/profile')}>
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
 
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">{t('helpAndSupport')}</h1>
-          <p className="text-muted-foreground font-light">{t('hereToHelp')}</p>
+        <div className="text-center space-y-1.5 sm:space-y-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('helpAndSupport')}</h1>
+          <p className="text-sm sm:text-base text-muted-foreground font-light">{t('hereToHelp')}</p>
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-foreground">{t('faq')}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-foreground">{t('faq')}</h2>
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="item-1">
               <AccordionTrigger className="text-left font-bold">{t('faqHowItWorks')}</AccordionTrigger>
@@ -60,9 +60,9 @@ const Support = () => {
           </Accordion>
         </div>
 
-        <Card className="p-6">
-          <h2 className="text-xl font-bold text-foreground mb-4">{t('contactUs')}</h2>
-          <p className="text-sm text-muted-foreground font-light mb-6">{t('contactUsDesc')}</p>
+        <Card className="p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-3 sm:mb-4">{t('contactUs')}</h2>
+          <p className="text-sm text-muted-foreground font-light mb-4 sm:mb-6">{t('contactUsDesc')}</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">{t('name')}</Label>
