@@ -263,6 +263,7 @@ const Index = () => {
   };
 
   const getStatusInfo = (station: Station) => {
+    if (station.is_showcase) return { color: 'bg-accent/15 text-accent-foreground', text: t('showcase') };
     const online = isStationOnline(station);
     if (online) return { color: 'bg-success text-success-foreground', text: t('available') };
     if (station.status === 'BUSY') return { color: 'bg-warning text-warning-foreground', text: t('busy') };
