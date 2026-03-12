@@ -221,12 +221,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    // RBAC: ON is admin/partner/manager only (OFF is allowed for users to stop their wash)
+    // RBAC: ON requires an active wash session for regular users (cleanup flow)
     if (command === "ON" && userRole === "user") {
-      return new Response(JSON.stringify({ error: "Forbidden", success: false }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const adminCheck = getAdminClient();
+      const { data: activeSession } = await adminCheck
+        .from("wash_sessions")
+        .select("id")
+        .eq("station_id", station_id)
+        .eq("user_id", userId!)
+        .eq("status", "ACTIVE")
+        .limit(1)
+        .maybeSingle();
+
+      if (!activeSession) {
+        logStep("ON blocked: no active session for user", { userId, station_id });
+        return new Response(JSON.stringify({ error: "Forbidden", success: false }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      logStep("ON allowed: user has active session", { sessionId: activeSession.id });
     }
 
     const adminClient = getAdminClient();
