@@ -32,6 +32,7 @@ export interface Station {
   structure_owner_id: string | null;
   has_access_gate: boolean;
   access_code: string | null;
+  is_showcase: boolean;
 }
 
 export const getStationCategory = (type: string): StationCategory =>
@@ -81,6 +82,7 @@ const mapRow = (row: any): Station => {
     structure_owner_id: row.structure_owner_id ?? null,
     has_access_gate: row.has_access_gate ?? false,
     access_code: row.access_code ?? null,
+    is_showcase: row.is_showcase ?? false,
   };
 };
 
