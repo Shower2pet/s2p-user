@@ -232,6 +232,9 @@ Deno.serve(async (req) => {
 
     const adminClient = getAdminClient();
 
+    // Resolve board_id for MQTT topics (fallback to station_id)
+    const boardId = await resolveBoardId(adminClient, station_id);
+
     // ── START_TIMED_WASH ──
     if (command === "START_TIMED_WASH") {
       if (!duration_minutes || duration_minutes <= 0) {
