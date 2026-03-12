@@ -211,11 +211,13 @@ const Index = () => {
 
       const online = isStationOnline(station);
       const isRestricted = station.visibility === 'RESTRICTED';
-      const markerColor = !online
-        ? '#9ca3af'
-        : isRestricted
-          ? '#f59e0b'
-          : station.category === 'SHOWER' ? '#10b981' : '#005596';
+      const markerColor = station.is_showcase
+        ? '#a855f7'
+        : !online
+          ? '#9ca3af'
+          : isRestricted
+            ? '#f59e0b'
+            : station.category === 'SHOWER' ? '#10b981' : '#005596';
 
       // Pixel-based offset so markers are always visually separated regardless of zoom
       const pixelOffset: [number, number] = count > 0
