@@ -169,8 +169,9 @@ const StationDetail = () => {
   }
 
   const online = isStationOnline(station);
-  const displayStatus = online ? 'available' : station.status === 'MAINTENANCE' ? 'maintenance' : station.status === 'BUSY' ? 'busy' : 'offline';
-  const washOptions = station.washing_options || [];
+  const isShowcase = station.is_showcase;
+  const displayStatus = isShowcase ? 'available' : online ? 'available' : station.status === 'MAINTENANCE' ? 'maintenance' : station.status === 'BUSY' ? 'busy' : 'offline';
+  const washOptions = isShowcase ? [] : (station.washing_options || []);
   const chosen = washOptions.find(o => o.id === selectedOption);
   const walletBalance = wallet?.balance || 0;
   const isRestricted = station.visibility === 'RESTRICTED';
