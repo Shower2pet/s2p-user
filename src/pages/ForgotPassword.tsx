@@ -64,7 +64,7 @@ const ForgotPassword = () => {
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">{t('forgotPasswordTitle')}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{t('forgotPasswordTitle')}</h1>
           <p className="text-muted-foreground font-light">{t('forgotPasswordDesc')}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
