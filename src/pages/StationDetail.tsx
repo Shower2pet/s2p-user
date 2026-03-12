@@ -402,7 +402,7 @@ const StationDetail = () => {
         )}
 
         {/* Restricted visibility verification */}
-        {isRestricted && (
+        {!isShowcase && isRestricted && (
           <Card className="p-4 space-y-3 animate-fade-in border-warning/30 bg-warning/5">
             <div className="flex items-center gap-2 text-warning">
               <Lock className="w-5 h-5" />
