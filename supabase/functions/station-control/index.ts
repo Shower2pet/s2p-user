@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
 
     logStep("Request", { station_id, command, duration_minutes, session_id });
 
-    const validCommands = ["START_TIMED_WASH", "PULSE", "ON", "OFF", "AUTO_CLEAN"];
+    const validCommands = ["START_TIMED_WASH", "PULSE", "ON", "OFF", "AUTO_CLEAN", "AUTO_CLEAN_OFF"];
     if (!command || !validCommands.includes(command)) {
       throw new Error(`Invalid command. Must be one of: ${validCommands.join(", ")}`);
     }
