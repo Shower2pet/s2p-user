@@ -852,6 +852,10 @@ export const translations: Record<string, Record<string, string>> = {
     aboutStep2: 'Scegli un programma di lavaggio e paga con carta o crediti.',
     aboutStep3: 'Lava e asciuga il tuo cane — fatto! Lascia la postazione pulita per il prossimo utente.',
     aboutFooter: '© Shower2Pet — Postazioni self-service per il lavaggio dei cani',
+    showcase: 'Vetrina',
+    showcaseStation: 'Stazione Vetrina',
+    showcaseDesc: 'Questa è una stazione espositiva. Non è disponibile per l\'utilizzo.',
+    showcaseOnly: 'Solo esposizione',
   },
 };
 
