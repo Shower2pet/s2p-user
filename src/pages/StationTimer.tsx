@@ -309,8 +309,6 @@ const StationTimer = () => {
   }, [step, session]);
 
   // Cleanup timer countdown (synced from session.ends_at)
-
-  // Cleanup timer countdown (synced from session.ends_at)
   useEffect(() => {
     if (step !== 'cleanup_timer' || !session?.ends_at) return;
 
