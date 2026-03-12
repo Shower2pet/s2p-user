@@ -39,7 +39,7 @@ const Support = () => {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-foreground">{t('faq')}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-foreground">{t('faq')}</h2>
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="item-1">
               <AccordionTrigger className="text-left font-bold">{t('faqHowItWorks')}</AccordionTrigger>
