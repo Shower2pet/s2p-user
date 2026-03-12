@@ -91,6 +91,26 @@ const StationTimer = () => {
             setIsActive(true);
           }
         }
+
+        // Restore timed cleanup steps from DB ends_at
+        if (currentStep === 'cleanup_timer' || currentStep === 'auto_clean_countdown' || currentStep === 'auto_clean') {
+          const endsAt = new Date(data.ends_at).getTime();
+          const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+          if (remaining > 0) {
+            if (currentStep === 'cleanup_timer') setCleanupTimerSeconds(remaining);
+            else if (currentStep === 'auto_clean_countdown') setAutoCleanCountdown(remaining);
+            else if (currentStep === 'auto_clean') setAutoCleanSeconds(remaining);
+          } else {
+            // Timer already expired — advance to next step
+            if (currentStep === 'cleanup_timer') setStep('cleanup_check2');
+            else if (currentStep === 'auto_clean_countdown') {
+              // Will trigger auto-clean via useEffect
+              setAutoCleanCountdown(0);
+            } else if (currentStep === 'auto_clean') {
+              setAutoCleanSeconds(0);
+            }
+          }
+        }
         setLoading(false);
       } else if (retries < maxRetries) {
         retries++;
@@ -419,7 +439,8 @@ const StationTimer = () => {
       setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
       setStep('cleanup_timer');
       if (session) {
-        updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+        const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
+        updateSessionTiming(session.id, session.started_at, endsAt, 'cleanup_timer', { isGuest: !user });
         try {
           await sendStationCommand(session.station_id, 'ON');
         } catch (err) {
@@ -440,7 +461,8 @@ const StationTimer = () => {
         setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
         setStep('cleanup_timer');
         if (session) {
-          updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+          const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
+          updateSessionTiming(session.id, session.started_at, endsAt, 'cleanup_timer', { isGuest: !user });
           try {
             await sendStationCommand(session.station_id, 'ON');
           } catch (err) {
@@ -458,13 +480,21 @@ const StationTimer = () => {
   const handleDogRemoved = () => {
     setAutoCleanCountdown(AUTO_CLEAN_COUNTDOWN_SECONDS);
     setStep('auto_clean_countdown');
-    if (session) updateSessionStep(session.id, 'auto_clean_countdown', undefined, { isGuest: !user });
+    if (session) {
+      const endsAt = new Date(Date.now() + AUTO_CLEAN_COUNTDOWN_SECONDS * 1000).toISOString();
+      updateSessionTiming(session.id, session.started_at, endsAt, 'auto_clean_countdown', { isGuest: !user });
+    }
   };
 
   const handleStartAutoClean = async () => {
     if (!session) return;
     setAutoCleanSeconds(AUTO_CLEAN_SECONDS);
     setStep('auto_clean');
+
+    // Persist ends_at so page refresh can resume
+    const endsAt = new Date(Date.now() + AUTO_CLEAN_SECONDS * 1000).toISOString();
+    updateSessionTiming(session.id, session.started_at, endsAt, 'auto_clean', { isGuest: !user })
+      .catch((e) => console.warn('[AUTO_CLEAN] timing update failed:', e));
 
     try {
       await sendStationCommand(session.station_id, 'AUTO_CLEAN');
