@@ -470,12 +470,12 @@ const StationTimer = () => {
 
   // User confirmed dog is out → start 30s countdown before auto-clean
   const handleDogRemoved = () => {
+    if (!session) return;
+    const endsAt = new Date(Date.now() + AUTO_CLEAN_COUNTDOWN_SECONDS * 1000).toISOString();
     setAutoCleanCountdown(AUTO_CLEAN_COUNTDOWN_SECONDS);
     setStep('auto_clean_countdown');
-    if (session) {
-      const endsAt = new Date(Date.now() + AUTO_CLEAN_COUNTDOWN_SECONDS * 1000).toISOString();
-      updateSessionTiming(session.id, session.started_at, endsAt, 'auto_clean_countdown', { isGuest: !user });
-    }
+    setSession({ ...session, ends_at: endsAt, step: 'auto_clean_countdown' });
+    updateSessionTiming(session.id, session.started_at, endsAt, 'auto_clean_countdown', { isGuest: !user });
   };
 
   const handleStartAutoClean = async () => {
