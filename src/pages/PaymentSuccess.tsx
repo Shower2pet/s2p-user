@@ -95,7 +95,7 @@ const PaymentSuccess = () => {
           <div className="w-20 h-20 rounded-full bg-success/20 flex items-center justify-center mx-auto">
             <CheckCircle className="w-12 h-12 text-success" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">{t('paymentSuccessful')}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('paymentSuccessful')}</h1>
           <p className="text-lg text-muted-foreground font-light">
             {t('creditsAddedSuccess')}
           </p>

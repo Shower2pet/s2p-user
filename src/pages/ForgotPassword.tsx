@@ -59,7 +59,7 @@ const ForgotPassword = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-sky/10 flex items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-md p-8 space-y-6">
+      <Card className="w-full max-w-md p-6 sm:p-8 space-y-5 sm:space-y-6">
         <Button variant="ghost" onClick={() => navigate('/login')} className="mb-4">
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>

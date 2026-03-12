@@ -21,8 +21,8 @@ export const AppShell = ({
       
       <main className={cn(
         "flex-1 overflow-y-auto",
-        showNav && "pb-20"
-      )}>
+        showNav && "pb-24"
+      )} style={showNav ? { paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' } : undefined}>
         {children}
       </main>
       

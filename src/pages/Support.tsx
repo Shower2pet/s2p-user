@@ -60,9 +60,9 @@ const Support = () => {
           </Accordion>
         </div>
 
-        <Card className="p-6">
-          <h2 className="text-xl font-bold text-foreground mb-4">{t('contactUs')}</h2>
-          <p className="text-sm text-muted-foreground font-light mb-6">{t('contactUsDesc')}</p>
+        <Card className="p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-3 sm:mb-4">{t('contactUs')}</h2>
+          <p className="text-sm text-muted-foreground font-light mb-4 sm:mb-6">{t('contactUsDesc')}</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">{t('name')}</Label>

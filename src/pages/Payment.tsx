@@ -42,7 +42,7 @@ const Payment = () => {
           <ArrowLeft className="w-4 h-4" /> {t('back')}
         </Button>
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">{t('payment')}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('payment')}</h1>
           <p className="text-muted-foreground font-light">{t('completePayment')}</p>
         </div>
         <Card className="p-6 space-y-6">

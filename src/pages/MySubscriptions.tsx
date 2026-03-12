@@ -49,10 +49,10 @@ const MySubscriptions = () => {
 
   return (
     <AppShell>
-      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-            <Crown className="w-6 h-6 text-accent" />
+      <div className="container max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
+        <div className="text-center space-y-1.5 sm:space-y-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center justify-center gap-2">
+            <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
             {t('mySubscriptions')}
           </h1>
           <p className="text-sm text-muted-foreground">{t('manageYourSubscriptions')}</p>
