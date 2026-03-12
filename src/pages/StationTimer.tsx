@@ -405,9 +405,7 @@ const StationTimer = () => {
       if (session) {
         updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
         try {
-          await sendStationCommand(session.station_id, 'PULSE', {
-            duration_minutes: CLEANUP_TIMER_SECONDS / 60,
-          });
+          await sendStationCommand(session.station_id, 'ON');
         } catch (err) {
           console.error('[CLEANUP] relay ON failed:', err);
         }
@@ -428,9 +426,7 @@ const StationTimer = () => {
         if (session) {
           updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
           try {
-            await sendStationCommand(session.station_id, 'PULSE', {
-              duration_minutes: CLEANUP_TIMER_SECONDS / 60,
-            });
+            await sendStationCommand(session.station_id, 'ON');
           } catch (err) {
             console.error('[CLEANUP] relay ON failed:', err);
           }
