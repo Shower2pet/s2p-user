@@ -461,7 +461,8 @@ const StationTimer = () => {
         setCleanupTimerSeconds(CLEANUP_TIMER_SECONDS);
         setStep('cleanup_timer');
         if (session) {
-          updateSessionStep(session.id, 'cleanup_timer', undefined, { isGuest: !user });
+          const endsAt = new Date(Date.now() + CLEANUP_TIMER_SECONDS * 1000).toISOString();
+          updateSessionTiming(session.id, session.started_at, endsAt, 'cleanup_timer', { isGuest: !user });
           try {
             await sendStationCommand(session.station_id, 'ON');
           } catch (err) {
