@@ -18,12 +18,31 @@ function getSupabaseAdmin() {
 }
 
 /**
- * Extract station_id from EMQX clientid.
- * clientid === station_id (confirmed by user).
+ * Extract board_id from EMQX clientid.
+ * Boards connect with their board_id (e.g. ETH_1, WIFI_2).
+ * Ignore our own edge function clients (prefix 's2p-').
  */
-function extractStationId(clientid: string): string | null {
-  if (!clientid || clientid.startsWith('s2p-')) return null; // ignore our own edge function clients
+function extractBoardId(clientid: string): string | null {
+  if (!clientid || clientid.startsWith('s2p-')) return null;
   return clientid;
+}
+
+/**
+ * Resolve board_id → station_id via boards table.
+ * Falls back to treating boardId as station_id for backward compat.
+ */
+async function resolveStationId(supabase: ReturnType<typeof getSupabaseAdmin>, boardId: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("boards")
+      .select("station_id")
+      .eq("id", boardId)
+      .maybeSingle();
+    if (data?.station_id) {
+      return data.station_id;
+    }
+  } catch { /* fallback */ }
+  return boardId;
 }
 
 serve(async (req) => {
