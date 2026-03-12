@@ -365,7 +365,20 @@ const StationDetail = () => {
           />
         </div>
 
-        {/* Access Gate Button */}
+        {/* Showcase banner */}
+        {isShowcase && (
+          <Card className="p-5 border-accent/30 bg-accent/5 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-accent/15 flex items-center justify-center shrink-0">
+                <Sparkles className="w-6 h-6 text-accent" />
+              </div>
+              <div>
+                <p className="font-bold text-foreground">{t('showcaseStation')}</p>
+                <p className="text-sm text-muted-foreground">{t('showcaseDesc')}</p>
+              </div>
+            </div>
+          </Card>
+        )}
         {station.has_access_gate && (
           <Card className="p-4 space-y-2 animate-fade-in border-primary/30 bg-primary/5">
             <div className="flex items-center justify-between">
