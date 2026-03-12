@@ -17,7 +17,7 @@ export type TransactionTypeEnum = 'CREDIT_TOPUP' | 'WASH_SERVICE' | 'GUEST_WASH'
 // ─── Application-level status unions (not DB enums, but constrained values) ──
 
 export type WashSessionStatus = 'ACTIVE' | 'COMPLETED' | 'EXPIRED' | 'CANCELLED';
-export type WashSessionStep = 'timer' | 'sanitize' | 'courtesy' | 'rating' | 'done';
+export type WashSessionStep = 'ready' | 'rules' | 'timer' | 'sanitize' | 'courtesy' | 'rating' | 'done' | 'cleanup' | 'cleanup_timer' | 'cleanup_check2' | 'remove_dog' | 'auto_clean_countdown' | 'auto_clean';
 export type TransactionStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
 export type FiscalStatus = 'TO_SEND' | 'SENT' | 'ERROR' | 'NOT_REQUIRED';
 export type ReceiptStatus = 'PENDING' | 'SENT' | 'ERROR';
