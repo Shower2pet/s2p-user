@@ -280,18 +280,21 @@ const Index = () => {
     const online = isStationOnline(station);
     const catStyle = getCategoryStyle(station.category);
     const distLabel = getDistanceLabel(station);
+    const isShowcase = station.is_showcase;
 
     return (
       <Card
         key={station.id}
-        className={`p-4 cursor-pointer transition-all ${selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''}`}
+        className={`p-4 cursor-pointer transition-all ${isShowcase ? 'border-accent/30 bg-accent/5' : ''} ${selectedStation?.id === station.id ? 'ring-2 ring-primary' : ''}`}
         onClick={() => setSelectedStation(station)}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className={`w-10 h-10 rounded-full ${catStyle.bg} flex items-center justify-center flex-shrink-0`}>
+            <div className={`w-10 h-10 rounded-full ${isShowcase ? 'bg-accent/15' : catStyle.bg} flex items-center justify-center flex-shrink-0`}>
               {station.visibility === 'RESTRICTED' ? (
                 <Lock className={`w-5 h-5 ${catStyle.text}`} />
+              ) : isShowcase ? (
+                <Sparkles className="w-5 h-5 text-accent" />
               ) : (
                 <MapPin className={`w-5 h-5 ${catStyle.text}`} />
               )}
@@ -302,7 +305,10 @@ const Index = () => {
                 {station.structure_address || ''}
                 {distLabel && <span className="ml-1 text-primary font-medium">· {distLabel}</span>}
               </p>
-              {station.visibility === 'RESTRICTED' && (
+              {isShowcase && (
+                <p className="text-xs text-accent mt-0.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> {t('showcaseOnly')}</p>
+              )}
+              {station.visibility === 'RESTRICTED' && !isShowcase && (
                 <p className="text-xs text-warning mt-0.5 flex items-center gap-1"><Lock className="w-3 h-3" /> {t('onlyClients')}</p>
               )}
             </div>
@@ -313,12 +319,14 @@ const Index = () => {
         </div>
         {selectedStation?.id === station.id && (
           <div className="flex gap-2 mt-3 pt-3 border-t border-border relative z-10">
-            <Button variant="default" size="sm" className="flex-1"
-              onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
-            >
-              <MapPin className="w-4 h-4" /> {t('learnMore')}
-            </Button>
-            <Button variant="outline" size="sm" className="flex-1"
+            {!isShowcase && (
+              <Button variant="default" size="sm" className="flex-1"
+                onClick={(e) => { e.stopPropagation(); handleActivateStation(station); }}
+              >
+                <MapPin className="w-4 h-4" /> {t('learnMore')}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className={isShowcase ? 'w-full' : 'flex-1'}
               onClick={(e) => { e.stopPropagation(); handleNavigate(station); }}
             >
               <Navigation className="w-4 h-4" /> {t('directions')}
