@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import logo from '@/assets/shower2pet-logo.png';
 
 import { WashSession } from '@/types/database';
-import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession } from '@/services/sessionService';
+import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession, submitRating } from '@/services/sessionService';
 import { sendStationCommand } from '@/services/stationService';
 import { logErrorToDb, GENERIC_ERROR_MESSAGE } from '@/services/errorLogService';
 // receiptService rimosso: gli scontrini Fiskaly vengono triggerati solo dal stripe-webhook server-side
