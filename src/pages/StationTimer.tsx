@@ -674,7 +674,23 @@ const StationTimer = () => {
             <p className="text-primary-foreground/70 text-sm">{t('howWasIt')}</p>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setRating(star)}>
+                <button
+                  key={star}
+                  disabled={ratingSubmitted}
+                  onClick={async () => {
+                    setRating(star);
+                    if (!ratingSubmitted && user && session) {
+                      try {
+                        await submitRating(session.station_id, session.id, user.id, star);
+                        setRatingSubmitted(true);
+                        toast.success(t('ratingSubmitted'));
+                      } catch (e) {
+                        console.error('[RATING] submit failed:', e);
+                        toast.error(t('ratingError'));
+                      }
+                    }
+                  }}
+                >
                   <Star
                     className={`w-8 h-8 sm:w-10 sm:h-10 transition-colors ${
                       star <= rating ? 'text-warning fill-warning' : 'text-primary-foreground/30'
@@ -683,6 +699,9 @@ const StationTimer = () => {
                 </button>
               ))}
             </div>
+            {ratingSubmitted && (
+              <p className="text-primary-foreground/60 text-xs">{t('ratingSubmitted')}</p>
+            )}
           </div>
         )}
 
