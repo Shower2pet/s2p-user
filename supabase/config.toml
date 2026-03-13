@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.update-guest-session]
 verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false

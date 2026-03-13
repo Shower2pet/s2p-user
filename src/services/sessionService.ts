@@ -133,3 +133,26 @@ export const subscribeToSession = (
     supabase.removeChannel(channel);
   };
 };
+
+/* ── Submit rating ───────────────────────────────────────── */
+export const submitRating = async (
+  stationId: string,
+  sessionId: string,
+  userId: string,
+  rating: number,
+) => {
+  const { error } = await supabase
+    .from('station_ratings')
+    .insert({ station_id: stationId, session_id: sessionId, user_id: userId, rating });
+  if (error) throw error;
+};
+
+/* ── Fetch station average rating ────────────────────────── */
+export const fetchStationAvgRating = async (
+  stationId: string,
+): Promise<{ avg_rating: number; total_count: number }> => {
+  const { data, error } = await supabase.rpc('get_station_avg_rating', { p_station_id: stationId });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return { avg_rating: Number(row?.avg_rating ?? 0), total_count: Number(row?.total_count ?? 0) };
+};

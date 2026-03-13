@@ -352,6 +352,7 @@ const StationDetail = () => {
             name={getStationDisplayName(station)}
             status={displayStatus as 'available' | 'busy' | 'offline'}
             description={station.structure_description || undefined}
+            stationId={station.id}
           />
         </div>
 

@@ -1,57 +1,70 @@
 
 
-# Plan: Rating System + Account Self-Delete
+## Piano: Gestire tutte le email con Resend
 
-## 1. Rating System (save to DB + display on station)
+### Approccio: SMTP di Resend per le email di autenticazione
 
-The rating UI already exists in `StationTimer.tsx` (step `rating`) but doesn't save anything. The `station_ratings` table and `get_station_avg_rating` RPC function already exist in Supabase.
+Il modo più semplice e affidabile è configurare Resend come provider SMTP custom nelle impostazioni Auth di Supabase. Questo permette di inviare tutte le email (auth + transazionali) dal dominio `shower2pet.it` tramite Resend, senza creare hook aggiuntivi.
 
-### Changes
+### Cosa serve
 
-**A. `src/services/sessionService.ts`** — Add `submitRating()` function:
-- Insert into `station_ratings` table (`station_id`, `session_id`, `user_id`, `rating`)
-- Handle guest sessions (skip if no user)
+#### 1. Configurazione su Resend Dashboard
+Dalla dashboard di Resend (resend.com/domains), il dominio `shower2pet.it` è già verificato. Serve solo recuperare le credenziali SMTP:
 
-**B. `src/pages/StationTimer.tsx`** — Wire up rating submission:
-- When user taps a star, call `submitRating()` 
-- Show toast on success
-- Disable stars after submission
+- Vai su **resend.com/settings/smtp**
+- Le credenziali SMTP sono:
+  - **Host:** `smtp.resend.com`
+  - **Port:** `465` (SSL) oppure `587` (STARTTLS)
+  - **Username:** `resend`
+  - **Password:** la tua API Key (la stessa `RESEND_API_KEY` già configurata)
 
-**C. `src/components/station/StationIdentityBlock.tsx`** — Display average rating:
-- Call `get_station_avg_rating` RPC
-- Show stars + count next to station name
+#### 2. Configurazione su Supabase Dashboard
+Vai su **Supabase Dashboard → Authentication → SMTP Settings** (`https://supabase.com/dashboard/project/rbdzinajiyswzdeoenil/auth/smtp`):
 
-**D. `src/config/translations.ts`** — Add keys:
-- `ratingSubmitted`, `ratingError`, `reviews`
+- Abilita **Custom SMTP**
+- **Sender email:** `noreply@shower2pet.it`
+- **Sender name:** `Shower2Pet`
+- **Host:** `smtp.resend.com`
+- **Port:** `465`
+- **Username:** `resend`
+- **Password:** incolla la tua Resend API Key
+- **Minimum interval:** 30 secondi (o come preferisci)
 
-## 2. Account Self-Delete
+#### 3. Personalizzazione template Auth in Supabase
+Nella stessa sezione Auth → **Email Templates** (`https://supabase.com/dashboard/project/rbdzinajiyswzdeoenil/auth/templates`), personalizza i template HTML per:
 
-Users cannot delete from `auth.users` client-side. Need a new Edge Function.
+- **Confirm signup** — conferma registrazione
+- **Reset password** — recupero password
+- **Magic link** — accesso con link
+- **Change email** — cambio email
 
-### Changes
+#### 4. Modifiche al codice (Edge Function `send-email`)
+Aggiungere template brandizzati per le email auth (opzionale, se vuoi gestire anche le auth email via Edge Function in futuro), ma con l'approccio SMTP non serve nessuna modifica al codice. Le email auth passano direttamente da Supabase → Resend SMTP.
 
-**A. New Edge Function: `supabase/functions/delete-account/index.ts`**
-- Validates JWT from Authorization header
-- Uses service role client to call `auth.admin.deleteUser(userId)`
-- Cascade on `profiles` FK handles cleanup automatically
-- Returns 200 on success
+### Risultato finale
 
-**B. `supabase/config.toml`** — Add `[functions.delete-account]` with `verify_jwt = false` (manual JWT validation in code)
+```text
+Supabase Auth (SMTP → Resend)        Edge Function (API → Resend)
+┌──────────────────────────┐         ┌──────────────────────────┐
+│ Conferma registrazione   │         │ Conferma acquisto        │
+│ Reset password           │         │ Crediti acquistati       │
+│ Magic link               │         │ Abbonamento attivato     │
+│ Cambio email             │         │ Credenziali partner      │
+│                          │         │ Ticket manutenzione      │
+└──────────────────────────┘         └──────────────────────────┘
+  smtp.resend.com                      send-email → Resend API
+  Template: Supabase Dashboard         Template: Edge Function
+  Dominio: shower2pet.it               Dominio: shower2pet.it
+```
 
-**C. `src/services/authService.ts`** — Add `deleteAccount()`:
-- Calls `supabase.functions.invoke('delete-account')`
+### Riepilogo passi
 
-**D. `src/pages/Profile.tsx`** — Add delete account button + AlertDialog:
-- Red "Delete Account" button at bottom
-- Confirmation dialog with warning text
-- On confirm: call `deleteAccount()`, clear state, redirect to `/`
+| # | Dove | Azione |
+|---|------|--------|
+| 1 | Resend Dashboard | Verificare credenziali SMTP (già disponibili) |
+| 2 | Supabase Dashboard → Auth → SMTP | Configurare SMTP custom con le credenziali Resend |
+| 3 | Supabase Dashboard → Auth → Templates | Personalizzare i 4 template HTML con branding Shower2Pet |
+| 4 | Nessuna modifica al codice | Le email transazionali funzionano già via `send-email` |
 
-**E. `src/config/translations.ts`** — Add keys:
-- `deleteAccount`, `deleteAccountConfirm`, `deleteAccountDesc`, `deleteAccountSuccess`, `deleting`
-
-## Technical Notes
-
-- The `profiles` table has `ON DELETE CASCADE` from `auth.users`, so deleting the auth user cleans up profiles automatically
-- `structure_wallets`, `wash_sessions`, `transactions` etc. reference `user_id` but don't cascade — the data stays for audit/history (user_id becomes orphaned UUID)
-- Rating is only saved for authenticated users (guests skip)
+**Nessuna modifica al codice è necessaria.** Serve solo configurazione nelle due dashboard. Se vuoi posso fornirti i template HTML brandizzati da incollare nella sezione Email Templates di Supabase.
 

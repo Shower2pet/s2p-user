@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import logo from '@/assets/shower2pet-logo.png';
 
 import { WashSession } from '@/types/database';
-import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession } from '@/services/sessionService';
+import { fetchActiveSession, updateSessionStep, updateSessionTiming, updateCourtesyEnd, subscribeToSession, submitRating } from '@/services/sessionService';
 import { sendStationCommand } from '@/services/stationService';
 import { logErrorToDb, GENERIC_ERROR_MESSAGE } from '@/services/errorLogService';
 // receiptService rimosso: gli scontrini Fiskaly vengono triggerati solo dal stripe-webhook server-side
@@ -42,6 +42,7 @@ const StationTimer = () => {
   const [warningShown, setWarningShown] = useState(false);
   const [courtesySeconds, setCourtesySeconds] = useState(60);
   const [rating, setRating] = useState(0);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
   const [cleanupTimerSeconds, setCleanupTimerSeconds] = useState(CLEANUP_TIMER_SECONDS);
   const [cleanupAttempt, setCleanupAttempt] = useState(0);
@@ -673,7 +674,23 @@ const StationTimer = () => {
             <p className="text-primary-foreground/70 text-sm">{t('howWasIt')}</p>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setRating(star)}>
+                <button
+                  key={star}
+                  disabled={ratingSubmitted}
+                  onClick={async () => {
+                    setRating(star);
+                    if (!ratingSubmitted && user && session) {
+                      try {
+                        await submitRating(session.station_id, session.id, user.id, star);
+                        setRatingSubmitted(true);
+                        toast.success(t('ratingSubmitted'));
+                      } catch (e) {
+                        console.error('[RATING] submit failed:', e);
+                        toast.error(t('ratingError'));
+                      }
+                    }
+                  }}
+                >
                   <Star
                     className={`w-8 h-8 sm:w-10 sm:h-10 transition-colors ${
                       star <= rating ? 'text-warning fill-warning' : 'text-primary-foreground/30'
@@ -682,6 +699,9 @@ const StationTimer = () => {
                 </button>
               ))}
             </div>
+            {ratingSubmitted && (
+              <p className="text-primary-foreground/60 text-xs">{t('ratingSubmitted')}</p>
+            )}
           </div>
         )}
 

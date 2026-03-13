@@ -4,17 +4,21 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
-import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Crown, LogIn, UserPlus, Info } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ChevronRight, Bell, HelpCircle, LogOut, Settings, Camera, Loader2, Crown, LogIn, UserPlus, Info, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
+import { deleteAccount } from '@/services/authService';
 
 const Profile = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { profile, signOut, user, loading: authLoading } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -136,13 +140,57 @@ const Profile = () => {
           </Card>
 
           {user && (
-            <Button onClick={handleLogout} disabled={isLoggingOut} variant="destructive" size="lg" className="w-full mt-6">
-              {isLoggingOut ? (
-                <><Loader2 className="w-5 h-5 animate-spin" /> {t('loggingOut')}</>
-              ) : (
-                <><LogOut className="w-5 h-5" /> {t('logout')}</>
-              )}
-            </Button>
+            <>
+              <Button onClick={handleLogout} disabled={isLoggingOut} variant="destructive" size="lg" className="w-full mt-6">
+                {isLoggingOut ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> {t('loggingOut')}</>
+                ) : (
+                  <><LogOut className="w-5 h-5" /> {t('logout')}</>
+                )}
+              </Button>
+
+              <Button
+                onClick={() => setShowDeleteConfirm(true)}
+                variant="outline"
+                size="lg"
+                className="w-full border-destructive text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="w-5 h-5" /> {t('deleteAccount')}
+              </Button>
+
+              <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t('deleteAccountConfirm')}</AlertDialogTitle>
+                    <AlertDialogDescription>{t('deleteAccountDesc')}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={isDeleting}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={async () => {
+                        setIsDeleting(true);
+                        try {
+                          await deleteAccount();
+                          await signOut();
+                          toast.success(t('deleteAccountSuccess'));
+                          navigate('/');
+                        } catch (e) {
+                          console.error('[DELETE-ACCOUNT]', e);
+                          toast.error(t('genericError'));
+                        } finally {
+                          setIsDeleting(false);
+                        }
+                      }}
+                    >
+                      {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                      {isDeleting ? t('deleting') : t('deleteAccountConfirm')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           )}
         </div>
       </div>

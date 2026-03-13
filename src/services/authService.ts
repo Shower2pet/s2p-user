@@ -70,3 +70,9 @@ export const fetchProfile = async (userId: string): Promise<Profile | null> => {
   if (error) throw error;
   return data as Profile | null;
 };
+
+/* ── Delete account ──────────────────────────────────────── */
+export const deleteAccount = async () => {
+  const { error } = await supabase.functions.invoke('delete-account');
+  if (error) throw error;
+};

@@ -427,6 +427,18 @@ export const translations: Record<string, Record<string, string>> = {
     showcaseStation: 'Showcase Station',
     showcaseDesc: 'This is a display station. It is not available for use.',
     showcaseOnly: 'Display only',
+
+    // Rating
+    ratingSubmitted: 'Thank you for your rating!',
+    ratingError: 'Error submitting rating',
+    reviews: 'reviews',
+
+    // Account deletion
+    deleteAccount: 'Delete Account',
+    deleteAccountConfirm: 'Delete your account?',
+    deleteAccountDesc: 'This action is irreversible. All your personal data will be permanently deleted. Credits and subscription history will be lost.',
+    deleteAccountSuccess: 'Account deleted successfully',
+    deleting: 'Deleting...',
   },
   it: {
     // Navigation
@@ -856,6 +868,18 @@ export const translations: Record<string, Record<string, string>> = {
     showcaseStation: 'Stazione Vetrina',
     showcaseDesc: 'Questa è una stazione espositiva. Non è disponibile per l\'utilizzo.',
     showcaseOnly: 'Solo esposizione',
+
+    // Rating
+    ratingSubmitted: 'Grazie per la tua valutazione!',
+    ratingError: 'Errore nell\'invio della valutazione',
+    reviews: 'recensioni',
+
+    // Account deletion
+    deleteAccount: 'Elimina Account',
+    deleteAccountConfirm: 'Eliminare il tuo account?',
+    deleteAccountDesc: 'Questa azione è irreversibile. Tutti i tuoi dati personali verranno eliminati permanentemente. Crediti e storico abbonamenti andranno persi.',
+    deleteAccountSuccess: 'Account eliminato con successo',
+    deleting: 'Eliminazione...',
   },
 };
 
