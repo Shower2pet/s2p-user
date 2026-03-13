@@ -17,6 +17,8 @@ const Profile = () => {
   const { t } = useLanguage();
   const { profile, signOut, user, loading: authLoading } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
