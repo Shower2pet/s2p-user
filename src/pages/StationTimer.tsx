@@ -42,6 +42,7 @@ const StationTimer = () => {
   const [warningShown, setWarningShown] = useState(false);
   const [courtesySeconds, setCourtesySeconds] = useState(60);
   const [rating, setRating] = useState(0);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [sanitizeSeconds, setSanitizeSeconds] = useState(SANITIZE_SECONDS);
   const [cleanupTimerSeconds, setCleanupTimerSeconds] = useState(CLEANUP_TIMER_SECONDS);
   const [cleanupAttempt, setCleanupAttempt] = useState(0);
