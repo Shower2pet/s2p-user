@@ -868,6 +868,18 @@ export const translations: Record<string, Record<string, string>> = {
     showcaseStation: 'Stazione Vetrina',
     showcaseDesc: 'Questa è una stazione espositiva. Non è disponibile per l\'utilizzo.',
     showcaseOnly: 'Solo esposizione',
+
+    // Rating
+    ratingSubmitted: 'Grazie per la tua valutazione!',
+    ratingError: 'Errore nell\'invio della valutazione',
+    reviews: 'recensioni',
+
+    // Account deletion
+    deleteAccount: 'Elimina Account',
+    deleteAccountConfirm: 'Eliminare il tuo account?',
+    deleteAccountDesc: 'Questa azione è irreversibile. Tutti i tuoi dati personali verranno eliminati permanentemente. Crediti e storico abbonamenti andranno persi.',
+    deleteAccountSuccess: 'Account eliminato con successo',
+    deleting: 'Eliminazione...',
   },
 };
 
