@@ -134,11 +134,40 @@ serve(async (req) => {
         log("OFF result", { station: session.station_id, success: ok });
       }
 
-      await supabase
-        .from('wash_sessions')
-        .update({ status: 'COMPLETED', step: 'rating' })
-        .eq('id', session.id)
-        .eq('status', 'ACTIVE');
+      // For TUB stations in 'timer' step, transition to 'cleanup' (not 'rating')
+      // so the tub cleaning flow can run. SHOWER stations and 'courtesy' step go directly to rating.
+      if (session.step === 'timer') {
+        const { data: stationData } = await supabase
+          .from('stations')
+          .select('type')
+          .eq('id', session.station_id)
+          .maybeSingle();
+
+        const stationType = (stationData?.type || '').toUpperCase();
+        const isTub = stationType !== 'BRACCO';
+
+        if (isTub) {
+          log("TUB session — transitioning to cleanup", { station: session.station_id });
+          await supabase
+            .from('wash_sessions')
+            .update({ step: 'cleanup' })
+            .eq('id', session.id)
+            .eq('status', 'ACTIVE');
+        } else {
+          await supabase
+            .from('wash_sessions')
+            .update({ status: 'COMPLETED', step: 'rating' })
+            .eq('id', session.id)
+            .eq('status', 'ACTIVE');
+        }
+      } else {
+        // courtesy step — always complete
+        await supabase
+          .from('wash_sessions')
+          .update({ status: 'COMPLETED', step: 'rating' })
+          .eq('id', session.id)
+          .eq('status', 'ACTIVE');
+      }
 
       processed++;
     }

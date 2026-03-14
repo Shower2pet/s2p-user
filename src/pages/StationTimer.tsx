@@ -131,9 +131,9 @@ const StationTimer = () => {
 
     const unsubscribe = subscribeToSession(session.id, (updated) => {
       setSession(updated);
-      setStep(updated.step as WashStep);
+      const dbStep = updated.step as WashStep;
+      setStep(dbStep);
       if (updated.status === 'COMPLETED') {
-        setStep('rating');
         setIsActive(false);
       }
     });
